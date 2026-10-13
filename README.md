@@ -1,4 +1,59 @@
-# ai-profiles
+# claude-switch
+
+[ai-profiles](https://github.com/bartekczyz/ai-profiles)(`54b8259`, MIT)를 가져와, macOS Claude Desktop용 **signed clone 실행 모드**를 더한 포크입니다. ai-profiles의 프로필 저장 구조, 인증 경로, 사용량 조회, 세션 이동은 그대로 둡니다. 그 위에서 Claude 프로필마다 서명을 건드리지 않은 Claude.app 복제본을 띄웁니다.
+
+> **상태**: 구현은 끝났고, 실제 실행 검증은 아직입니다. 정적 검사(복제·서명·Gatekeeper)와 단위·E2E 테스트는 통과했습니다. 로그인, 권한, Dock, 업데이트 동작은 [검증 가이드](docs/signed-clone-verification.md)에 따라 확인해야 합니다.
+
+## signed clone 모드
+
+| | script (기본) | Distinct Dock icon (wrapper) | **Signed clone** |
+|---|---|---|---|
+| 실행되는 앱 | `/Applications/Claude.app` | 재서명한 복제본 | 서명을 그대로 둔 APFS 복제본 |
+| Dock 구분 | 안 됨 | 프로필 아이콘 | Finder 사용자 지정 아이콘 (프로필 색) |
+| Keychain·권한·passkey·Cowork | 정상 | 다시 로그인·권한 재요청, Cowork 폴더 불가 | 정상 (예상) |
+| Claude 자동 업데이트 | 원본 | 다시 빌드 | 복제본이 스스로 업데이트하고, 버전은 앞으로만 감 |
+
+- **켜는 법**: 프로필 생성·편집에서 Desktop launcher 아래의 **Signed clone**을 켭니다. Claude 프로필에서만 보입니다. Distinct Dock icon과는 함께 켤 수 없습니다.
+- **만들어지는 것**:
+  - `~/Library/Application Support/ai-profiles/profiles/<id>/app.noindex/Claude (<Name>).app` — 복제본. 캐시라서 지워도 다시 만들어집니다.
+  - `/Applications/Claude (<Name>).app` — launcher. ai-profiles로 실행을 넘기고, ai-profiles가 없으면 원본을 엽니다.
+  - `~/Library/LaunchAgents/app.ai-profiles.clone-watch.plist` — 감시 에이전트. signed clone 프로필이 있을 때만 설치됩니다.
+- **기존 데이터 경로를 그대로 씁니다**: `gui-data`(`--user-data-dir`)와 `cli-config`(`CLAUDE_CONFIG_DIR`). 계정 데이터는 자동으로 옮기거나 지우지 않고, 실행 중인 복제본은 교체하지 않습니다.
+- **실행 중이면** 그 프로필의 창을 앞으로 가져옵니다.
+- **업데이트나 Dock 클릭으로 인자 없이 다시 떴을 때**: 20초 이내면 자동으로 종료하고 프로필로 다시 엽니다. 그보다 오래됐으면 확인을 받고, 업데이트 후 열리지 않은 경우에는 알림을 보냅니다.
+- **Claude Desktop이 업데이트되어도 이 앱은 업데이트할 필요가 없습니다**: Claude 버전, 실행 파일, 서명 요건, 아이콘을 모두 실행할 때마다 설치된 앱에서 읽습니다.
+- **처음 로그인할 때는** 다른 Claude 창을 모두 종료하세요. `claude://` 로그인 링크는 실행 중인 Claude 중 하나로 갑니다.
+
+자세한 내용: [설계](docs/signed-clone-design.md) · [검증 가이드](docs/signed-clone-verification.md)
+
+## 빌드
+
+```sh
+pnpm install
+pnpm --filter ai-profiles tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
+# → apps/ai-profiles/src-tauri/target/release/bundle/macos/ai-profiles.app 를 /Applications 로 복사
+```
+
+테스트는 다음과 같이 돌립니다.
+
+```sh
+(cd apps/ai-profiles/src-tauri && cargo test -- --test-threads=1)
+NODE_OPTIONS=--no-webstorage pnpm --filter ai-profiles test   # Node 25+에서는 내장 localStorage가 happy-dom과 충돌해서 필요
+```
+
+`pnpm install`은 lefthook git 훅도 설치합니다. 그중 pre-push 훅의 `cargo clippy --all-targets`는 최신 stable clippy(1.93)에서 upstream 원본 테스트 코드의 lint 2건(`test_support.rs`, `profiles.rs`) 때문에 실패합니다. CI는 `--all-targets` 없이 검사하므로 통과합니다. 훅이 필요 없으면 `pnpm install --ignore-scripts`로 설치하고, 이미 설치했다면 `LEFTHOOK=0 git push`로 건너뛰면 됩니다.
+
+## 원본과의 차이와 주의
+
+- upstream의 release-please·release 워크플로를 제거했습니다(upstream secret이 필요해 이 저장소에서는 실패합니다). CI는 그대로 둡니다.
+- 앱 updater가 이 저장소의 Releases를 봅니다. 릴리스가 없으므로 자동 업데이트도 없습니다. upstream 빌드로 덮어써지는 것을 막기 위해서입니다.
+- 데이터 디렉터리와 식별자(`ai-profiles`, `app.ai-profiles.*`)는 원본과 같습니다. **원본 ai-profiles 앱과 동시에 쓰지 마세요.** 원본은 `signedClone`을 모르므로 저장할 때 이 필드가 사라지고, 해당 프로필은 script 모드로 돌아갑니다(데이터는 안전합니다).
+
+---
+
+아래는 원본 ai-profiles README입니다.
+
+## ai-profiles
 
 > Run multiple Claude and ChatGPT accounts on one Mac — the desktop app and the CLI, side by side — and move coding sessions between them. Free and open-source.
 
