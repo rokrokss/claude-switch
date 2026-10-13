@@ -33,9 +33,16 @@ pub fn desktop_pid(home: &Home, ps_output: &str) -> Option<i32> {
 /// profile's wrapper also runs without arguments while macOS starts it, but
 /// from its own bundle, so it isn't taken for the stock one.
 ///
+/// A profile's signed clone started without arguments (a stray, see
+/// [`crate::launchers::clone::Stray`]) runs on the stock data and config, so it
+/// counts as the stock home's instance too, not as its profile's.
+///
 /// [`find_running_pid`]: crate::launch::find_running_pid
 pub fn desktop_pids(home: &Home, ps_output: &str) -> Vec<i32> {
     let data_dir = home.gui_data_dir.display().to_string();
+    let profiles_root = crate::paths::profiles_root()
+        .map(|root| root.display().to_string())
+        .ok();
     let mut pids = Vec::new();
     for candidate in home.app.spec().gui_bundle_candidates {
         pids.extend(find_running_pids(
@@ -49,6 +56,13 @@ pub fn desktop_pids(home: &Home, ps_output: &str) -> Vec<i32> {
                 candidate.bundle_name, candidate.macos_exec
             );
             pids.extend(pids_ending_with(ps_output, &[bare]));
+            if let Some(root) = &profiles_root {
+                pids.extend(crate::launchers::clone::stray_pids(
+                    ps_output,
+                    root,
+                    candidate.macos_exec,
+                ));
+            }
         }
     }
     let mut seen = HashSet::new();
@@ -188,6 +202,30 @@ mod tests {
         );
 
         assert_eq!(desktop_pid(&home(STOCK_DIR, true), &ps_output), None);
+    }
+
+    #[test]
+    fn a_signed_clone_started_without_its_profile_is_the_stock_instance() {
+        let root = crate::paths::profiles_root().unwrap().display().to_string();
+        let clone = format!("{root}/abc/app.noindex/Claude (Work).app/Contents/MacOS/Claude");
+        let work_data = format!("{root}/abc/gui-data");
+        let ps_output = format!("  740 {clone}\n  741 {clone} --user-data-dir={work_data}\n");
+        let claude = |gui_data_dir: &str, stock: bool| Home {
+            app: AppKind::Claude,
+            ..home(gui_data_dir, stock)
+        };
+
+        assert_eq!(
+            desktop_pids(
+                &claude("/Users/me/Library/Application Support/Claude", true),
+                &ps_output
+            ),
+            vec![740]
+        );
+        assert_eq!(
+            desktop_pids(&claude(&work_data, false), &ps_output),
+            vec![741]
+        );
     }
 
     #[test]

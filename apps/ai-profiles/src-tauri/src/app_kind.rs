@@ -103,6 +103,11 @@ pub struct AppSpec {
     ///
     /// [`cli_config_env`]: AppSpec::cli_config_env
     pub shared_surfaces: &'static [&'static str],
+    /// Whether a profile of this app can run its desktop app from a signed
+    /// clone: an APFS copy of the vendor bundle that keeps the vendor's
+    /// signature, told apart from the original by a Finder custom icon (see
+    /// [`crate::launchers::clone`]). Only Claude, and only on macOS.
+    pub supports_signed_clone: bool,
 }
 
 pub const CLAUDE: AppSpec = AppSpec {
@@ -129,6 +134,7 @@ pub const CLAUDE: AppSpec = AppSpec {
         "skills",
         "workflows",
     ],
+    supports_signed_clone: true,
 };
 
 pub const CODEX: AppSpec = AppSpec {
@@ -160,6 +166,7 @@ pub const CODEX: AppSpec = AppSpec {
     cli_stock_config_dir_name: ".codex",
     has_usage: true,
     shared_surfaces: &["AGENTS.md", "rules", "skills"],
+    supports_signed_clone: false,
 };
 
 /// Borrow the static [`AppSpec`] for a kind.

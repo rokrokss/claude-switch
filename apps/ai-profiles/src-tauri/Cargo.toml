@@ -72,6 +72,7 @@ objc2-app-kit = { version = "0.3", features = [
 ] }
 objc2-foundation = { version = "0.3", features = [
     "NSAppleEventDescriptor",
+    "NSData",
     "objc2-core-services",
     "libc",
     "NSDate",

@@ -59,6 +59,9 @@ pub fn run() {
                         }
                     }
                 }
+                // The clone watch runs this executable, which may have moved
+                // since it was installed.
+                launchers::clone_watch::sync_best_effort();
             });
 
             // Build the macOS app menu manually so we can swap the default

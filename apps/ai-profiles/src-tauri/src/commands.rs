@@ -7,6 +7,7 @@ use crate::app_kind::{spec, AppKind};
 use crate::app_state::{self, AppState, AppStatePatch};
 use crate::deps::{self, Dependencies};
 use crate::error::{AppError, AppResult};
+use crate::launchers::clone_watch;
 use crate::migration::{
     self, ExistingInstall, ExistingInstallSizes, ImportParams, MigrationBackupInfo,
 };
@@ -36,8 +37,9 @@ pub fn list_profiles() -> AppResult<Vec<Profile>> {
 /// otherwise freeze the window for as long. That is what makes the store lock in
 /// `profiles` necessary.
 ///
-/// `distinct_dock_icon` is opt-in: leaving it out means the profile gets the
-/// plain script launcher. Building a wrapper is something the user chooses.
+/// `distinct_dock_icon` and `signed_clone` are opt-in: leaving them out means
+/// the profile gets the plain script launcher. Building a wrapper or a clone is
+/// something the user chooses.
 #[tauri::command(async)]
 pub fn create_profile(
     app: AppKind,
@@ -45,14 +47,18 @@ pub fn create_profile(
     color: String,
     surfaces: Surfaces,
     distinct_dock_icon: Option<bool>,
+    signed_clone: Option<bool>,
 ) -> AppResult<Profile> {
-    profiles::create(
+    let created = profiles::create(
         app,
         &name,
         &color,
         surfaces,
         distinct_dock_icon.unwrap_or(false),
-    )
+        signed_clone.unwrap_or(false),
+    );
+    clone_watch::sync_best_effort();
+    created
 }
 
 #[tauri::command]
@@ -77,12 +83,16 @@ pub fn regenerate_launchers(id: String) -> AppResult<()> {
 #[tauri::command(async)]
 pub fn update_profile(id: String, patch: ProfilePatch) -> AppResult<Profile> {
     ensure_wrapper_not_running(&id)?;
-    profiles::update(&id, patch)
+    let updated = profiles::update(&id, patch);
+    clone_watch::sync_best_effort();
+    updated
 }
 
 #[tauri::command]
 pub fn delete_profile(id: String, move_to_trash: bool) -> AppResult<()> {
-    profiles::delete(&id, move_to_trash)?;
+    let deleted = profiles::delete(&id, move_to_trash);
+    clone_watch::sync_best_effort();
+    deleted?;
     // The profile is gone either way: a dismissal left behind for it is only
     // a stale key, not worth failing the delete over.
     let _ = app_state::forget_profile(&id);
@@ -124,7 +134,9 @@ pub fn toggle_surface(id: String, surface: Surface, enabled: bool) -> AppResult<
     if surface == Surface::Gui && !enabled {
         ensure_wrapper_not_running(&id)?;
     }
-    profiles::toggle_surface(&id, surface, enabled)
+    let toggled = profiles::toggle_surface(&id, surface, enabled);
+    clone_watch::sync_best_effort();
+    toggled
 }
 
 /// What opening a profile's desktop app came to.
@@ -153,8 +165,16 @@ pub struct WrapperBypass {
 /// Runs off the main thread, because it waits for the app to come up: a few
 /// seconds when macOS is assessing a wrapper it has not seen before, and a minute
 /// at the outside.
+///
+/// For a profile with a signed clone that has been running a while without the
+/// profile, this fails with `StrayRunning` unless `quit_stray` says the user
+/// agreed to have it quit (see [`crate::launch::open_profile_with`]).
 #[tauri::command(async)]
-pub fn open_profile_in_app(app: tauri::AppHandle, id: String) -> AppResult<LaunchResult> {
+pub fn open_profile_in_app(
+    app: tauri::AppHandle,
+    id: String,
+    quit_stray: Option<bool>,
+) -> AppResult<LaunchResult> {
     let all = profiles::load()?;
     let profile = all
         .iter()
@@ -168,7 +188,12 @@ pub fn open_profile_in_app(app: tauri::AppHandle, id: String) -> AppResult<Launc
     let focus = |pid: i32| {
         let _ = app.run_on_main_thread(move || crate::launch::focus_pid(pid));
     };
-    let bypass = crate::launch::open_profile(profile, env!("CARGO_PKG_VERSION"), focus)?;
+    let bypass = crate::launch::open_profile_with(
+        profile,
+        env!("CARGO_PKG_VERSION"),
+        focus,
+        quit_stray.unwrap_or(false),
+    )?;
     Ok(LaunchResult {
         profile: profiles::touch_last_used(&id)?,
         wrapper_bypass: bypass.map(|bypass| WrapperBypass {
@@ -231,6 +256,13 @@ pub fn open_default_gui(handle: tauri::AppHandle, app: AppKind, data_dir: String
     let focus = |pid: i32| {
         let _ = handle.run_on_main_thread(move || crate::launch::focus_pid(pid));
     };
+    if app_spec.supports_signed_clone {
+        // A clone just started without its profile holds the stock data, and a
+        // stock launch would only hand itself over to it. Put it back first.
+        if let Err(err) = clone_watch::rehome_fresh_strays(env!("CARGO_PKG_VERSION")) {
+            eprintln!("ai-profiles: {}", err.message());
+        }
+    }
     crate::launch::focus_or_launch(&data_dir, app_spec, focus, || {
         crate::launch::open_new_instance(&data_dir, app_spec, None)?;
         crate::launch::wait_for_new_instance(&data_dir, app_spec);
@@ -655,6 +687,7 @@ mod cli_login_tests {
                 cli: true,
             },
             distinct_dock_icon: false,
+            signed_clone: false,
             last_used_at: None,
         }
     }
@@ -721,6 +754,7 @@ mod running_wrapper_tests {
                 cli: false,
             },
             distinct_dock_icon,
+            signed_clone: false,
             last_used_at: None,
         }
     }

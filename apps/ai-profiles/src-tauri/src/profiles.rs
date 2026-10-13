@@ -40,6 +40,14 @@ pub struct Profile {
     /// profiles saved before this field existed stay as they were.
     #[serde(default)]
     pub distinct_dock_icon: bool,
+    /// Whether the desktop app runs from a signed clone: an APFS copy of the
+    /// vendor app kept under the profile's own directory, signature untouched,
+    /// told apart by a Finder custom icon (see [`crate::launchers::clone`]).
+    /// Never together with `distinct_dock_icon`, and only for an app whose spec
+    /// supports it. Off unless asked for; versions of this app that predate the
+    /// field ignore it and give the profile the plain script launcher.
+    #[serde(default)]
+    pub signed_clone: bool,
     /// Set whenever the user opens the desktop app or copies the CLI
     /// command for this profile. `None` until the first such interaction.
     #[serde(default)]
@@ -56,6 +64,9 @@ pub struct ProfilePatch {
     /// Switching this rebuilds the launcher in the other shape.
     #[serde(default)]
     pub distinct_dock_icon: Option<bool>,
+    /// Switching this rebuilds the launcher, and makes or drops the clone.
+    #[serde(default)]
+    pub signed_clone: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -145,9 +156,11 @@ pub fn create(
     color: &str,
     surfaces: Surfaces,
     distinct_dock_icon: bool,
+    signed_clone: bool,
 ) -> AppResult<Profile> {
     let trimmed = name.trim();
     validate_name(trimmed)?;
+    validate_desktop_mode(app, distinct_dock_icon, signed_clone)?;
     if !is_valid_hex_color(color) {
         return Err(AppError::Validation(format!(
             "color must be a 7-char hex like #7C3AED, got '{color}'"
@@ -177,6 +190,7 @@ pub fn create(
         created_at: Utc::now().to_rfc3339(),
         surfaces,
         distinct_dock_icon,
+        signed_clone,
         last_used_at: None,
     };
 
@@ -218,6 +232,31 @@ pub fn create(
         return Err(err);
     }
     Ok(profile)
+}
+
+/// Checks the desktop launch mode a profile of `app` asks for: a signed clone
+/// only where the app supports one, and never alongside a wrapper — the two
+/// are different launchers at the same path.
+fn validate_desktop_mode(
+    app: AppKind,
+    distinct_dock_icon: bool,
+    signed_clone: bool,
+) -> AppResult<()> {
+    if !signed_clone {
+        return Ok(());
+    }
+    if !app.spec().supports_signed_clone || !cfg!(target_os = "macos") {
+        return Err(AppError::Validation(format!(
+            "a signed clone is not available for {}",
+            app.spec().display_name
+        )));
+    }
+    if distinct_dock_icon {
+        return Err(AppError::Validation(
+            "a profile can't have both a distinct Dock icon and a signed clone".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 fn is_valid_hex_color(color: &str) -> bool {
@@ -284,6 +323,12 @@ fn patched(original: &Profile, patch: ProfilePatch, all: &[Profile]) -> AppResul
         )));
     }
 
+    let distinct_dock_icon = patch
+        .distinct_dock_icon
+        .unwrap_or(original.distinct_dock_icon);
+    let signed_clone = patch.signed_clone.unwrap_or(original.signed_clone);
+    validate_desktop_mode(original.app, distinct_dock_icon, signed_clone)?;
+
     Ok(Profile {
         id: original.id.clone(),
         app: original.app,
@@ -292,9 +337,8 @@ fn patched(original: &Profile, patch: ProfilePatch, all: &[Profile]) -> AppResul
         color: new_color,
         created_at: original.created_at.clone(),
         surfaces: original.surfaces.clone(),
-        distinct_dock_icon: patch
-            .distinct_dock_icon
-            .unwrap_or(original.distinct_dock_icon),
+        distinct_dock_icon,
+        signed_clone,
         last_used_at: original.last_used_at.clone(),
     })
 }
@@ -409,6 +453,9 @@ pub fn toggle_surface(id: &str, surface: Surface, enabled: bool) -> AppResult<Pr
         match surface {
             Surface::Gui => {
                 let _ = crate::launchers::gui::remove(&profile.name, profile.app.spec());
+                // A clone is only ever a cache of the vendor app: without a
+                // desktop surface there is nothing to keep it for.
+                crate::launchers::clone::remove_unless_in_use(&profile.id);
                 profile.surfaces.gui = false;
             }
             Surface::Cli => {
@@ -612,6 +659,7 @@ mod tests {
                 cli: false,
             },
             distinct_dock_icon: false,
+            signed_clone: false,
             last_used_at: None,
         }
     }
@@ -783,6 +831,7 @@ mod tests {
                 cli: true,
             },
             distinct_dock_icon: false,
+            signed_clone: false,
             last_used_at: None,
         };
         let raw = serde_json::to_string(&original).unwrap();
@@ -826,6 +875,7 @@ mod tests {
             name: name.map(str::to_owned),
             color: color.map(str::to_owned),
             distinct_dock_icon: dock,
+            signed_clone: None,
         }
     }
 
@@ -916,6 +966,7 @@ mod tests {
                 cli: false,
             },
             true,
+            false,
         )
         .unwrap();
         let launcher = gui_launcher_path(&created.name, created.app.spec());
@@ -973,6 +1024,7 @@ mod tests {
                 cli: true,
             },
             false,
+            false,
         )
         .unwrap();
 
@@ -982,6 +1034,7 @@ mod tests {
                 name: Some("Renamed".into()),
                 color: None,
                 distinct_dock_icon: None,
+                signed_clone: None,
             },
         )
         .unwrap();
@@ -1018,6 +1071,7 @@ mod tests {
                 cli: false,
             },
             false,
+            false,
         )
         .unwrap();
         let second = create(
@@ -1029,6 +1083,7 @@ mod tests {
                 cli: false,
             },
             false,
+            false,
         )
         .unwrap();
 
@@ -1038,6 +1093,7 @@ mod tests {
                 name: Some("Alpha".into()),
                 color: None,
                 distinct_dock_icon: None,
+                signed_clone: None,
             },
         )
         .unwrap_err();
@@ -1068,6 +1124,7 @@ mod tests {
                 gui: false,
                 cli: true,
             },
+            false,
             false,
         )
         .unwrap();
@@ -1106,6 +1163,7 @@ mod tests {
                 gui: false,
                 cli: true,
             },
+            false,
             false,
         )
         .unwrap();

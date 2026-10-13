@@ -59,8 +59,31 @@ pub fn app_state_json_path() -> AppResult<PathBuf> {
     Ok(app_data_dir()?.join("state.json"))
 }
 
+/// The directory every profile's own directory sits in.
+pub fn profiles_root() -> AppResult<PathBuf> {
+    Ok(app_data_dir()?.join("profiles"))
+}
+
 pub fn profile_dir(id: &str) -> AppResult<PathBuf> {
-    Ok(app_data_dir()?.join("profiles").join(id))
+    Ok(profiles_root()?.join(id))
+}
+
+/// Name of the directory, inside a profile's own, that holds its signed clone
+/// of the vendor app. The `.noindex` suffix keeps Spotlight out of it, so the
+/// clone is never offered as an app to open on its own — opened that way it
+/// would start without the profile's arguments.
+pub const CLONE_DIR_NAME: &str = "app.noindex";
+
+/// Where profile `id` keeps its signed clone and the record of it.
+pub fn clone_dir(id: &str) -> AppResult<PathBuf> {
+    Ok(profile_dir(id)?.join(CLONE_DIR_NAME))
+}
+
+/// The signed clone of profile `id`, named like its launcher:
+/// `<clone_dir>/Claude (<name>).app`. The file name is what the Dock and
+/// Cmd-Tab label the running clone with.
+pub fn clone_bundle_path(id: &str, name: &str, spec: &AppSpec) -> AppResult<PathBuf> {
+    Ok(clone_dir(id)?.join(format!("{} ({name}).app", spec.launcher_prefix)))
 }
 
 pub fn ensure_app_dir() -> AppResult<()> {
@@ -244,6 +267,18 @@ mod tests {
         let id = "11111111-1111-1111-1111-111111111111";
         let path = cli_config_dir(id).unwrap();
         assert!(path.ends_with(format!("profiles/{id}/cli-config")));
+    }
+
+    #[test]
+    fn a_signed_clone_lives_in_a_noindex_dir_inside_its_profile() {
+        let id = "11111111-1111-1111-1111-111111111111";
+        let path = clone_bundle_path(id, "Work", &CLAUDE).unwrap();
+        assert!(path.ends_with(format!("profiles/{id}/app.noindex/Claude (Work).app")));
+        assert_eq!(path.parent().unwrap(), clone_dir(id).unwrap());
+        assert_eq!(
+            profile_dir(id).unwrap().parent().unwrap(),
+            profiles_root().unwrap()
+        );
     }
 
     #[test]

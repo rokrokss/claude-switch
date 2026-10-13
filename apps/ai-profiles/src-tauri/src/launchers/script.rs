@@ -32,6 +32,64 @@ DATA_DIR="{profiles_base}/{profile_id}/gui-data"
     )
 }
 
+/// Marks the script of a launcher that hands its launches to ai-profiles, in
+/// the signed-clone shape: the line that does it.
+const HANDOFF_MARKER: &str = "exec \"$HOST\" --open-profile";
+
+/// Generate the script of a profile whose desktop app runs from a signed clone.
+///
+/// The launcher stays a script launcher — its own bundle id, its badged icon,
+/// at `/Applications/<App> (<Name>).app` — but hands the launch to the
+/// ai-profiles executable at `host_binary` with `--open-profile <id>`, which
+/// focuses the profile if it runs and otherwise opens it from its clone,
+/// making or refreshing that first (see [`crate::launch::open_profile`]).
+///
+/// Should ai-profiles not be at `host_binary` any more, the script carries on
+/// as [`launcher_script`] does, opening the stock app on the profile's data, so
+/// the profile never becomes unlaunchable because of where ai-profiles went.
+pub fn handoff_launcher_script(
+    profile_id: &str,
+    spec: &AppSpec,
+    host_binary: &str,
+    gui_app_target: &str,
+) -> String {
+    let fallback = launcher_script(profile_id, spec, gui_app_target);
+    let fallback_body = fallback
+        .split_once('\n')
+        .map_or(fallback.as_str(), |(_, rest)| rest);
+    format!(
+        r#"#!/bin/bash
+# ai-profiles launcher — profile id: {profile_id} — mode: signed clone
+# Hands the launch to ai-profiles, which opens this profile from its signed
+# clone, or focuses it if it is running. Without ai-profiles at HOST, the
+# profile opens the stock way below.
+HOST={host}
+if [ -x "$HOST" ]; then
+  {HANDOFF_MARKER} "{profile_id}"
+fi
+{fallback_body}"#,
+        host = shell_quote(host_binary),
+    )
+}
+
+/// Pure: whether `script` is a launcher script in the signed-clone shape.
+pub fn hands_off(script: &str) -> bool {
+    script.contains(HANDOFF_MARKER)
+}
+
+/// Pure: the ai-profiles executable a signed-clone launcher script hands its
+/// launches to, as [`handoff_launcher_script`] wrote it.
+pub fn handoff_host(script: &str) -> Option<String> {
+    let quoted = script.lines().find_map(|line| line.strip_prefix("HOST="))?;
+    let inner = quoted.strip_prefix('\'')?.strip_suffix('\'')?;
+    Some(inner.replace("'\\''", "'"))
+}
+
+/// `text` as one single-quoted shell word.
+fn shell_quote(text: &str) -> String {
+    format!("'{}'", text.replace('\'', "'\\''"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,6 +137,48 @@ mod tests {
             "CONFIG_DIR=\"$HOME/Library/Application Support/ai-profiles/profiles/abc/cli-config\""
         ));
         assert!(script.contains(r#"export CODEX_HOME="$CONFIG_DIR""#));
+    }
+
+    const HOST: &str = "/Applications/ai-profiles.app/Contents/MacOS/ai-profiles";
+
+    #[test]
+    fn a_handoff_script_hands_the_launch_to_ai_profiles_first() {
+        let script = handoff_launcher_script("abc", &CLAUDE, HOST, "/Applications/Claude.app");
+        assert!(script.starts_with("#!/bin/bash\n"));
+        assert!(script.contains("# ai-profiles launcher — profile id: abc — mode: signed clone"));
+        assert!(script.contains(&format!("HOST='{HOST}'")));
+        assert!(script.contains(r#"exec "$HOST" --open-profile "abc""#));
+        let handoff = script.find("--open-profile").unwrap();
+        let fallback = script.find("exec open -n -a").unwrap();
+        assert!(
+            handoff < fallback,
+            "ai-profiles is tried before the stock app"
+        );
+    }
+
+    #[test]
+    fn a_handoff_script_falls_back_to_the_stock_launch_with_the_config_home() {
+        let script = handoff_launcher_script("abc", &CLAUDE, HOST, "/Applications/Claude.app");
+        assert!(script.contains(
+            r#"exec open -n -a "/Applications/Claude.app" --args --user-data-dir="$DATA_DIR""#
+        ));
+        assert!(script.contains(r#"export CLAUDE_CONFIG_DIR="$CONFIG_DIR""#));
+        assert_eq!(script.matches("#!/bin/bash").count(), 1);
+    }
+
+    #[test]
+    fn the_handoff_host_is_read_back_however_it_is_quoted() {
+        let script = handoff_launcher_script("abc", &CLAUDE, HOST, "/Applications/Claude.app");
+        assert!(hands_off(&script));
+        assert_eq!(handoff_host(&script).as_deref(), Some(HOST));
+
+        let odd = "/Users/o'neil/Apps/ai profiles.app/Contents/MacOS/ai-profiles";
+        let script = handoff_launcher_script("abc", &CLAUDE, odd, "/Applications/Claude.app");
+        assert_eq!(handoff_host(&script).as_deref(), Some(odd));
+
+        let plain = launcher_script("abc", &CLAUDE, "/Applications/Claude.app");
+        assert!(!hands_off(&plain));
+        assert_eq!(handoff_host(&plain), None);
     }
 
     #[test]

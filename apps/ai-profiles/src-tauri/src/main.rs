@@ -3,7 +3,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use ai_profiles_lib::cli::{invocation, open_profile, Invocation};
+use ai_profiles_lib::cli::{invocation, open_profile, watch_clones, Invocation};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -15,6 +15,7 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        Invocation::WatchClones => watch_clones(),
         Invocation::Misuse(message) => {
             eprintln!("ai-profiles: {message}");
             std::process::exit(2);

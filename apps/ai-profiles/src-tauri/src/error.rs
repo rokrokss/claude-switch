@@ -20,6 +20,12 @@ pub enum AppError {
     /// by installing it, not a failure that trying again gets past.
     #[error("not installed: {0}")]
     NotInstalled(String),
+
+    /// A profile's signed clone is running without the profile — on the default
+    /// account — and has been for a while, so it isn't quit without asking.
+    /// Opening the profile again with the user's go-ahead quits it first.
+    #[error("stray running: {0}")]
+    StrayRunning(String),
 }
 
 impl AppError {
@@ -31,7 +37,8 @@ impl AppError {
             AppError::Json(error) => error.to_string(),
             AppError::Validation(message)
             | AppError::NotFound(message)
-            | AppError::NotInstalled(message) => message.clone(),
+            | AppError::NotInstalled(message)
+            | AppError::StrayRunning(message) => message.clone(),
         }
     }
 }
@@ -47,6 +54,7 @@ impl AppError {
             AppError::Validation(_) => AppError::Validation(message),
             AppError::NotFound(_) => AppError::NotFound(message),
             AppError::NotInstalled(_) => AppError::NotInstalled(message),
+            AppError::StrayRunning(_) => AppError::StrayRunning(message),
         }
     }
 }
@@ -62,6 +70,7 @@ impl Serialize for AppError {
             AppError::Validation(_) => "Validation",
             AppError::NotFound(_) => "NotFound",
             AppError::NotInstalled(_) => "NotInstalled",
+            AppError::StrayRunning(_) => "StrayRunning",
         };
         let mut map = serializer.serialize_map(Some(2))?;
         map.serialize_entry("kind", kind)?;

@@ -11,7 +11,8 @@
 //! A profile with a wrapper (see [`crate::launchers::wrapper`]) is opened
 //! through it, and never becomes unlaunchable because of it: whatever is wrong
 //! with the wrapper, the profile is started the stock way instead and the caller
-//! is told why.
+//! is told why. The same holds for a profile with a signed clone (see
+//! [`crate::launchers::clone`]), which is opened from its clone.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -23,8 +24,8 @@ use profile_shim::VENDOR_BINARY_SUFFIX;
 
 use crate::app_kind::AppSpec;
 use crate::error::{AppError, AppResult};
-use crate::launchers::gui;
 use crate::launchers::wrapper::{self, WrapperState};
+use crate::launchers::{clone, gui};
 use crate::paths::{
     cli_config_dir, gui_launcher_path, profile_dir, resolve_gui_app, ResolvedGuiApp,
 };
@@ -237,11 +238,28 @@ pub fn open_new_instance(
 ) -> AppResult<()> {
     let resolved = crate::paths::resolve_gui_app(spec)
         .ok_or_else(|| AppError::Validation(format!("{} isn't installed", spec.display_name)))?;
+    open_instance_of(&resolved.bundle_path, data_dir, config_env)
+}
+
+/// [`open_new_instance`] for the app bundle at `bundle`, whichever it is: the
+/// stock app, or a profile's signed clone of it.
+///
+/// Always through LaunchServices, never by running the executable directly: an
+/// app LaunchServices starts is responsible for itself, so macOS asks for its
+/// permissions (microphone, folders) in its own name. Started as a child of
+/// ai-profiles it would ask in ai-profiles' name instead. And always `-n`: a
+/// clone shares the vendor's bundle id, so without it `open` would bring the
+/// running stock app forward instead of starting the clone.
+fn open_instance_of(
+    bundle: &Path,
+    data_dir: &str,
+    config_env: Option<(&str, &Path)>,
+) -> AppResult<()> {
     let mut command = open_command();
     command
         .arg("-n")
         .arg("-a")
-        .arg(&resolved.bundle_path)
+        .arg(bundle)
         .arg("--args")
         .arg(format!("--user-data-dir={data_dir}"));
     if let Some((name, value)) = config_env {
@@ -251,7 +269,7 @@ pub fn open_new_instance(
     if !status.success() {
         return Err(AppError::Validation(format!(
             "`open -n -a {} --args --user-data-dir={data_dir}` exited with status {status}",
-            resolved.bundle_path.display()
+            bundle.display()
         )));
     }
     Ok(())
@@ -323,6 +341,8 @@ pub enum Bypass {
     NeverStarted,
     /// The profile's process showed up and then went away again.
     ExitedEarly,
+    /// The profile's signed clone couldn't be made ready.
+    CloneFailed(String),
 }
 
 impl fmt::Display for Bypass {
@@ -344,6 +364,13 @@ impl fmt::Display for Bypass {
             }
             Bypass::NeverStarted => write!(formatter, "The launcher didn't start."),
             Bypass::ExitedEarly => write!(formatter, "The launcher quit right after starting."),
+            Bypass::CloneFailed(detail) => {
+                write!(
+                    formatter,
+                    "The signed clone couldn't be prepared: {}",
+                    brief(detail)
+                )
+            }
         }
     }
 }
@@ -494,7 +521,7 @@ fn watch_start(pause: Duration, mut look: impl FnMut() -> Sighting) -> Result<()
 }
 
 /// Pure: whether any process in `ps_output` is running from inside `bundle`.
-fn runs_from(ps_output: &str, bundle: &Path) -> bool {
+pub(crate) fn runs_from(ps_output: &str, bundle: &Path) -> bool {
     let inside = format!("{}/Contents/", bundle.display());
     ps_output.lines().any(|line| line.contains(&inside))
 }
@@ -598,7 +625,15 @@ impl Effects for ProfileLaunch<'_> {
     }
 
     fn open_script_launcher(&mut self) -> AppResult<()> {
-        open_bundle(&self.launcher)?;
+        // A launcher left in the signed-clone shape hands every launch back to
+        // ai-profiles, so opening it for a profile without a clone would come
+        // straight back here. Start the stock app instead; the launcher is
+        // rebuilt in the right shape when the app next starts.
+        if gui::hands_off(&self.launcher) {
+            self.open_stock()?;
+        } else {
+            open_bundle(&self.launcher)?;
+        }
         // The launcher only shells out again, so `open` returning says nothing
         // about the app being up. Without this the caller is told the launch is
         // over before there is a window, and a profile with a script launcher
@@ -651,11 +686,27 @@ pub fn open_profile(
     version: &str,
     focus: impl FnOnce(i32),
 ) -> AppResult<Option<Bypass>> {
+    open_profile_with(profile, version, focus, false)
+}
+
+/// [`open_profile`], saying what to do about a stray of the profile's signed
+/// clone that has been running a while (see [`clone::Stray`]): with
+/// `quit_old_stray` it is quit first, as a fresh one always is; without, the
+/// launch is refused with [`AppError::StrayRunning`] so the user can be asked.
+pub fn open_profile_with(
+    profile: &Profile,
+    version: &str,
+    focus: impl FnOnce(i32),
+    quit_old_stray: bool,
+) -> AppResult<Option<Bypass>> {
     let spec = profile.app.spec();
     let data_dir = profile_dir(&profile.id)?
         .join("gui-data")
         .display()
         .to_string();
+    if profile.signed_clone {
+        return open_signed_clone(profile, version, &data_dir, focus, quit_old_stray);
+    }
     let mut effects = ProfileLaunch {
         profile,
         version,
@@ -670,6 +721,123 @@ pub fn open_profile(
         Ok(())
     })?;
     Ok(bypass)
+}
+
+/// What opening a profile from its signed clone does to the system, kept apart
+/// from the decisions around it like [`Effects`].
+trait CloneEffects {
+    /// Bring the clone into shape (see [`clone::ensure`]) and say where it is.
+    fn ensure_clone(&mut self) -> AppResult<PathBuf>;
+    /// Start the clone at `bundle` on the profile's data and see that it stays up.
+    fn open_clone(&mut self, bundle: &Path) -> Result<(), Bypass>;
+    /// Start the vendor app on the profile's data, without the clone.
+    fn open_stock(&mut self) -> AppResult<()>;
+}
+
+/// Start a profile's app from its signed clone, or the stock way if the clone
+/// can't be made ready or doesn't come up. Returns why the clone was bypassed,
+/// if it was; fails only if the stock app cannot be started either.
+fn launch_clone_with<E: CloneEffects>(effects: &mut E) -> AppResult<Option<Bypass>> {
+    let opened = match effects.ensure_clone() {
+        Ok(bundle) => effects.open_clone(&bundle),
+        Err(err) => Err(Bypass::CloneFailed(err.message())),
+    };
+    match opened {
+        Ok(()) => Ok(None),
+        Err(bypass) => {
+            effects.open_stock().map_err(|err| {
+                AppError::Validation(format!(
+                    "{bypass} Opening the stock app failed too: {}",
+                    err.message()
+                ))
+            })?;
+            Ok(Some(bypass))
+        }
+    }
+}
+
+/// The real thing: one signed-clone launch, against the actual machine.
+struct CloneLaunch<'a> {
+    profile: &'a Profile,
+    version: &'a str,
+    vendor: &'a ResolvedGuiApp,
+    /// The vendor's executable, as its Info.plist names it now.
+    exec: &'a str,
+    data_dir: &'a str,
+}
+
+impl CloneEffects for CloneLaunch<'_> {
+    fn ensure_clone(&mut self) -> AppResult<PathBuf> {
+        clone::ensure(self.profile, self.vendor, self.version)
+    }
+
+    fn open_clone(&mut self, bundle: &Path) -> Result<(), Bypass> {
+        let config_home =
+            cli_config_dir(&self.profile.id).map_err(|err| Bypass::OpenFailed(err.message()))?;
+        let spec = self.profile.app.spec();
+        open_instance_of(
+            bundle,
+            self.data_dir,
+            Some((spec.cli_config_env, config_home.as_path())),
+        )
+        .map_err(|err| Bypass::OpenFailed(err.message()))?;
+        // macOS may hold the first run of a clone at a new path while it assesses
+        // it, as it does a wrapper's, so the same watch tells slow from failed.
+        watch_start(LOOK_INTERVAL, || sighting(self.data_dir, self.exec, bundle))
+    }
+
+    fn open_stock(&mut self) -> AppResult<()> {
+        let config_home = cli_config_dir(&self.profile.id)?;
+        let spec = self.profile.app.spec();
+        open_instance_of(
+            &self.vendor.bundle_path,
+            self.data_dir,
+            Some((spec.cli_config_env, config_home.as_path())),
+        )?;
+        wait_until_up(LOOK_INTERVAL, SETTLE_LOOKS, || {
+            seems_up(self.data_dir, self.exec)
+        });
+        Ok(())
+    }
+}
+
+/// Open `profile` from its signed clone, or focus it if it runs.
+///
+/// Strays of the clone come first: a stray is invisible to the data-dir check
+/// that finds a running profile, so without this an open would start a second
+/// instance from the same bundle. Fresh strays are quit; an older one is only
+/// quit with `quit_old_stray`, and otherwise refuses the launch.
+fn open_signed_clone(
+    profile: &Profile,
+    version: &str,
+    data_dir: &str,
+    focus: impl FnOnce(i32),
+    quit_old_stray: bool,
+) -> AppResult<Option<Bypass>> {
+    let spec = profile.app.spec();
+    let vendor = resolve_gui_app(spec)
+        .ok_or_else(|| AppError::Validation(format!("{} isn't installed", spec.display_name)))?;
+    let exec = clone::vendor_executable(&vendor);
+
+    if let Some(stray) = clone::settle_strays(&profile.id, &exec, quit_old_stray)? {
+        return Err(AppError::StrayRunning(format!(
+            "{} ({}) is running without its profile, on your default {} account (pid {}). \
+             Quit it and open it again as {}?",
+            spec.display_name, profile.name, spec.display_name, stray.pid, profile.name
+        )));
+    }
+
+    if let Some(pid) = running_pid(data_dir, &exec)? {
+        focus(pid);
+        return Ok(None);
+    }
+    launch_clone_with(&mut CloneLaunch {
+        profile,
+        version,
+        vendor: &vendor,
+        exec: &exec,
+        data_dir,
+    })
 }
 
 #[cfg(test)]
@@ -1214,6 +1382,95 @@ mod tests {
         assert!(error.contains(&Bypass::NeverStarted.to_string()), "{error}");
     }
 
+    /// A signed-clone launch whose steps succeed or fail as told, recording
+    /// what it was asked to do.
+    #[derive(Default)]
+    struct FakeClone {
+        ensure_fails: bool,
+        open_fails: bool,
+        stock_fails: bool,
+        calls: Vec<&'static str>,
+    }
+
+    impl CloneEffects for FakeClone {
+        fn ensure_clone(&mut self) -> AppResult<PathBuf> {
+            self.calls.push("ensure");
+            if self.ensure_fails {
+                return Err(AppError::Validation("cp failed".into()));
+            }
+            Ok(PathBuf::from("/clone/Claude (Work).app"))
+        }
+
+        fn open_clone(&mut self, bundle: &Path) -> Result<(), Bypass> {
+            assert_eq!(bundle, Path::new("/clone/Claude (Work).app"));
+            self.calls.push("open_clone");
+            if self.open_fails {
+                return Err(Bypass::ExitedEarly);
+            }
+            Ok(())
+        }
+
+        fn open_stock(&mut self) -> AppResult<()> {
+            self.calls.push("open_stock");
+            if self.stock_fails {
+                return Err(AppError::Validation("no app".into()));
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_ready_clone_is_opened_and_the_stock_app_left_alone() {
+        let mut fake = FakeClone::default();
+        assert_eq!(launch_clone_with(&mut fake).unwrap(), None);
+        assert_eq!(fake.calls, vec!["ensure", "open_clone"]);
+    }
+
+    #[test]
+    fn a_clone_that_cannot_be_made_ready_falls_back_to_the_stock_app() {
+        let mut fake = FakeClone {
+            ensure_fails: true,
+            ..FakeClone::default()
+        };
+        let bypass = launch_clone_with(&mut fake).unwrap();
+        assert!(
+            matches!(&bypass, Some(Bypass::CloneFailed(detail)) if detail.contains("cp failed")),
+            "{bypass:?}"
+        );
+        assert_eq!(fake.calls, vec!["ensure", "open_stock"]);
+        assert!(bypass
+            .unwrap()
+            .to_string()
+            .starts_with("The signed clone couldn't be prepared"));
+    }
+
+    #[test]
+    fn a_clone_that_does_not_stay_up_falls_back_to_the_stock_app() {
+        let mut fake = FakeClone {
+            open_fails: true,
+            ..FakeClone::default()
+        };
+        assert_eq!(
+            launch_clone_with(&mut fake).unwrap(),
+            Some(Bypass::ExitedEarly)
+        );
+        assert_eq!(fake.calls, vec!["ensure", "open_clone", "open_stock"]);
+    }
+
+    #[test]
+    fn a_clone_launch_fails_only_when_the_stock_app_fails_too() {
+        let mut fake = FakeClone {
+            open_fails: true,
+            stock_fails: true,
+            ..FakeClone::default()
+        };
+        let err = launch_clone_with(&mut fake).unwrap_err();
+        assert!(
+            err.message().contains("Opening the stock app failed too"),
+            "{err:?}"
+        );
+    }
+
     /// The fixture of an opted-in profile, for the opt-in tests below.
     fn wrapped_profile() -> Profile {
         Profile {
@@ -1228,6 +1485,7 @@ mod tests {
                 cli: false,
             },
             distinct_dock_icon: true,
+            signed_clone: false,
             last_used_at: None,
         }
     }

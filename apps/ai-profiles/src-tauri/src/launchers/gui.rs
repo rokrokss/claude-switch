@@ -6,7 +6,7 @@ use std::sync::{Mutex, PoisonError};
 use crate::app_kind::AppSpec;
 use crate::error::{AppError, AppResult};
 use crate::launchers::wrapper::{self, WrapperRequest};
-use crate::launchers::{icons, plist, script};
+use crate::launchers::{clone, icons, plist, script};
 use crate::paths::{
     cli_config_dir, gui_launcher_path, gui_launcher_path_with_prefix, profile_dir, resolve_gui_app,
     stock_cli_config_dir, ResolvedGuiApp,
@@ -23,7 +23,9 @@ static BUILDING: Mutex<()> = Mutex::new(());
 /// Build the launcher .app bundle for `profile` at
 /// `/Applications/<App> (<Name>).app/`, in the shape the profile asks for: a
 /// script that opens the stock app, or, with `distinct_dock_icon`, a wrapper
-/// that is an app in its own right and so gets a Dock tile of its own.
+/// that is an app in its own right and so gets a Dock tile of its own, or, with
+/// `signed_clone`, a script that hands the launch to ai-profiles, which opens the
+/// profile's signed clone (made here first, see [`clone::ensure`]).
 /// Idempotent: if the bundle already exists it's torn down and rebuilt.
 /// Returns the path to the generated .app.
 pub fn generate(profile: &Profile, version: &str) -> AppResult<PathBuf> {
@@ -33,10 +35,19 @@ pub fn generate(profile: &Profile, version: &str) -> AppResult<PathBuf> {
         .ok_or_else(|| AppError::Validation(format!("{} isn't installed", spec.display_name)))?;
     let bundle = gui_launcher_path(&profile.name, spec);
 
-    if profile.distinct_dock_icon {
+    if profile.signed_clone {
+        // The clone first: should it fail, the launcher is left as it was
+        // rather than handing launches to a profile with no clone to open.
+        clone::ensure(profile, &resolved_gui_app, version)?;
+        build_script_launcher(profile, version, &resolved_gui_app, &bundle)?;
+    } else if profile.distinct_dock_icon {
         build_wrapper(profile, version, &resolved_gui_app, &bundle)?;
     } else {
         build_script_launcher(profile, version, &resolved_gui_app, &bundle)?;
+    }
+    if !profile.signed_clone {
+        // Left over from when the profile had one: a clone is only a cache.
+        clone::remove_unless_in_use(&profile.id);
     }
 
     // The desktop app's agent reads the profile's config home, so give it the
@@ -90,12 +101,33 @@ pub fn outdated(profile: &Profile, bundle: &Path, version: &str) -> bool {
     if script == profile.distinct_dock_icon {
         return true;
     }
+    if script && !handoff_current(bundle, profile.signed_clone) {
+        return true;
+    }
     let built_by = if script {
         text("CFBundleVersion")
     } else {
         text(wrapper::BUILT_BY_KEY)
     };
     built_by != Some(version) || !exports(bundle, &info, profile.app.spec().cli_config_env)
+}
+
+/// Pure-ish: whether the script launcher at `bundle` is in the shape a profile
+/// with (or without) a signed clone needs: handing launches to ai-profiles at a
+/// path that still holds it, or not handing them off at all.
+fn handoff_current(bundle: &Path, signed_clone: bool) -> bool {
+    let script = fs::read_to_string(bundle.join("Contents/MacOS/launcher")).unwrap_or_default();
+    if !script::hands_off(&script) {
+        return !signed_clone;
+    }
+    signed_clone && script::handoff_host(&script).is_some_and(|host| Path::new(&host).exists())
+}
+
+/// Whether the launcher at `bundle` is a script launcher in the signed-clone
+/// shape, which hands every launch to ai-profiles.
+pub fn hands_off(bundle: &Path) -> bool {
+    fs::read_to_string(bundle.join("Contents/MacOS/launcher"))
+        .is_ok_and(|script| script::hands_off(&script))
 }
 
 /// Whether the launcher at `bundle` sets `env`, its app's config-home env var,
@@ -190,8 +222,20 @@ fn build_script_launcher(
     let plist_bytes = plist::info_plist(profile, version)?;
     fs::write(contents.join("Info.plist"), plist_bytes)?;
 
-    let script_text =
-        script::launcher_script(&profile.id, spec, &app.bundle_path.display().to_string());
+    let target = app.bundle_path.display().to_string();
+    let script_text = if profile.signed_clone {
+        // Where the launcher hands launches to. Recorded rather than assumed,
+        // like a wrapper's shim, and the launcher is rebuilt if it moves.
+        let host_binary = std::env::current_exe().map_err(AppError::Io)?;
+        script::handoff_launcher_script(
+            &profile.id,
+            spec,
+            &host_binary.display().to_string(),
+            &target,
+        )
+    } else {
+        script::launcher_script(&profile.id, spec, &target)
+    };
     let launcher_path = macos.join("launcher");
     fs::write(&launcher_path, script_text)?;
     let mut perms = fs::metadata(&launcher_path)?.permissions();
@@ -343,6 +387,7 @@ mod tests {
                 cli: false,
             },
             distinct_dock_icon: false,
+            signed_clone: false,
             last_used_at: None,
         }
     }
@@ -598,6 +643,52 @@ mod tests {
             ],
         );
         assert!(exports_config_home(&wrapper, "CLAUDE_CONFIG_DIR"));
+    }
+
+    #[test]
+    fn a_script_launcher_in_the_wrong_handoff_shape_is_outdated() {
+        let dir = tempfile::tempdir().unwrap();
+        let profile = fixture();
+        let cloned = Profile {
+            signed_clone: true,
+            ..fixture()
+        };
+        let ours = plist::bundle_identifier(&profile);
+        let bundle = launcher_bundle(
+            dir.path(),
+            "Script.app",
+            &[
+                ("CFBundleIdentifier", &ours),
+                ("CFBundleExecutable", "launcher"),
+                ("CFBundleVersion", "1.3.0"),
+            ],
+        );
+        let macos = bundle.join("Contents/MacOS");
+        fs::create_dir_all(&macos).unwrap();
+
+        // A plain script: right for a profile without a clone only.
+        with_launcher_script(&bundle, &profile);
+        assert!(!outdated(&profile, &bundle, "1.3.0"));
+        assert!(outdated(&cloned, &bundle, "1.3.0"));
+        assert!(!hands_off(&bundle));
+
+        // A handoff to an ai-profiles that is there: right for the clone only.
+        let host = dir.path().join("ai-profiles");
+        fs::write(&host, b"").unwrap();
+        let handoff = script::handoff_launcher_script(
+            &profile.id,
+            profile.app.spec(),
+            &host.display().to_string(),
+            "/Applications/Claude.app",
+        );
+        fs::write(macos.join("launcher"), &handoff).unwrap();
+        assert!(hands_off(&bundle));
+        assert!(!outdated(&cloned, &bundle, "1.3.0"));
+        assert!(outdated(&profile, &bundle, "1.3.0"));
+
+        // A handoff to an ai-profiles that has gone: rebuilt.
+        fs::remove_file(&host).unwrap();
+        assert!(outdated(&cloned, &bundle, "1.3.0"));
     }
 
     #[test]

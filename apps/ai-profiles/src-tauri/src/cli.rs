@@ -9,9 +9,17 @@
 //! `ai-profiles --open-profile <id>` opens one profile through the usual route
 //! — which rebuilds a stale wrapper on the way — and exits, without ever
 //! starting Tauri or showing a window.
+//!
+//! The launcher of a profile with a signed clone hands every launch here the
+//! same way, and the clone watch LaunchAgent runs `ai-profiles --watch-clones`
+//! (see [`crate::launchers::clone_watch`]).
 
+use crate::error::AppError;
 use crate::launch;
+use crate::launchers::clone_watch;
 use crate::profiles;
+
+pub use clone_watch::WATCH_CLONES_FLAG;
 
 /// Flag that opens one profile and exits, instead of starting the GUI. Defined
 /// with the shim's keys, because the shim is what passes it.
@@ -24,6 +32,8 @@ pub enum Invocation<'a> {
     Gui,
     /// Open this profile's desktop app, then exit.
     OpenProfile(&'a str),
+    /// Run the clone watch until stopped.
+    WatchClones,
     /// The arguments named a mode without giving it what it needs.
     Misuse(String),
 }
@@ -36,6 +46,9 @@ pub enum Invocation<'a> {
 /// stop the app from opening.
 pub fn invocation(args: &[String]) -> Invocation<'_> {
     let Some(offset) = args.iter().skip(1).position(|arg| arg == OPEN_PROFILE_FLAG) else {
+        if args.iter().skip(1).any(|arg| arg == WATCH_CLONES_FLAG) {
+            return Invocation::WatchClones;
+        }
         return Invocation::Gui;
     };
     match args.get(offset + 2) {
@@ -61,14 +74,48 @@ pub fn open_profile(id: &str) -> Result<(), String> {
         return Err(format!("profile {id} has no desktop surface"));
     }
 
-    let bypass = launch::open_profile(profile, env!("CARGO_PKG_VERSION"), launch::focus_pid)
-        .map_err(|err| err.message())?;
+    let version = env!("CARGO_PKG_VERSION");
+    let bypass = match launch::open_profile(profile, version, launch::focus_pid) {
+        // The profile's clone has been running for a while without the profile.
+        // Nobody is at a window of ours to ask, so ask in a dialog.
+        Err(AppError::StrayRunning(question)) => {
+            if !confirm(&format!("Claude ({})", profile.name), &question) {
+                return Ok(());
+            }
+            launch::open_profile_with(profile, version, launch::focus_pid, true)
+        }
+        other => other,
+    }
+    .map_err(|err| err.message())?;
     // Not a failure: the profile is open, just not through its wrapper. Worth
     // saying, because this is the only trace such a launch leaves anywhere.
     if let Some(bypass) = bypass {
         eprintln!("ai-profiles: {bypass}");
     }
     Ok(())
+}
+
+/// Run the clone watch; never returns.
+pub fn watch_clones() -> ! {
+    clone_watch::run()
+}
+
+/// Ask `question` in a dialog titled `title`, and say whether the user went
+/// ahead.
+fn confirm(title: &str, question: &str) -> bool {
+    std::process::Command::new("/usr/bin/osascript")
+        .args([
+            "-e",
+            "on run argv",
+            "-e",
+            "display dialog (item 1 of argv) with title (item 2 of argv) buttons {\"Cancel\", \"Quit and Reopen\"} default button \"Quit and Reopen\" cancel button \"Cancel\" with icon caution",
+            "-e",
+            "end run",
+            question,
+            title,
+        ])
+        .status()
+        .is_ok_and(|status| status.success())
 }
 
 #[cfg(test)]
@@ -119,6 +166,19 @@ mod tests {
                 "{tail:?} parsed as {parsed:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_watch_flag_runs_the_clone_watch() {
+        assert_eq!(
+            invocation(&args(&[WATCH_CLONES_FLAG])),
+            Invocation::WatchClones
+        );
+        assert_eq!(
+            invocation(&args(&[OPEN_PROFILE_FLAG, "abc", WATCH_CLONES_FLAG])),
+            Invocation::OpenProfile("abc"),
+            "opening a profile wins"
+        );
     }
 
     #[test]

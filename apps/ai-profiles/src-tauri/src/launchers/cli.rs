@@ -150,6 +150,7 @@ mod tests {
                 cli: true,
             },
             distinct_dock_icon: false,
+            signed_clone: false,
             last_used_at: None,
         }
     }
