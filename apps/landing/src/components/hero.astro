@@ -1,0 +1,65 @@
+---
+const releasesUrl = 'https://github.com/bartekczyz/ai-profiles/releases/latest'
+const repoUrl = 'https://github.com/bartekczyz/ai-profiles'
+---
+<section class="mx-auto max-w-[760px] px-6 pt-[72px] pb-9 text-center">
+  <h1 class="m-0 text-[40px] font-semibold leading-[1.12] tracking-[-0.022em]">
+    Run multiple AI accounts on macOS without logging out.
+  </h1>
+  <p class="mx-auto mb-7 mt-[18px] max-w-[580px] text-[17px] leading-[1.55] text-ink-soft">
+    ai-profiles lets you keep multiple Claude and ChatGPT accounts side by side — the desktop app and the CLI both — and move a coding session from one account to another. Free, open-source, local-only.
+  </p>
+  <div class="mb-[14px] flex items-center justify-center gap-3">
+    <a
+      id="download-cta"
+      href={releasesUrl}
+      class="inline-flex items-center gap-2 rounded-lg bg-orange px-[18px] py-[11px] text-[13.5px] font-medium text-white shadow-button-primary"
+    >
+      Download for macOS
+    </a>
+    <a
+      href={repoUrl}
+      class="inline-flex items-center gap-2 rounded-lg border border-border-strong px-4 py-[10px] text-[13.5px] text-ink"
+    >
+      View on GitHub
+    </a>
+  </div>
+  <p id="fineprint" class="font-mono text-[11.5px] text-muted">macOS 12+  ·  MIT</p>
+</section>
+
+<script>
+  import { fetchLatest, pickDmg } from '../lib/release.ts'
+
+  async function init() {
+    const release = await fetchLatest()
+    if (release) {
+      const dmg = pickDmg(release.assets)
+      if (dmg) {
+        const cta = document.getElementById('download-cta')
+        if (cta) {
+          cta.setAttribute('href', dmg.browser_download_url)
+        }
+        const installRow = document.querySelector('[data-install-cmd="install-download"]')
+        if (installRow) {
+          installRow.textContent = dmg.name
+        }
+        const downloadLink = document.getElementById('install-download-link')
+        if (downloadLink) {
+          downloadLink.setAttribute('href', dmg.browser_download_url)
+        }
+        const fineprint = document.getElementById('fineprint')
+        if (fineprint) {
+          const sizeMb = Math.round(dmg.size / (1024 * 1024))
+          fineprint.textContent = `macOS 12+  ·  ${sizeMb} MB  ·  MIT`
+        }
+      }
+      const versionEl = document.getElementById('footer-version')
+      if (versionEl) {
+        versionEl.textContent = release.tag_name
+      }
+      window.__cpRelease = release
+    }
+  }
+
+  init()
+</script>

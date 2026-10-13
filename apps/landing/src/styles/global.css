@@ -1,0 +1,55 @@
+@import "tailwindcss";
+@import "@ai-profiles/design-tokens/tokens.css";
+
+@import "@fontsource-variable/geist/index.css";
+@import "@fontsource-variable/geist-mono/index.css";
+
+@utility shadow-button-primary {
+  box-shadow: var(--shadow-button-primary);
+}
+
+@utility shadow-window {
+  box-shadow: var(--shadow-window);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+@import "./cookie-banner.css";
+
+/* Animate <details>/<summary> open/close. Modern browsers only;
+   older browsers fall back to instant toggle (acceptable). */
+@supports (interpolate-size: allow-keywords) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition: block-size 220ms var(--ease-natural, ease), content-visibility 220ms allow-discrete;
+  }
+  details[open]::details-content {
+    block-size: auto;
+  }
+}
+
+/* Theme toggle icon visibility */
+#theme-icon-sun { display: none; }
+:root[data-theme="dark"] #theme-icon-sun { display: block; }
+:root[data-theme="dark"] #theme-icon-moon { display: none; }
+
+/* App screenshot — show light variant in light theme, dark in dark. */
+:root[data-theme="dark"] .screenshot-light { display: none; }
+:root:not([data-theme="dark"]) .screenshot-dark { display: none; }

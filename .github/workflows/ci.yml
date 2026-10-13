@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  rust:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './apps/ai-profiles/src-tauri -> target'
+
+      - name: cargo fmt --check
+        # --all: without it only the root package is checked, not the shim.
+        run: cargo fmt --all --check
+        working-directory: apps/ai-profiles/src-tauri
+
+      - name: cargo clippy
+        run: cargo clippy -- -D warnings
+        working-directory: apps/ai-profiles/src-tauri
+
+      - name: cargo test
+        # State-touching tests are serialised via the cfg(test) tempdir in
+        # paths.rs, so --test-threads=1 is no longer strictly required.
+        # Kept as a safety net.
+        run: cargo test -- --test-threads=1
+        working-directory: apps/ai-profiles/src-tauri
+
+  frontend:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # fallow audit diffs against the PR base, so it needs history.
+          fetch-depth: 0
+
+      # No `version:` here on purpose — `packageManager` in root
+      # package.json is the source of truth and pnpm/action-setup@v4
+      # errors out if both are set.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Restore turbo cache
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: typecheck
+        run: pnpm turbo run typecheck
+
+      - name: biome check
+        run: pnpm biome check
+
+      - name: test
+        run: pnpm turbo run test
+
+      - name: fallow audit (new findings in changed files)
+        if: github.event_name == 'pull_request'
+        run: pnpm fallow audit --base origin/${{ github.base_ref }} --quiet
+
+      - name: fallow (full)
+        if: github.event_name == 'push'
+        run: pnpm fallow --quiet

@@ -1,0 +1,101 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    # Expose release-please's per-package outputs to downstream jobs.
+    # The package path lives at `apps/ai-profiles` (see
+    # release-please-config.json), so the output keys are namespaced
+    # accordingly. Bracket syntax is required because the keys contain
+    # `/` and `--`.
+    outputs:
+      release_created: ${{ steps.release.outputs['apps/ai-profiles--release_created'] }}
+      tag_name: ${{ steps.release.outputs['apps/ai-profiles--tag_name'] }}
+      sha: ${{ steps.release.outputs['apps/ai-profiles--sha'] }}
+    steps:
+      # Guard against the race where release-please runs while the
+      # previous release's binaries are still building. During that
+      # window the latest GitHub release is still a draft, and
+      # release-please excludes drafts from its "latest release"
+      # baseline lookup — so it walks history from the previous
+      # published release and proposes a nonsensical version. See PR
+      # #19 retrospective. Skipping here lets the next push (or a
+      # manual workflow_dispatch after the build publishes the
+      # release) generate the correct release PR.
+      - name: Skip if latest release is still a draft
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          latest=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName,isDraft -q '.[0]')
+          if [ -z "$latest" ]; then
+            echo "No releases yet — proceeding."
+            exit 0
+          fi
+          tag=$(echo "$latest" | jq -r .tagName)
+          is_draft=$(echo "$latest" | jq -r .isDraft)
+          if [ "$is_draft" = "true" ]; then
+            echo "::notice::Latest release $tag is still a draft (binaries still building?). Skipping release-please run."
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `token:` MUST be a PAT (or GitHub App token) — not the default
+      # GITHUB_TOKEN. GitHub deliberately doesn't fire downstream
+      # workflows for tags pushed under GITHUB_TOKEN, so release.yml
+      # would never run on the v* tag pushed by the next job. A PAT
+      # bypasses that. See:
+      # https://github.com/googleapis/release-please-action#github-credentials
+      - id: release
+        if: steps.gate.outputs.skipped != 'true'
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # On the push that merges a release PR, this same run creates
+          # the new GitHub release as a draft, and the v* tag only gets
+          # pushed by the next job — so the just-released version is
+          # invisible to release-please's own baseline lookup within
+          # this run. If it builds the next release PR anyway, it
+          # replays the entire commit history and an old
+          # `Release-As: 0.2.2` footer (7bfd98f) pins the proposed
+          # version to 0.2.2 — see PR #26. Skip PR building on release
+          # merges (both squash titles and branch merge commits); the
+          # next push to main generates the correct release PR, which
+          # is the same self-heal that already happened in practice.
+          skip-github-pull-request: "${{ startsWith(github.event.head_commit.message, 'chore(main): release') || contains(github.event.head_commit.message, 'release-please--branches--') }}"
+
+  push-release-tag:
+    # release-please creates the GitHub Release as a draft (configured
+    # via "draft": true in release-please-config.json) so users never
+    # see a release without its .dmg attached. The catch: a draft
+    # release does not create the underlying git tag, so release.yml's
+    # `push: tags` trigger never fires on its own.
+    #
+    # Push the missing tag here, using the PAT so downstream workflows
+    # do trigger. release.yml then builds the .dmg, uploads it to the
+    # existing draft, and flips the draft to published — completing the
+    # "merge release PR → published release with assets" loop.
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          # The default fetch-depth=1 is fine — we only need the
+          # release commit to tag.
+      - name: Push release tag
+        run: |
+          git tag "${{ needs.release-please.outputs.tag_name }}"
+          git push origin "${{ needs.release-please.outputs.tag_name }}"

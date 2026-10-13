@@ -1,0 +1,35 @@
+---
+import AppScreenshot from '../components/app-screenshot.astro'
+import CookieBanner from '../components/cookie-banner'
+import FaqSection from '../components/faq-section.astro'
+import Footer from '../components/footer.astro'
+import Hero from '../components/hero.astro'
+import HowItWorks from '../components/how-it-works.astro'
+import InstallSection from '../components/install-section.astro'
+import MigrationExplainer from '../components/migration-explainer.astro'
+import Sessions from '../components/sessions.astro'
+import TerminalStrip from '../components/terminal-strip.astro'
+import TopBar from '../components/top-bar.astro'
+import UsageStats from '../components/usage-stats.astro'
+import PageLayout from '../layouts/page.astro'
+---
+
+<PageLayout
+  title="ai-profiles — run multiple Claude accounts on one Mac"
+  description="Free, open-source profile manager for the Claude desktop app and the Claude Code CLI. Switch Claude accounts on macOS without logging out."
+>
+  <TopBar />
+  <main class="flex-1">
+    <Hero />
+    <AppScreenshot />
+    <TerminalStrip />
+    <HowItWorks />
+    <Sessions />
+    <UsageStats />
+    <MigrationExplainer />
+    <InstallSection />
+    <FaqSection />
+  </main>
+  <Footer />
+  <CookieBanner client:idle />
+</PageLayout>

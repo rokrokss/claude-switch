@@ -1,0 +1,256 @@
+# Changelog
+
+## [1.4.0](https://github.com/bartekczyz/ai-profiles/compare/v1.3.1...v1.4.0) (2026-09-27)
+
+
+### Added
+
+* **profiles:** let the default profile be renamed ([#49](https://github.com/bartekczyz/ai-profiles/issues/49)) (by [@marcusadolfsson](https://github.com/marcusadolfsson)) ([52f2896](https://github.com/bartekczyz/ai-profiles/commit/52f28961fe348114a35604a71e93e1a7a09a6598))
+* **profiles:** show the account a profile is signed in under ([#53](https://github.com/bartekczyz/ai-profiles/issues/53)) (by [@marcusadolfsson](https://github.com/marcusadolfsson)) ([9dbd8eb](https://github.com/bartekczyz/ai-profiles/commit/9dbd8ebd4534f40087ba9bcb5bde176d9f72cd18))
+* **sessions:** list, move, archive and restore each profile's coding sessions ([#66](https://github.com/bartekczyz/ai-profiles/issues/66)) ([a60783a](https://github.com/bartekczyz/ai-profiles/commit/a60783a413445a505db175330fc10f699b4e4c90))
+
+
+### Fixed
+
+* **launch:** don't pass on the config home ai-profiles was started with ([#63](https://github.com/bartekczyz/ai-profiles/issues/63)) (by [@marcusadolfsson](https://github.com/marcusadolfsson)) ([175a9fb](https://github.com/bartekczyz/ai-profiles/commit/175a9fb8ce0b169f7c13a6be0005176fffae9473))
+* **launchers:** point Claude desktop profiles at their own config dir ([#48](https://github.com/bartekczyz/ai-profiles/issues/48)) (by [@marcusadolfsson](https://github.com/marcusadolfsson)) ([360c49d](https://github.com/bartekczyz/ai-profiles/commit/360c49d8c1d0509d906ca5d8d3f1eed25a7fa519))
+* **profiles:** say that Claude's own Dock icon costs Cowork its folders, and start it off ([#61](https://github.com/bartekczyz/ai-profiles/issues/61)) (by [@marcusadolfsson](https://github.com/marcusadolfsson)) ([e368f65](https://github.com/bartekczyz/ai-profiles/commit/e368f65605498cb32b8f21d1dfd6113c38010a42))
+* **security:** validate profile names, scope backup deletion, add CSP ([#47](https://github.com/bartekczyz/ai-profiles/issues/47)) (by [@marcusadolfsson](https://github.com/marcusadolfsson)) ([2d6c06a](https://github.com/bartekczyz/ai-profiles/commit/2d6c06a7b72c926656b2240fe29fabc81063fd00))
+
+
+### Changed
+
+* pin pane headers above a scrolling body ([#62](https://github.com/bartekczyz/ai-profiles/issues/62)) ([b595c9a](https://github.com/bartekczyz/ai-profiles/commit/b595c9a5a802867ab476e525c8b395a80dc9967c))
+
+## [1.3.1](https://github.com/bartekczyz/ai-profiles/compare/v1.3.0...v1.3.1) (2026-09-22)
+
+
+### Fixed
+
+* **launchers:** let a profile app update itself again ([#54](https://github.com/bartekczyz/ai-profiles/issues/54)) ([9355732](https://github.com/bartekczyz/ai-profiles/commit/93557326e3176fd6d890dabcfcaf02fccb5e4662))
+
+## [1.3.0](https://github.com/bartekczyz/ai-profiles/compare/v1.2.0...v1.3.0) (2026-09-21)
+
+
+### Added
+
+* **usage:** show per-model weekly quota and usage credits ([#45](https://github.com/bartekczyz/ai-profiles/issues/45)) ([ad89046](https://github.com/bartekczyz/ai-profiles/commit/ad89046f8e962c81ea44b05e8beabfe3d54a5577))
+
+
+### Fixed
+
+* render plan-aware Codex quota windows and reset-credit expiries, thanks [@borisdamato](https://github.com/borisdamato) for the contribution! ([#43](https://github.com/bartekczyz/ai-profiles/issues/43)) ([4752697](https://github.com/bartekczyz/ai-profiles/commit/4752697d7d9fa4cfe4a424acf41c0a13e3191f99))
+
+## [1.2.0](https://github.com/bartekczyz/ai-profiles/compare/v1.1.0...v1.2.0) (2026-09-20)
+
+
+### Added
+
+* **launchers:** let profiles have their own Dock icon and name ([#40](https://github.com/bartekczyz/ai-profiles/issues/40)) ([c9810e2](https://github.com/bartekczyz/ai-profiles/commit/c9810e20b0b94bb12b3a5ac9852e3b435df22d0b))
+* **whats-new:** show release notes after an upgrade ([#42](https://github.com/bartekczyz/ai-profiles/issues/42)) ([52bcad0](https://github.com/bartekczyz/ai-profiles/commit/52bcad07e826a7bdd6fd6f4232c11a0d78c2904b))
+
+## [1.1.0](https://github.com/bartekczyz/ai-profiles/compare/v1.0.2...v1.1.0) (2026-08-09)
+
+
+### Added
+
+* **ui:** rebuild the profile pane as grouped rows ([#37](https://github.com/bartekczyz/ai-profiles/issues/37)) ([a427b39](https://github.com/bartekczyz/ai-profiles/commit/a427b397a8aa12ed852e6b40339b5df9f86fb04b))
+
+
+### Fixed
+
+* **cli:** profile wrappers inherit skills, agents and global instructions ([#34](https://github.com/bartekczyz/ai-profiles/issues/34)) ([af64262](https://github.com/bartekczyz/ai-profiles/commit/af64262a5c352a6692b889960c715feebb1d1668))
+* **codex:** recognise ChatGPT.app and rename the Codex GUI identity ([#39](https://github.com/bartekczyz/ai-profiles/issues/39)) ([48272c5](https://github.com/bartekczyz/ai-profiles/commit/48272c5e936351ca642c44a94b8ae5011ed930a5))
+
+## [1.0.2](https://github.com/bartekczyz/ai-profiles/compare/v1.0.1...v1.0.2) (2026-06-20)
+
+
+### Fixed
+
+* **usage:** run claude token refresh in an empty scratch dir ([#31](https://github.com/bartekczyz/ai-profiles/issues/31)) ([c5be401](https://github.com/bartekczyz/ai-profiles/commit/c5be401e3ea33598ad6427941b3376b8c072a1a8))
+
+## [1.0.1](https://github.com/bartekczyz/ai-profiles/compare/v1.0.0...v1.0.1) (2026-06-16)
+
+
+### Fixed
+
+* **usage:** fix daily profile logouts — working token refresh, safer polling, clearer recovery ([#29](https://github.com/bartekczyz/ai-profiles/issues/29)) ([1d4c077](https://github.com/bartekczyz/ai-profiles/commit/1d4c07705760bf43820821fe09793de234c60c56))
+
+## [1.0.0](https://github.com/bartekczyz/ai-profiles/compare/v0.6.0...v1.0.0) (2026-06-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* the macOS bundle identifier (app.claude-profiles -> app.ai-profiles), the app data dir (~/Library/Application Support/ claude-profiles -> ai-profiles), and the shell-rc / CLI-wrapper markers all change. Existing installs do not auto-update across the new identifier and won't see prior profiles. First stable release.
+
+* release 1.0.0 ([464674c](https://github.com/bartekczyz/ai-profiles/commit/464674c29d3627efc54bcfcc31dfd668120972cf))
+
+
+### Changed
+
+* rename product claude-profiles to ai-profiles ([#27](https://github.com/bartekczyz/ai-profiles/issues/27)) ([89b8c5f](https://github.com/bartekczyz/ai-profiles/commit/89b8c5f394f0c89ee2875d528e4bd445e22ca9b9))
+
+## [0.6.0](https://github.com/bartekczyz/claude-profiles/compare/v0.5.0...v0.6.0) (2026-06-08)
+
+
+### Added
+
+* Codex multi-app support + dead credential handling ([#25](https://github.com/bartekczyz/claude-profiles/issues/25)) ([2fcc942](https://github.com/bartekczyz/claude-profiles/commit/2fcc942d22c140a5be93de001bd796ea51a2afe7))
+
+
+### Fixed
+
+* Default profile launch — open the stock app, single-instance per entry ([#24](https://github.com/bartekczyz/claude-profiles/issues/24)) ([80e7056](https://github.com/bartekczyz/claude-profiles/commit/80e705667615f8b8ff6f965217a3dd77ab4a02ca))
+
+## [0.5.0](https://github.com/bartekczyz/claude-profiles/compare/v0.4.0...v0.5.0) (2026-05-29)
+
+
+### Added
+
+* default profile row + usage-card polish ([#21](https://github.com/bartekczyz/claude-profiles/issues/21)) ([7df9dc4](https://github.com/bartekczyz/claude-profiles/commit/7df9dc4242cdafc747b046a28e6a495f56dcf439))
+
+## [0.4.0](https://github.com/bartekczyz/claude-profiles/compare/v0.3.0...v0.4.0) (2026-05-28)
+
+
+### Added
+
+* **usage:** add daily segments and on-pace marker to weekly meters ([0f74bb7](https://github.com/bartekczyz/claude-profiles/commit/0f74bb7c53c325ba25973998dcfa4ac7ed43f939))
+* **usage:** auto-trigger Claude Code refresh on unauthorized quota fetch ([b87dbeb](https://github.com/bartekczyz/claude-profiles/commit/b87dbeb9477e3428b41b3945a6e52bc64ce56e07))
+* **usage:** compose command and register it ([0b5dbdf](https://github.com/bartekczyz/claude-profiles/commit/0b5dbdf6e31e7688c551605eaa7c0ade3e9d34f2))
+* **usage:** defensive credentials reader ([16a4f6a](https://github.com/bartekczyz/claude-profiles/commit/16a4f6a8d767cf9985a2cf311df5e2f2892396df))
+* **usage:** frontend types, hook and defensive narrowing ([555a0fc](https://github.com/bartekczyz/claude-profiles/commit/555a0fcfebf3890e534dbeb099aee754588982ad))
+* **usage:** per-profile Claude usage stats ([5eb69fd](https://github.com/bartekczyz/claude-profiles/commit/5eb69fd832ba034f66f7d0f6586eb2b704b2d5ab))
+* **usage:** per-profile usage card on profile detail ([07c681d](https://github.com/bartekczyz/claude-profiles/commit/07c681d0800cf827633b6ea7c3084fb41893e3d6))
+* **usage:** polish card with countdown, equal-width bars and responsive labels ([da71b9c](https://github.com/bartekczyz/claude-profiles/commit/da71b9c7fbe3ccc5604ee997481f4823aa3a8dc7))
+* **usage:** quota http client with defensive parsing ([1923fe1](https://github.com/bartekczyz/claude-profiles/commit/1923fe19ee7ff073cbc1b0abf82f9209be671341))
+* **usage:** scaffold rust module + price table ([478c142](https://github.com/bartekczyz/claude-profiles/commit/478c142e860ebddfdaab59d3814b93379b6a2d11))
+
+
+### Fixed
+
+* **usage:** fall back to macos keychain for credentials ([79b5a5c](https://github.com/bartekczyz/claude-profiles/commit/79b5a5cca9e14fbe330179792b0df7dce33afd8e))
+* **usage:** gate macOS-only credential lookups behind cfg(target_os = "macos") ([237444f](https://github.com/bartekczyz/claude-profiles/commit/237444fbde1705c6eadd13ae1795e01a48935854))
+* **usage:** harden quota fetch — explicit 4xx mapping, body size pre-check, token trim ([b60a0ad](https://github.com/bartekczyz/claude-profiles/commit/b60a0ad5e9941a8dcbf35d54d4a5fc61dae06814))
+* **usage:** isolate usage cache from profile invalidations, reset error boundary across profiles ([85963e4](https://github.com/bartekczyz/claude-profiles/commit/85963e43a34aea30cfef905d07acd5071d1008d4))
+* **usage:** keep local breakdown visible when quota fetch fails, refine unauthorized copy ([3c46af8](https://github.com/bartekczyz/claude-profiles/commit/3c46af8c67a0215ce9e400b4523ad5396dcb0a29))
+* **usage:** serialise + back off CLI token refresh, wait for token write ([09aae53](https://github.com/bartekczyz/claude-profiles/commit/09aae536f2e4c23ad3c3b653f3266ec2c2f57157))
+* **usage:** show explicit message for every quota error state ([b11a514](https://github.com/bartekczyz/claude-profiles/commit/b11a51435cedd3bb696b3ba29b1241564a011775))
+* **usage:** split 429 rate limit out from generic network error ([0884ec9](https://github.com/bartekczyz/claude-profiles/commit/0884ec9dea4989081baa425bdd6f01b26d1716c0))
+* **usage:** treat utilization as 0-100 percentage, not 0-1 fraction ([ec83b21](https://github.com/bartekczyz/claude-profiles/commit/ec83b2141af9609a93f92f349dbaccbee70807db))
+
+
+### Changed
+
+* **profiles:** rename useProfileUsage to useProfileLastUsed ([52aa7b5](https://github.com/bartekczyz/claude-profiles/commit/52aa7b5c55496217075fb8be1f10dae707dd6865))
+
+## [0.3.0](https://github.com/bartekczyz/claude-profiles/compare/v0.2.2...v0.3.0) (2026-05-25)
+
+
+### Added
+
+* **empty-state:** guide users through Claude install when neither surface is detected ([b46aff6](https://github.com/bartekczyz/claude-profiles/commit/b46aff6e79f32e9e548d1ee542f2b2ad4f35b6b1))
+* **empty-state:** guide users through Claude install when neither surface is detected ([2e922e1](https://github.com/bartekczyz/claude-profiles/commit/2e922e14b348b243fcf60f0d1f7d84ac1c2adec2))
+* **settings:** show the app version next to the Updates row ([aa1054d](https://github.com/bartekczyz/claude-profiles/commit/aa1054d7118512fa663768b34a32cef5cc3b472f))
+
+
+### Fixed
+
+* **about:** correct version display and tidy About / Settings ([6bf20fe](https://github.com/bartekczyz/claude-profiles/commit/6bf20fe07a70049ac74129c6f3d6748d6ead7d30))
+* **about:** use a clearer dialog title and drop the long subtitle ([ef4dd0d](https://github.com/bartekczyz/claude-profiles/commit/ef4dd0d93a126b36274900f048db9627dcfa890d))
+
+## [0.2.2](https://github.com/bartekczyz/claude-profiles/compare/v0.2.1...v0.2.2) (2026-05-25)
+
+
+### Fixed
+
+* **updater:** relaunch the app after downloadAndInstall ([689b6c1](https://github.com/bartekczyz/claude-profiles/commit/689b6c18e74b03999e63a201632f3012632a798b))
+* **updater:** relaunch the app after downloadAndInstall ([7bfd98f](https://github.com/bartekczyz/claude-profiles/commit/7bfd98fbd5a3faf0cde4d3c170a3864db66e2c4d))
+
+## [0.2.1](https://github.com/bartekczyz/claude-profiles/compare/v0.2.0...v0.2.1) (2026-05-25)
+
+
+### Fixed
+
+* **boot:** paint brand background + loader before the JS bundle runs ([0d32ff3](https://github.com/bartekczyz/claude-profiles/commit/0d32ff30701a2c25066c24938433669aef25d173))
+
+
+### Performance
+
+* **deps:** cache shell-PATH lookup and short-circuit via process env ([7b2135e](https://github.com/bartekczyz/claude-profiles/commit/7b2135e18c9b254fe35072fac690e8b92dfe6f4e))
+* faster, less ugly app startup ([19225da](https://github.com/bartekczyz/claude-profiles/commit/19225da82f6fe6443f0afee4d12467378ed9cd89))
+* **migration:** defer the directory-size walks off the boot path ([718fe9e](https://github.com/bartekczyz/claude-profiles/commit/718fe9efb0b8fb4fc70b1074df29ba2d014cfa98))
+
+## [0.2.0](https://github.com/bartekczyz/claude-profiles/compare/v0.1.1...v0.2.0) (2026-05-25)
+
+
+### Added
+
+* **migration:** redesign import dialog with side-by-side layout ([5cc2d25](https://github.com/bartekczyz/claude-profiles/commit/5cc2d256e5732522aed0aeec966dfe148d59f4c6))
+* onboarding & migration polish ([0314d9b](https://github.com/bartekczyz/claude-profiles/commit/0314d9b38ef26c3704464c10b0f07c5145267c23))
+* **onboarding:** replace auto-migration prompt with a fork dialog ([c2b6380](https://github.com/bartekczyz/claude-profiles/commit/c2b638062ff1c9418fbe71d6a1c24797832e5273))
+
+
+### Fixed
+
+* **onboarding:** restyle welcome dialog with the Atelier primitive ([8c8b110](https://github.com/bartekczyz/claude-profiles/commit/8c8b110c784a069e69a7f644b54707365116c567))
+* **settings:** keep settings open when re-import is dismissed ([dea9c33](https://github.com/bartekczyz/claude-profiles/commit/dea9c33b97f6aa97103e91111b9cabafbce1575d))
+* **ui:** polish onboarding controls ([1154350](https://github.com/bartekczyz/claude-profiles/commit/1154350296b57c0f355b0524555320621a8f7648))
+* **updater:** stop overriding the platform key to darwin-universal ([cf5339b](https://github.com/bartekczyz/claude-profiles/commit/cf5339bcb6780aea875f6ba05b6ec97881b4ede2))
+
+## [0.1.1](https://github.com/bartekczyz/claude-profiles/compare/v0.2.0...v0.1.1) (2026-05-24)
+
+
+* release 0.1.1 ([8dfbb73](https://github.com/bartekczyz/claude-profiles/commit/8dfbb73423d39595a644d6a4deaf4a9c68cb7287))
+
+
+### Added
+
+* **app:** focus sidebar search with ⌘F ([e74d248](https://github.com/bartekczyz/claude-profiles/commit/e74d2489fea67c327344b58de324a2e15a22bd8c))
+* **migration:** redesign import dialog with side-by-side layout ([5cc2d25](https://github.com/bartekczyz/claude-profiles/commit/5cc2d256e5732522aed0aeec966dfe148d59f4c6))
+* onboarding & migration polish ([0314d9b](https://github.com/bartekczyz/claude-profiles/commit/0314d9b38ef26c3704464c10b0f07c5145267c23))
+* **onboarding:** replace auto-migration prompt with a fork dialog ([c2b6380](https://github.com/bartekczyz/claude-profiles/commit/c2b638062ff1c9418fbe71d6a1c24797832e5273))
+
+
+### Fixed
+
+* **onboarding:** restyle welcome dialog with the Atelier primitive ([8c8b110](https://github.com/bartekczyz/claude-profiles/commit/8c8b110c784a069e69a7f644b54707365116c567))
+* **settings:** keep settings open when re-import is dismissed ([dea9c33](https://github.com/bartekczyz/claude-profiles/commit/dea9c33b97f6aa97103e91111b9cabafbce1575d))
+* **ui:** polish onboarding controls ([1154350](https://github.com/bartekczyz/claude-profiles/commit/1154350296b57c0f355b0524555320621a8f7648))
+* **updater:** stop overriding the platform key to darwin-universal ([cf5339b](https://github.com/bartekczyz/claude-profiles/commit/cf5339bcb6780aea875f6ba05b6ec97881b4ede2))
+
+
+### Changed
+
+* restructure as Turborepo monorepo under apps/claude-profiles ([7fa4f59](https://github.com/bartekczyz/claude-profiles/commit/7fa4f59aa79f22ac266426a108213589977fef0d))
+* **tokens:** extract design tokens to packages/design-tokens ([3f327be](https://github.com/bartekczyz/claude-profiles/commit/3f327bea27147a129447593c166ef69cdb179f02))
+
+## [0.2.0](https://github.com/bartekczyz/claude-profiles/compare/v0.1.1...v0.2.0) (2026-05-24)
+
+
+### Added
+
+* **migration:** redesign import dialog with side-by-side layout ([5cc2d25](https://github.com/bartekczyz/claude-profiles/commit/5cc2d256e5732522aed0aeec966dfe148d59f4c6))
+* onboarding & migration polish ([0314d9b](https://github.com/bartekczyz/claude-profiles/commit/0314d9b38ef26c3704464c10b0f07c5145267c23))
+* **onboarding:** replace auto-migration prompt with a fork dialog ([c2b6380](https://github.com/bartekczyz/claude-profiles/commit/c2b638062ff1c9418fbe71d6a1c24797832e5273))
+
+
+### Fixed
+
+* **onboarding:** restyle welcome dialog with the Atelier primitive ([8c8b110](https://github.com/bartekczyz/claude-profiles/commit/8c8b110c784a069e69a7f644b54707365116c567))
+* **settings:** keep settings open when re-import is dismissed ([dea9c33](https://github.com/bartekczyz/claude-profiles/commit/dea9c33b97f6aa97103e91111b9cabafbce1575d))
+* **ui:** polish onboarding controls ([1154350](https://github.com/bartekczyz/claude-profiles/commit/1154350296b57c0f355b0524555320621a8f7648))
+* **updater:** stop overriding the platform key to darwin-universal ([cf5339b](https://github.com/bartekczyz/claude-profiles/commit/cf5339bcb6780aea875f6ba05b6ec97881b4ede2))
+
+## 0.1.1 (2026-05-24)
+
+Initial release.
+
+## Changelog
+
+All notable changes are recorded here. This file is maintained automatically by
+[release-please](https://github.com/googleapis/release-please) — please don't edit it by hand.
+Commit messages following the [Conventional Commits](https://www.conventionalcommits.org/)
+spec drive what lands here on the next release.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
+project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
