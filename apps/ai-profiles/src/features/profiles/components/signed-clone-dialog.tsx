@@ -18,7 +18,7 @@ type Props = {
 function points(displayName: string): Array<string> {
   return [
     `This profile runs from its own copy of ${displayName}, kept with the profile's data. The copy shares the original's disk space until it updates itself.`,
-    `The copy keeps ${displayName}'s own signature, so sign-in, permissions like the microphone and camera, passkeys and Cowork's folders work as they do in the original. Only a Finder icon in the profile's color is added, which is what the Dock shows.`,
+    `The copy keeps ${displayName}'s own signature, so sign-in, permissions like the microphone and camera, passkeys and Cowork's folders work as they do in the original. The only addition is a Finder icon — the app's own, with a badge in the profile's color — which is what the Dock shows.`,
     `The copy updates itself. When ${displayName} in Applications is newer, opening the profile moves the copy forward first; it is never taken back to an older version, and never changed while it runs.`,
     'When macOS starts the copy on its own — after an update, or from its Dock tile — it would open on your default account. ai-profiles quits it within seconds and opens the profile instead, or, if it has been running a while, asks first.',
     'Opening the profile, and watching for that, is done by ai-profiles: it installs a small background item while any profile uses a signed clone.',
