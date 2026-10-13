@@ -1,7 +1,6 @@
 # The signed clone launch mode (Claude Desktop on macOS)
 
 - Status: **implemented, runtime verification pending** (2026-10-14)
-- Built on: ai-profiles `54b8259`, with the design informed by claude-desktop-profiles (cdp) `3ad67e7`
 - Measured on: macOS 26.6.2 (25G83), arm64, Claude Desktop 2.31226.1
 - Verification steps: [signed-clone-verification.md](signed-clone-verification.md)
 
@@ -25,7 +24,7 @@ The two existing modes stay as they are.
 
 | # | Topic | Decision |
 |---|-------|----------|
-| P1 | claude-switch takes ai-profiles as it is and adds one mode on top. | A commit imports `54b8259` verbatim; the changes are separate commits on top of it. The MIT notice is kept. |
+| P1 | The signed clone is added on top of what the app already does. | Profile storage, auth paths, usage stats and session moves are left as they are. |
 | P2 | Data paths and identifiers are ai-profiles' own (`~/Library/Application Support/ai-profiles/`, `app.ai-profiles.*`). | Kept, so existing profiles never have to move. |
 | P3 | A signed clone is available for Claude profiles on macOS only. | Gated by `AppSpec.supports_signed_clone` in Rust and `appSpecs[app].signedClone` in TypeScript. |
 | P4 | The script and wrapper modes keep their code and behavior. | Kept. |
@@ -99,7 +98,7 @@ In short: the signature itself is preserved, but to strict validation the bundle
   - it is not on together with `distinct_dock_icon`.
 - If a hand-edited `profiles.json` has both true, launching and launcher generation both prefer the signed clone.
 - **Backward compatibility**:
-  - Upstream ai-profiles and earlier builds ignore `signedClone`. They rebuild such a profile as a script launcher and open it that way, on the same data paths.
+  - Builds of the app that predate the field ignore `signedClone`. They rebuild such a profile as a script launcher and open it that way, on the same data paths.
   - When such a build saves `profiles.json`, the field is lost. So the two apps must not share the same data.
 - In the frontend, `signedClone?` is optional. The forms send it only when it is on or being turned off, so a form for any other profile submits exactly what it always did.
 
@@ -171,7 +170,7 @@ If the bundle holds files not owned by the user (an update that ran as root), th
 
 ### 5.5 Icon
 
-- **It is a badge, not a recolor.** Claude's own icon stays as it is, and a circular badge in the profile color, with a white ring, sits at its bottom right. This is ai-profiles' existing launcher icon (`icons::render_icns`), so the launcher in Spotlight and the running Dock tile look the same. cdp instead rotates the hue of the whole icon; that was not adopted.
+- **It is a badge, not a recolor.** Claude's own icon stays as it is, and a circular badge in the profile color, with a white ring, sits at its bottom right. This is the app's existing launcher icon (`icons::render_icns`), so the launcher in Spotlight and the running Dock tile look the same. The rest of the icon is not recolored.
 - Changing the color while the profile runs updates the launcher's icon at once, and the clone's icon on its next launch.
 - Whether the macOS 26 Dock prefers the Finder custom icon over the asset catalog (`CFBundleIconName`) is not known yet (check D2).
 
@@ -209,7 +208,7 @@ A stray is a process whose executable is `profiles/<id>/app.noindex/*.app/Conten
 | Wrapper ↔ signed clone | Refused while the wrapper runs, by the existing `ensure_wrapper_not_running`. | Untouched |
 | Rename or recolor | Only the launcher is rebuilt; the clone changes on its next launch. | Untouched |
 | Desktop surface off | The launcher is removed, and the clone too unless in use. | Untouched |
-| Profile deleted | Upstream's existing policy (not refused while running). The clone goes with the profile folder, to the Trash or deleted. | As the user chose |
+| Profile deleted | The existing policy (not refused while running). The clone goes with the profile folder, to the Trash or deleted. | As the user chose |
 
 **Never done**: moving or deleting account data automatically; replacing, changing or moving a clone that is running; `sudo`; writing to `/Applications/Claude.app`.
 
@@ -227,11 +226,11 @@ A Claude Desktop update never requires rebuilding or updating claude-switch. Not
 
 - **When the original updates**: profiles that aren't running are cloned forward on their next launch. A running profile is left alone and updates itself. Both follow from the version comparison.
 - **It still opens if something breaks**: should a new Claude make the clone unusable (a signature change, a restriction on where it may run), the launch falls back with a `Bypass` to the stock app, and the profile still opens.
-- **Remaining assumptions**, which all of ai-profiles relies on — if one breaks, upstream ai-profiles needs fixing too:
+- **Remaining assumptions**, which the whole app relies on — if one breaks, the existing modes need fixing too:
   - The app is at `/Applications/Claude.app` (`AppSpec.gui_bundle_candidates`).
   - Electron honors `--user-data-dir`.
   - The Code tab follows `CLAUDE_CONFIG_DIR`.
-- This app's own updater now checks this repository's Releases. There are none, so it never updates itself either, which keeps an upstream build from replacing it.
+- This app's own updater now checks this repository's Releases. There are none, so it never updates itself.
 
 ### 5.9 Known limitations
 
@@ -271,7 +270,7 @@ A Claude Desktop update never requires rebuilding or updating claude-switch. Not
 - **E2E** (`AI_PROFILES_E2E=1`): `a_built_clone_keeps_the_vendor_signature_and_carries_its_icon` checks a real clone, its verification and its removal. The app is never launched.
 - **Frontend**: 689 pass, 9 of them new: the edit plan, the two options clearing each other in the create and edit dialogs, the option being hidden for ChatGPT, and the explanation dialog.
 - **Static checks**: `cargo clippy -- -D warnings` (as CI runs it), `cargo fmt --check`, `tsc`, `biome check` and `fallow` all pass.
-  - `cargo clippy --all-targets` reports two errors (`test_support.rs`, `profiles.rs:788`); both are in upstream's code as imported.
+  - `cargo clippy --all-targets` reports two errors (`test_support.rs`, `profiles.rs:788`); both are in existing test code.
 
 Runtime checks (sign-in, permissions, the Dock, updates) follow [signed-clone-verification.md](signed-clone-verification.md).
 
@@ -282,6 +281,6 @@ Runtime checks (sign-in, permissions, the Dock, updates) follow [signed-clone-ve
 - No `DesktopMode` enum: one bool plus `validate_desktop_mode` was enough.
 - A JSON file with both flags true is not corrected on save; launching and building prefer the signed clone instead.
 - S6 is reported in a notification rather than reopened automatically (why: §5.6), so nothing is ever reopened against the user's intent.
-- Deleting a profile follows upstream's policy (not refused while running) rather than being refused.
+- Deleting a profile follows the existing policy (not refused while running) rather than being refused.
 - A file lock and a re-check right before the swap guard against concurrent `ensure` calls for the same profile (GUI, launcher, watch).
-- The app's updater points at this repository, and upstream's release workflows are removed.
+- The app's updater points at this repository, and release workflows this repository can't run are removed.

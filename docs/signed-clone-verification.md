@@ -25,7 +25,7 @@ pnpm --filter ai-profiles tauri build --bundles app --config '{"bundle":{"create
 The result is `apps/ai-profiles/src-tauri/target/release/bundle/macos/ai-profiles.app`. Copy it to `/Applications`, and open it the first time with right-click → Open (it is a local build without notarization).
 
 - The clone watch and the launchers record **the path of the ai-profiles executable that is running**, so verify with the app installed in `/Applications`. `tauri dev` works too, but the paths then point at the development build.
-- If upstream's ai-profiles app is installed, **don't run both**. Upstream doesn't know `signedClone` and drops it when it saves.
+- If another build of the app is installed, **don't run both** on the same data. A build that doesn't know `signedClone` drops it when it saves.
 
 ### 0.2 Test profile and shell variables
 
@@ -302,7 +302,7 @@ These five decide whether the mode is worth having. About 30 minutes.
 
 **H5** — Record whether switching between wrapper and signed clone needs a new sign-in.
 
-**H6** — A running signed clone profile can be deleted (upstream's policy). After the delete, the watch doesn't start that profile again.
+**H6** — A running signed clone profile can be deleted (the existing policy). After the delete, the watch doesn't start that profile again.
 
 ### I. Safety boundaries
 
