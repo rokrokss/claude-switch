@@ -424,3 +424,37 @@ describe('EditProfileDialog — leaving it', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('EditProfileDialog — signed clone', () => {
+  function signedCloneOption() {
+    return screen.getByRole('checkbox', { name: /Signed clone/, hidden: true })
+  }
+
+  it('shows the saved setting and saves turning it off', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    renderEdit({ open: true, profile: fixture({ signedClone: true }), dependencies: DEPS, onClose: vi.fn(), onSave })
+    expect(signedCloneOption()).toBeChecked()
+    expect(screen.getByRole('button', { name: /^Save/ })).toBeDisabled()
+
+    await user.click(signedCloneOption())
+    await user.click(screen.getByRole('button', { name: /^Save/ }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ signedClone: false }))
+  })
+
+  it('turns a wrapper off when it is turned on', async () => {
+    const user = userEvent.setup()
+    const onSave = vi.fn().mockResolvedValue(undefined)
+    renderEdit({
+      open: true,
+      profile: fixture({ distinctDockIcon: true }),
+      dependencies: DEPS,
+      dockIconAcknowledged: true,
+      onClose: vi.fn(),
+      onSave,
+    })
+    await user.click(signedCloneOption())
+    await user.click(screen.getByRole('button', { name: /^Save/ }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ distinctDockIcon: false, signedClone: true }))
+  })
+})

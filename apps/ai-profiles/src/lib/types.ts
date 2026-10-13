@@ -22,6 +22,13 @@ export type Profile = {
    */
   distinctDockIcon: boolean
   /**
+   * Whether the desktop app runs from a signed clone: a copy of the stock app
+   * kept with the profile, signature untouched, told apart in the Dock by a
+   * custom icon. Never together with `distinctDockIcon`. Absent from profiles
+   * an older backend lists, which means off.
+   */
+  signedClone?: boolean
+  /**
    * RFC 3339 timestamp of the last `launched_gui` or `copied_cli` event,
    * or `null` if this profile has never been used.
    */
@@ -49,6 +56,10 @@ export type ProfilePatch = {
    * Switching this rebuilds the launcher in the other shape.
    */
   distinctDockIcon?: boolean
+  /**
+   * Switching this rebuilds the launcher, and makes or drops the clone.
+   */
+  signedClone?: boolean
 }
 
 /**

@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { useToast } from '@/design'
 import { copyToClipboard, openProfileInApp, touchProfileLastUsed } from '@/lib/commands'
+import { extractErrorKind, extractErrorMessage } from '@/lib/extract-error-message'
 import { queryKeys } from '@/lib/query/keys'
 
 function setEntry(list: Array<Profile> | undefined, updated: Profile): Array<Profile> {
@@ -23,6 +24,11 @@ function setEntry(list: Array<Profile> | undefined, updated: Profile): Array<Pro
  * succeeded — the profile is open — so it surfaces as a notice rather than an
  * error, and the setting stays as it was.
  *
+ * A launch refused because the profile's signed clone has been running a while
+ * without the profile (on the default account) asks, in a notice, whether to
+ * quit that instance and open the profile; nothing is quit unless the user says
+ * so.
+ *
  * The hook returns plain async callbacks so the surface card can keep
  * its `onPrimary: () => void` interface; errors propagate to the caller.
  */
@@ -34,7 +40,8 @@ export function useProfileLastUsed(): {
   const toast = useToast()
 
   const launchMutation = useMutation({
-    mutationFn: openProfileInApp,
+    mutationFn: (input: { profileId: string; quitStray?: boolean }) =>
+      openProfileInApp(input.profileId, input.quitStray),
     onSuccess: ({ profile, wrapperBypass }) => {
       queryClient.setQueryData<Array<Profile>>(queryKeys.profiles.all, (previous) => setEntry(previous, profile))
       if (wrapperBypass) {
@@ -53,8 +60,36 @@ export function useProfileLastUsed(): {
     },
   })
 
+  async function launchDesktop(profileId: string): Promise<Profile> {
+    try {
+      return (await launchMutation.mutateAsync({ profileId })).profile
+    } catch (caught) {
+      const current = queryClient
+        .getQueryData<Array<Profile>>(queryKeys.profiles.all)
+        ?.find((profile) => profile.id === profileId)
+      if (extractErrorKind(caught) !== 'StrayRunning' || current === undefined) {
+        throw caught
+      }
+      toast.show({
+        tone: 'info',
+        title: 'Running without its profile',
+        description: extractErrorMessage(caught),
+        durationMs: null,
+        action: {
+          label: 'Quit and reopen',
+          onClick: () => {
+            launchMutation.mutateAsync({ profileId, quitStray: true }).catch((failed: unknown) => {
+              toast.error('Could not open the profile.', extractErrorMessage(failed))
+            })
+          },
+        },
+      })
+      return current
+    }
+  }
+
   return {
-    launchDesktop: async (profileId) => (await launchMutation.mutateAsync(profileId)).profile,
+    launchDesktop,
     copyCli: (input) => copyMutation.mutateAsync(input),
   }
 }

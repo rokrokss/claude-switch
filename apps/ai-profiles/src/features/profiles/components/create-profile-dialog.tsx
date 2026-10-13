@@ -8,16 +8,20 @@ import { extractErrorMessage } from '@/lib/extract-error-message'
 
 import {
   availableSurfaces,
+  effectiveSignedClone,
   effectiveSurfaces,
   installedAppIds,
   isProfileFormValid,
   newProfileDockIcon,
   preselectedApp,
+  signedCloneField,
 } from '../lib/profile-form'
 import { DockIconConsentDialog } from './dock-icon-consent-dialog'
 import { ProfileDialogFoot } from './profile-dialog-foot'
 import { ProfileFormFields } from './profile-form-fields'
+import { SignedCloneDialog } from './signed-clone-dialog'
 import { useDockIconConsent } from './use-dock-icon-consent'
+import { useSignedCloneOption } from './use-signed-clone-option'
 
 type Props = {
   open: boolean
@@ -38,6 +42,10 @@ type Props = {
     color: string
     surfaces: Surfaces
     distinctDockIcon: boolean
+    /**
+     * Present, and true, only when the profile is to run from a signed clone.
+     */
+    signedClone?: boolean
   }) => Promise<void>
 }
 
@@ -57,6 +65,7 @@ export function CreateProfileDialog({
   // `null` until the user has chosen, so that the app's default follows them
   // when they change the app.
   const [dockIconChoice, setDockIconChoice] = useState<boolean | null>(null)
+  const signedCloneOption = useSignedCloneOption(false, () => setDockIconChoice(false))
 
   const installedApps = installedAppIds(dependencies)
   const defaultApp = preselectedApp(installedApps)
@@ -65,10 +74,13 @@ export function CreateProfileDialog({
   const effective = effectiveSurfaces(surfaces, availableSurfaces(dependencies, app))
   const canSubmit = app !== '' && isProfileFormValid(name, color, effective)
 
+  // Choosing a signed clone sets the Dock icon choice to off, so the two never
+  // come out on together.
+  const signedClone = effectiveSignedClone(signedCloneOption.chosen, app, effective.gui)
   const dockIcon = newProfileDockIcon(dockIconChoice, app, dockIconAcknowledged, effective.gui)
   const dockIconConsent = useDockIconConsent({
     acknowledged: dockIconAcknowledged,
-    onChoose: setDockIconChoice,
+    onChoose: signedCloneOption.withDockIcon(setDockIconChoice),
     onAcknowledge: onAcknowledgeDockIcon,
   })
 
@@ -85,11 +97,13 @@ export function CreateProfileDialog({
         color,
         surfaces: effective,
         distinctDockIcon: dockIcon,
+        ...signedCloneField(signedClone, false),
       })
       setName('')
       setColor(presetColors[0])
       setSurfaces({ gui: true, cli: true })
       setDockIconChoice(null)
+      signedCloneOption.set(false)
       setApp(defaultApp)
       onClose()
     } catch (caught) {
@@ -131,17 +145,27 @@ export function CreateProfileDialog({
           onSurfacesChange={setSurfaces}
           onDistinctDockIconChange={dockIconConsent.choose}
           onExplainDockIcon={dockIconConsent.explain}
+          signedClone={signedClone}
+          onSignedCloneChange={signedCloneOption.choose}
+          onExplainSignedClone={signedCloneOption.explain}
         />
       </Dialog>
       {/* A sibling rather than a child, so keys pressed in it are not taken for
           keys pressed in the form underneath. */}
       {app !== '' ? (
-        <DockIconConsentDialog
-          open={dockIconConsent.open}
-          app={app}
-          onClose={dockIconConsent.cancel}
-          onConfirm={dockIconConsent.asking ? dockIconConsent.confirm : undefined}
-        />
+        <>
+          <DockIconConsentDialog
+            open={dockIconConsent.open}
+            app={app}
+            onClose={dockIconConsent.cancel}
+            onConfirm={dockIconConsent.asking ? dockIconConsent.confirm : undefined}
+          />
+          <SignedCloneDialog
+            open={signedCloneOption.explaining}
+            app={app}
+            onClose={signedCloneOption.closeExplanation}
+          />
+        </>
       ) : null}
     </>
   )

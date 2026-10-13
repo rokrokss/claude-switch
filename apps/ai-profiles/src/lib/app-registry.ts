@@ -69,6 +69,11 @@ export type AppSpec = {
    * What giving a profile of this app its own Dock icon means for it.
    */
   dockIcon: AppDockIconSpec
+  /**
+   * Whether a profile of this app can run from a signed clone. Mirrors
+   * `supports_signed_clone` in the Rust `AppSpec`.
+   */
+  signedClone: boolean
   /** Usage-card copy, present only when `hasUsage` is true. */
   usage: AppUsageSpec | null
   /** CSS custom-property name driving this app's accent. */
@@ -110,6 +115,7 @@ const claude: AppSpec = {
   // more, and Cowork won't share a folder with it (#59). Off unless asked for,
   // as for any app it costs something.
   dockIcon: { defaultOn: false, cost: "Cowork can't use folders you attach in this profile." },
+  signedClone: true,
   usage: {
     noCredentials: 'Sign in to Claude Code once with this profile to see usage.',
     unauthorized: 'Token refresh needed — run `claude` in a terminal once, then retry.',
@@ -152,6 +158,7 @@ const codex: AppSpec = {
   // ChatGPT is signed with a push-notification entitlement (`aps-environment`)
   // that belongs to OpenAI's team, so the wrapper has to drop it.
   dockIcon: { defaultOn: false, cost: "Notifications don't work for this profile." },
+  signedClone: false,
   usage: {
     noCredentials: 'Sign in to ChatGPT once with this profile to see usage.',
     unauthorized: 'Token refresh needed — run `codex` in a terminal once, then retry.',

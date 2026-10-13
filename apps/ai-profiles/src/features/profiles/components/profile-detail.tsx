@@ -175,18 +175,21 @@ function ResolvedManagedSurfaces({
       profile={profile}
       shortcutsEnabled={shortcutsEnabled}
       launch={launch}
-      guiDescription={desktopDescription(profile.distinctDockIcon, paths.guiLauncherPath)}
+      guiDescription={desktopDescription(profile, paths.guiLauncherPath)}
       cliDescription={cliDescription(profile.app, paths.cliWrapperPath, dependencies.deps.localBinOnPath)}
       onError={onError}
     />
   )
 }
 
-function desktopDescription(distinctDockIcon: boolean, guiLauncherPath: string | null): string {
+function desktopDescription(profile: Profile, guiLauncherPath: string | null): string {
   if (guiLauncherPath === null) {
     return 'Launcher missing — re-save from Edit'
   }
-  return distinctDockIcon ? 'Own Dock icon and name' : 'Isolated launcher installed'
+  if (profile.signedClone) {
+    return 'Signed clone with its own Dock icon'
+  }
+  return profile.distinctDockIcon ? 'Own Dock icon and name' : 'Isolated launcher installed'
 }
 
 function cliDescription(app: AppId, cliWrapperPath: string | null, localBinOnPath: boolean): string {

@@ -126,6 +126,38 @@ export function dockIconDescription(app: FormApp): string {
 }
 
 /**
+ * Pure: whether a profile of `app` can run from a signed clone.
+ */
+export function signedCloneAvailable(app: FormApp): boolean {
+  return app !== '' && appSpecs[app].signedClone
+}
+
+/**
+ * Pure: whether a profile will be saved with a signed clone: chosen, for an app
+ * that has one, with a desktop launcher for it to belong to.
+ */
+export function effectiveSignedClone(chosen: boolean, app: FormApp, desktopLauncher: boolean): boolean {
+  return chosen && desktopLauncher && signedCloneAvailable(app)
+}
+
+/**
+ * Pure: the signed clone field of what a form submits. Present when the profile
+ * has one or is to get one, and left out otherwise, so a form for a profile
+ * that never had one submits what it always did.
+ */
+export function signedCloneField(signedClone: boolean, saved: boolean): { signedClone?: boolean } {
+  return signedClone || saved ? { signedClone } : {}
+}
+
+/**
+ * Pure: what the signed clone option says next to its checkbox.
+ */
+export function signedCloneDescription(app: FormApp): string {
+  const name = app === '' ? 'the app' : appSpecs[app].displayName
+  return `Runs this profile from its own copy of ${name}, signature untouched, with the profile's color in the Dock. Sign-in, permissions, passkeys and Cowork keep working.`
+}
+
+/**
  * Pure: how a surface's toggle reads. It self-disables when the surface is not
  * installed, and then says where to get it.
  */

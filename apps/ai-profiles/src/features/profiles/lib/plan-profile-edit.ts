@@ -20,6 +20,11 @@ export type ProfileEditInput = {
    * Whether the desktop launcher should carry a Dock icon of its own.
    */
   distinctDockIcon: boolean
+  /**
+   * Whether the profile should run from a signed clone. Left out by a form
+   * that doesn't offer it, which leaves the profile as it is.
+   */
+  signedClone?: boolean
 }
 
 /**
@@ -48,12 +53,14 @@ export function planProfileEdit(profile: Profile, input: ProfileEditInput): Prof
   const nameChanged = input.name !== profile.name
   const colorChanged = input.color.toLowerCase() !== profile.color.toLowerCase()
   const dockIconChanged = input.distinctDockIcon !== profile.distinctDockIcon
+  const signedCloneChanged = input.signedClone !== undefined && input.signedClone !== (profile.signedClone ?? false)
   const patch =
-    nameChanged || colorChanged || dockIconChanged
+    nameChanged || colorChanged || dockIconChanged || signedCloneChanged
       ? {
           name: input.name,
           color: input.color,
           ...(dockIconChanged ? { distinctDockIcon: input.distinctDockIcon } : {}),
+          ...(signedCloneChanged ? { signedClone: input.signedClone } : {}),
         }
       : null
   const toggles = surfaceOrder

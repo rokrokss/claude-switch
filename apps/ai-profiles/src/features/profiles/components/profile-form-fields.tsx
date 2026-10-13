@@ -30,6 +30,15 @@ type Props = {
    * Opens the explanation of the Dock icon option, for reading.
    */
   onExplainDockIcon: () => void
+  /**
+   * Whether the profile runs from a signed clone, as it will be saved.
+   */
+  signedClone: boolean
+  onSignedCloneChange: (next: boolean) => void
+  /**
+   * Opens the explanation of the signed clone option, for reading.
+   */
+  onExplainSignedClone: () => void
 }
 
 /**
@@ -76,6 +85,9 @@ export function ProfileFormFields({
   onSurfacesChange,
   onDistinctDockIconChange,
   onExplainDockIcon,
+  signedClone,
+  onSignedCloneChange,
+  onExplainSignedClone,
 }: Props) {
   return (
     <div className="space-y-4">
@@ -95,6 +107,9 @@ export function ProfileFormFields({
           onSurfacesChange={onSurfacesChange}
           onDistinctDockIconChange={onDistinctDockIconChange}
           onExplainDockIcon={onExplainDockIcon}
+          signedClone={signedClone}
+          onSignedCloneChange={onSignedCloneChange}
+          onExplainSignedClone={onExplainSignedClone}
         />
       </Field>
     </div>

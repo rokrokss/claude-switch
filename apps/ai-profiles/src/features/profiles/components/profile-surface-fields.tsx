@@ -6,7 +6,13 @@ import { Check, Info } from 'lucide-react'
 
 import { Button, cn } from '@/design'
 
-import { availableSurfaces, dockIconDescription, surfaceToggle } from '../lib/profile-form'
+import {
+  availableSurfaces,
+  dockIconDescription,
+  signedCloneAvailable,
+  signedCloneDescription,
+  surfaceToggle,
+} from '../lib/profile-form'
 
 type ProfileSurfaceFieldsProps = {
   /**
@@ -37,11 +43,23 @@ type ProfileSurfaceFieldsProps = {
    * Opens the explanation of the Dock icon option, for reading.
    */
   onExplainDockIcon: () => void
+  /**
+   * Whether the profile runs from a signed clone, as it will be saved.
+   */
+  signedClone: boolean
+  /**
+   * Takes the signed clone option's new value.
+   */
+  onSignedCloneChange: (next: boolean) => void
+  /**
+   * Opens the explanation of the signed clone option, for reading.
+   */
+  onExplainSignedClone: () => void
 }
 
 /**
- * The two surface toggle cards, with the Dock icon option under the desktop
- * one. A card self-disables when its surface is not installed, and says where
+ * The two surface toggle cards, with the Dock icon option — and, for an app
+ * that has one, the signed clone option — under the desktop one. A card self-disables when its surface is not installed, and says where
  * to get it underneath.
  */
 export function ProfileSurfaceFields({
@@ -52,6 +70,9 @@ export function ProfileSurfaceFields({
   onSurfacesChange,
   onDistinctDockIconChange,
   onExplainDockIcon,
+  signedClone,
+  onSignedCloneChange,
+  onExplainSignedClone,
 }: ProfileSurfaceFieldsProps) {
   const available = availableSurfaces(dependencies, app)
   const gui = surfaceToggle('gui', app, available.gui, surfaces.gui)
@@ -72,6 +93,17 @@ export function ProfileSurfaceFields({
           info={{ label: 'About the Dock icon', onClick: onExplainDockIcon }}
           onChange={onDistinctDockIconChange}
         />
+        {signedCloneAvailable(app) ? (
+          <ToggleRow
+            nested
+            checked={signedClone && desktopLauncher}
+            disabled={!desktopLauncher}
+            title="Signed clone"
+            description={signedCloneDescription(app)}
+            info={{ label: 'About the signed clone', onClick: onExplainSignedClone }}
+            onChange={onSignedCloneChange}
+          />
+        ) : null}
       </SurfaceOption>
       <SurfaceOption toggle={cli} onChange={(next) => onSurfacesChange({ ...surfaces, cli: next })} />
     </div>

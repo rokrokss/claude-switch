@@ -54,6 +54,32 @@ describe('planProfileEdit', () => {
     })
   })
 
+  it('leaves the signed clone out when the form does not offer it or it is unchanged', () => {
+    expect(planProfileEdit(profile, unchanged).patch).toBeNull()
+    expect(planProfileEdit(profile, { ...unchanged, signedClone: false }).patch).toBeNull()
+    expect(planProfileEdit({ ...profile, signedClone: true }, { ...unchanged, signedClone: true }).patch).toBeNull()
+  })
+
+  it('includes the signed clone in the patch when it changes, with the Dock icon when that changes too', () => {
+    expect(planProfileEdit(profile, { ...unchanged, signedClone: true }).patch).toEqual({
+      name: 'Work',
+      color: '#AABBCC',
+      signedClone: true,
+    })
+    const wrapped = { ...profile, distinctDockIcon: true }
+    expect(planProfileEdit(wrapped, { ...unchanged, distinctDockIcon: false, signedClone: true }).patch).toEqual({
+      name: 'Work',
+      color: '#AABBCC',
+      distinctDockIcon: false,
+      signedClone: true,
+    })
+    expect(planProfileEdit({ ...profile, signedClone: true }, { ...unchanged, signedClone: false }).patch).toEqual({
+      name: 'Work',
+      color: '#AABBCC',
+      signedClone: false,
+    })
+  })
+
   it('toggles each surface that changed, gui before cli', () => {
     expect(planProfileEdit(profile, { ...unchanged, surfaces: { gui: false, cli: true } }).toggles).toEqual([
       { surface: 'gui', enabled: false },

@@ -20,6 +20,7 @@ type UseProfilesResult = {
     color: string
     surfaces: Surfaces
     distinctDockIcon?: boolean
+    signedClone?: boolean
   }) => Promise<Profile>
   update: (input: { id: string; patch: ProfilePatch }) => Promise<Profile>
   remove: (input: { id: string; moveToTrash: boolean }) => Promise<void>

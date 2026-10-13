@@ -42,6 +42,10 @@ export function createProfile(input: {
    * Opt-in: leaving it out gives the profile the plain script launcher.
    */
   distinctDockIcon?: boolean
+  /**
+   * Opt-in, like `distinctDockIcon`, and never together with it.
+   */
+  signedClone?: boolean
 }): Promise<Profile> {
   return invoke<Profile>('create_profile', input)
 }
@@ -62,8 +66,13 @@ export function toggleSurface(input: { id: string; surface: Surface; enabled: bo
   return invoke<Profile>('toggle_surface', input)
 }
 
-export function openProfileInApp(id: string): Promise<LaunchResult> {
-  return invoke<LaunchResult>('open_profile_in_app', { id })
+/**
+ * Opens the profile's desktop app, or focuses it. For a profile whose signed
+ * clone has been running a while without the profile, this rejects with kind
+ * `StrayRunning` unless `quitStray` says the user agreed to have it quit.
+ */
+export function openProfileInApp(id: string, quitStray?: boolean): Promise<LaunchResult> {
+  return invoke<LaunchResult>('open_profile_in_app', { id, quitStray })
 }
 
 export function touchProfileLastUsed(id: string): Promise<Profile> {

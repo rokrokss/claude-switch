@@ -515,3 +515,57 @@ describe('CreateProfileDialog — leaving it', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('CreateProfileDialog — signed clone', () => {
+  // A dialog over the form hides it from the accessibility tree; the options
+  // are still there to be read.
+  function signedCloneOption() {
+    return screen.queryByRole('checkbox', { name: /Signed clone/, hidden: true })
+  }
+  function dockIconOption() {
+    return screen.getByRole('checkbox', { name: /Distinct Dock icon/, hidden: true })
+  }
+
+  it('starts off, and is left out of what is created', async () => {
+    const { user, onCreate } = setup()
+    expect(signedCloneOption()).not.toBeChecked()
+    await user.type(screen.getByLabelText('Name'), 'Personal')
+    await user.click(screen.getByRole('button', { name: /^Create profile/ }))
+    expect(onCreate.mock.calls[0][0]).not.toHaveProperty('signedClone')
+  })
+
+  it('creates the profile with a signed clone and no wrapper when turned on', async () => {
+    const { user, onCreate } = setup()
+    await user.click(signedCloneOption() as HTMLElement)
+    expect(signedCloneOption()).toBeChecked()
+    await user.type(screen.getByLabelText('Name'), 'Personal')
+    await user.click(screen.getByRole('button', { name: /^Create profile/ }))
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ signedClone: true, distinctDockIcon: false }))
+  })
+
+  it('and the Dock icon option clear each other', async () => {
+    const { user } = setup({ dockIconAcknowledged: true })
+    await user.click(dockIconOption())
+    expect(dockIconOption()).toBeChecked()
+    await user.click(signedCloneOption() as HTMLElement)
+    expect(signedCloneOption()).toBeChecked()
+    expect(dockIconOption()).not.toBeChecked()
+    await user.click(dockIconOption())
+    expect(dockIconOption()).toBeChecked()
+    expect(signedCloneOption()).not.toBeChecked()
+  })
+
+  it('is not offered for ChatGPT', () => {
+    setup({ dependencies: onlyCodexInstalled })
+    expect(signedCloneOption()).toBeNull()
+  })
+
+  it('explains itself without asking anything', async () => {
+    const { user } = setup()
+    await user.click(screen.getByRole('button', { name: 'About the signed clone' }))
+    const explanation = await screen.findByRole('dialog', { name: 'A signed clone' })
+    expect(within(explanation).getByText(/keeps Claude's own signature/)).toBeInTheDocument()
+    await user.click(within(explanation).getByRole('button', { name: /Close/ }))
+    expect(signedCloneOption()).not.toBeChecked()
+  })
+})
