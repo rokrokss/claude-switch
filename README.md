@@ -1,5 +1,10 @@
 # claude-switch
 
+<p align="center">
+  <img src="docs/assets/hero-dock.png" alt="Four Claude tiles in the Dock: the default Claude, and Work, Personal and Client, each with a badge in its profile color" width="900">
+</p>
+<p align="center"><sub>Illustration built from the icons claude-switch renders. Whether the macOS 26 Dock shows a clone's custom icon is still on the <a href="docs/signed-clone-verification.md">verification list</a> (D2).</sub></p>
+
 A fork of [ai-profiles](https://github.com/bartekczyz/ai-profiles) (`54b8259`, MIT) that adds a **signed clone** launch mode for Claude Desktop on macOS. ai-profiles' profile storage, auth paths, usage stats and session moves are unchanged; on top of them, each Claude profile can run from its own copy of Claude.app with Anthropic's signature left intact.
 
 > **Status**: implemented, not yet verified at runtime. Static checks (clone, signature, Gatekeeper) and the unit and E2E tests pass. Sign-in, permissions, the Dock and updates still need checking with the [verification guide](docs/signed-clone-verification.md).
@@ -13,7 +18,17 @@ A fork of [ai-profiles](https://github.com/bartekczyz/ai-profiles) (`54b8259`, M
 | Keychain, permissions, passkeys, Cowork | Work | Sign in again, permissions asked again, no Cowork folders | Work (expected) |
 | Claude's own updates | The original updates | Rebuilt | The clone updates itself; it only ever moves forward |
 
+<p align="center">
+  <img src="docs/assets/how-it-works.png" alt="What happens when you open a profile: the launcher hands off to ai-profiles, which focuses the profile or prepares its signed clone, which runs as the profile with its own gui-data and cli-config" width="900">
+</p>
+
 - **Turning it on**: in Create or Edit profile, turn on **Signed clone** under the desktop launcher. It is offered for Claude profiles only and can't be combined with Distinct Dock icon.
+
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/signed-clone-option-dark.png">
+    <img src="docs/assets/signed-clone-option-light.png" alt="The Edit profile dialog with Signed clone turned on under the Desktop App launcher" width="420">
+  </picture>
+
 - **What it creates**:
   - `~/Library/Application Support/ai-profiles/profiles/<id>/app.noindex/Claude (<Name>).app` — the clone. It's a cache: delete it and it is made again on the next launch.
   - `/Applications/Claude (<Name>).app` — the launcher. It hands launches to ai-profiles, and opens the stock app if ai-profiles is gone.
@@ -47,6 +62,7 @@ NODE_OPTIONS=--no-webstorage pnpm --filter ai-profiles test   # needed on Node 2
 
 - The release-please and release workflows are removed: they need upstream's secrets and would fail here. CI stays.
 - The app's updater checks this repository's Releases. There are none, so it never updates — which keeps an upstream build from replacing this fork.
+- claude-switch is not affiliated with or endorsed by Anthropic. "Claude" and the Claude icon are Anthropic's; the icons shown here are what the app draws from the Claude.app installed on the Mac.
 - The data directory and identifiers (`ai-profiles`, `app.ai-profiles.*`) are upstream's. **Don't run the upstream ai-profiles app against the same data.** It doesn't know `signedClone`, drops the field when it saves, and the profile falls back to the script launcher (its data is safe).
 
 ---
