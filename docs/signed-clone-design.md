@@ -25,7 +25,7 @@ The two existing modes stay as they are.
 | # | Topic | Decision |
 |---|-------|----------|
 | P1 | The signed clone is added on top of what the app already does. | Profile storage, auth paths, usage stats and session moves are left as they are. |
-| P2 | Data paths and identifiers are ai-profiles' own (`~/Library/Application Support/ai-profiles/`, `app.ai-profiles.*`). | Kept, so existing profiles never have to move. |
+| P2 | The app is named claude-switch: its data lives in `~/Library/Application Support/claude-switch/` and its bundles and agent are identified as `app.claude-switch.*`. | Profiles inside that folder never move. |
 | P3 | A signed clone is available for Claude profiles on macOS only. | Gated by `AppSpec.supports_signed_clone` in Rust and `appSpecs[app].signedClone` in TypeScript. |
 | P4 | The script and wrapper modes keep their code and behavior. | Kept. |
 | Q2 | Whether to install the background watch by default. | Installed while any profile uses a signed clone. It acts on its own only on strays younger than 20 seconds. |
@@ -68,7 +68,7 @@ The two existing modes stay as they are.
 
 ### 3.2 E2E test after implementation (nothing launched)
 
-`launchers::clone::tests::a_built_clone_keeps_the_vendor_signature_and_carries_its_icon` passes with `AI_PROFILES_E2E=1` (8.3 s). It has the real `clone::ensure` make a clone, give it its icon and pass the four-step verification. It then checks that a second `ensure` changes nothing (same inode), and that the clone is removed at the end.
+`launchers::clone::tests::a_built_clone_keeps_the_vendor_signature_and_carries_its_icon` passes with `CLAUDE_SWITCH_E2E=1` (8.3 s). It has the real `clone::ensure` make a clone, give it its icon and pass the four-step verification. It then checks that a second `ensure` changes nothing (same inode), and that the clone is removed at the end.
 
 In short: the signature itself is preserved, but to strict validation the bundle root carries extra metadata. Whether any runtime check (Keychain, TCC, Squirrel updates) objects to that can only be found out by running it.
 
@@ -79,7 +79,7 @@ In short: the signature itself is preserved, but to strict validation the bundle
 | | Script | Wrapper | **Signed clone** |
 |---|---|---|---|
 | Code signature | Anthropic's | Ad hoc, team entitlements removed | Anthropic's, byte for byte; only `--strict` fails |
-| Bundle ID | Anthropic's | `app.ai-profiles.claude.profile.<id>` | Anthropic's (shared with the original) |
+| Bundle ID | Anthropic's | `app.claude-switch.claude.profile.<id>` | Anthropic's (shared with the original) |
 | Dock icon while running | Stock orange | Profile badge | Finder custom icon with the profile badge; shown on macOS 26? (check D2) |
 | Sign in again after switching mode | — | Yes | Expected not to (C1) |
 | TCC, passkeys, Cowork | Work | Permissions asked again, passkeys may fail, no Cowork folders | Expected to work (C4–C6) |
@@ -105,7 +105,7 @@ In short: the signature itself is preserved, but to strict validation the bundle
 ### 5.2 Files on disk
 
 ```
-~/Library/Application Support/ai-profiles/
+~/Library/Application Support/claude-switch/
   profiles.json                          # gains the signedClone field
   clone-watch.log                        # the clone watch's log
   profiles/<id>/gui-data/                # unchanged
@@ -114,8 +114,8 @@ In short: the signature itself is preserved, but to strict validation the bundle
       Claude (<Name>).app                # the clone, with its Finder icon
       clone.json                         # {clonedFromVersion, color, builtBy}
       .lock                              # cross-process lock
-/Applications/Claude (<Name>).app        # script launcher shape; the script hands off to ai-profiles
-~/Library/LaunchAgents/app.ai-profiles.clone-watch.plist   # only while a profile uses a signed clone
+/Applications/Claude (<Name>).app        # script launcher shape; the script hands off to claude-switch
+~/Library/LaunchAgents/app.claude-switch.clone-watch.plist   # only while a profile uses a signed clone
 ```
 
 - **Ownership by path.** The clone keeps Anthropic's identifier and its Info.plist is sealed. So the existing identifier check (`is_ours`) can't recognize it, and nothing can be recorded inside it. What is known about it goes in `clone.json`, outside the bundle.
@@ -126,7 +126,7 @@ In short: the signature itself is preserved, but to strict validation the bundle
 
 ```
 GUI "Open"   ──┐
-Launcher in Spotlight ──> ai-profiles --open-profile <id> ──┐
+Launcher in Spotlight ──> claude-switch --open-profile <id> ──┐
 Clone watch ────────────────────────────────────────────────┴─> launch::open_profile_with
   1. Settle strays (clone::settle_strays)
      - 20 s old or younger: quit with SIGTERM, then carry on
@@ -140,9 +140,9 @@ Clone watch ──────────────────────�
   6. If 3–5 fail: return a Bypass and open the stock app instead, so the profile always opens
 ```
 
-- The launch always goes **through LaunchServices (`open`)**. Executed directly, the clone would have ai-profiles as its responsible process for TCC, and permission prompts would name ai-profiles.
+- The launch always goes **through LaunchServices (`open`)**. Executed directly, the clone would have claude-switch as its responsible process for TCC, and permission prompts would name claude-switch.
 - **`-n` is required.** The clone and the original share a bundle ID, so without it `open` brings the running original forward.
-- If the launcher (`/Applications/Claude (<Name>).app`) can't find ai-profiles at the recorded path, it opens the original the old script way.
+- If the launcher (`/Applications/Claude (<Name>).app`) can't find claude-switch at the recorded path, it opens the original the old script way.
 - A handoff launcher left behind for a profile without a signed clone would loop forever. So `open_script_launcher` opens the stock app instead of such a launcher, and the launcher is rebuilt in the right shape on the next start (`outdated` detects a shape mismatch or a host path that has gone).
 
 ### 5.4 Clone refresh policy (`clone::plan`)
@@ -190,7 +190,7 @@ A stray is a process whose executable is `profiles/<id>/app.noindex/*.app/Conten
 | At launch | `launch::open_signed_clone` | Strays 20 s old or younger are quit; older ones are asked about (§5.3). SIGKILL is never used. |
 | When opening Default | `commands::open_default_gui` | Re-homes fresh strays first; otherwise the stock launch would hand itself over to the stray. |
 | Session checks | `sessions::instance::desktop_pids` | A stray uses the stock data, so it **counts as the default instance**. |
-| The clone watch | `clone_watch` (`ai-profiles --watch-clones`, every 2 s) | Re-homes fresh strays. Notifies once per pid about an older stray. For S6: when a clone's version changed and nothing runs from it 30 s later, sends a notification. |
+| The clone watch | `clone_watch` (`claude-switch --watch-clones`, every 2 s) | Re-homes fresh strays. Notifies once per pid about an older stray. For S6: when a clone's version changed and nothing runs from it 30 s later, sends a notification. |
 
 - **Why S6 is not reopened automatically**: Squirrel also installs updates silently when the user simply quits. So from outside there is no telling whether a relaunch was meant. Instead the notification says "updated; if it didn't reopen, open it again", which is right either way. A clone this app made itself matches `clonedFromVersion` in `clone.json`, so it causes no notification.
 - **Installing and removing the watch**: `clone_watch::sync` runs after a profile is created, edited or deleted, after a surface is switched, and when the app starts.
@@ -267,7 +267,7 @@ A Claude Desktop update never requires rebuilding or updating claude-switch. Not
   - reading and writing the record, clearing leftovers, adopting a renamed clone, leaving a clone in use alone;
   - generating, recognizing and parsing the handoff script's host path (including quoted paths), and the `outdated` shape checks;
   - the four fallback cases (`FakeClone`), counting strays as the stock instance, the watch's plist, when it is wanted, version-change detection, and parsing `--watch-clones`.
-- **E2E** (`AI_PROFILES_E2E=1`): `a_built_clone_keeps_the_vendor_signature_and_carries_its_icon` checks a real clone, its verification and its removal. The app is never launched.
+- **E2E** (`CLAUDE_SWITCH_E2E=1`): `a_built_clone_keeps_the_vendor_signature_and_carries_its_icon` checks a real clone, its verification and its removal. The app is never launched.
 - **Frontend**: 689 pass, 9 of them new: the edit plan, the two options clearing each other in the create and edit dialogs, the option being hidden for ChatGPT, and the explanation dialog.
 - **Static checks**: `cargo clippy -- -D warnings` (as CI runs it), `cargo fmt --check`, `tsc`, `biome check` and `fallow` all pass.
   - `cargo clippy --all-targets` reports two errors (`test_support.rs`, `profiles.rs:788`); both are in existing test code.

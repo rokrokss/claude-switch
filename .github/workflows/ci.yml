@@ -18,23 +18,23 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: './apps/ai-profiles/src-tauri -> target'
+          workspaces: './apps/claude-switch/src-tauri -> target'
 
       - name: cargo fmt --check
         # --all: without it only the root package is checked, not the shim.
         run: cargo fmt --all --check
-        working-directory: apps/ai-profiles/src-tauri
+        working-directory: apps/claude-switch/src-tauri
 
       - name: cargo clippy
         run: cargo clippy -- -D warnings
-        working-directory: apps/ai-profiles/src-tauri
+        working-directory: apps/claude-switch/src-tauri
 
       - name: cargo test
         # State-touching tests are serialised via the cfg(test) tempdir in
         # paths.rs, so --test-threads=1 is no longer strictly required.
         # Kept as a safety net.
         run: cargo test -- --test-threads=1
-        working-directory: apps/ai-profiles/src-tauri
+        working-directory: apps/claude-switch/src-tauri
 
   frontend:
     runs-on: macos-latest

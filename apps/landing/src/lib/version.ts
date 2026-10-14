@@ -1,8 +1,7 @@
-import desktopPackage from '../../../ai-profiles/package.json'
+import desktopPackage from '../../../claude-switch/package.json'
 
 // The version of the desktop app, sourced at build time from
-// apps/ai-profiles/package.json (release-please updates that
-// file on every release). Prefix with `v` to match the
+// apps/claude-switch/package.json. Prefix with `v` to match the
 // GitHub Releases tag convention.
 const desktopVersionRaw: string = desktopPackage.version
 export const desktopVersion: string = `v${desktopVersionRaw}`

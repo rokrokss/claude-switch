@@ -1,5 +1,5 @@
 {
-  "extends": ["@ai-profiles/tsconfig/base.json", "astro/tsconfigs/strict"],
+  "extends": ["@claude-switch/tsconfig/base.json", "astro/tsconfigs/strict"],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {

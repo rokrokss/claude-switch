@@ -19,21 +19,21 @@ pnpm install
 ```
 
 ```bash
-pnpm --filter ai-profiles tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
+pnpm --filter claude-switch tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
 ```
 
-The result is `apps/ai-profiles/src-tauri/target/release/bundle/macos/ai-profiles.app`. Copy it to `/Applications`, and open it the first time with right-click → Open (it is a local build without notarization).
+The result is `apps/claude-switch/src-tauri/target/release/bundle/macos/claude-switch.app`. Copy it to `/Applications`, and open it the first time with right-click → Open (it is a local build without notarization).
 
-- The clone watch and the launchers record **the path of the ai-profiles executable that is running**, so verify with the app installed in `/Applications`. `tauri dev` works too, but the paths then point at the development build.
+- The clone watch and the launchers record **the path of the claude-switch executable that is running**, so verify with the app installed in `/Applications`. `tauri dev` works too, but the paths then point at the development build.
 - If another build of the app is installed, **don't run both** on the same data. A build that doesn't know `signedClone` drops it when it saves.
 
 ### 0.2 Test profile and shell variables
 
-1. In ai-profiles, create a profile: for example name `CloneTest`, app Claude, desktop on, CLI on, Signed clone **off** (so that C1 can be done first).
+1. In claude-switch, create a profile: for example name `CloneTest`, app Claude, desktop on, CLI on, Signed clone **off** (so that C1 can be done first).
 2. Find its id:
 
 ```bash
-plutil -p "$HOME/Library/Application Support/ai-profiles/profiles.json" | grep -E '"(id|name|signedClone|distinctDockIcon)"'
+plutil -p "$HOME/Library/Application Support/claude-switch/profiles.json" | grep -E '"(id|name|signedClone|distinctDockIcon)"'
 ```
 
 ```bash
@@ -41,7 +41,7 @@ export ID=<the id found above>
 ```
 
 ```bash
-export P="$HOME/Library/Application Support/ai-profiles/profiles/$ID"
+export P="$HOME/Library/Application Support/claude-switch/profiles/$ID"
 ```
 
 ### 0.3 Commands used throughout
@@ -61,13 +61,13 @@ ls -la "$P/app.noindex" && cat "$P/app.noindex/clone.json" && /usr/libexec/Plist
 The clone watch's state:
 
 ```bash
-launchctl print "gui/$(id -u)/app.ai-profiles.clone-watch" | head -20
+launchctl print "gui/$(id -u)/app.claude-switch.clone-watch" | head -20
 ```
 
 The clone watch's log:
 
 ```bash
-tail -f "$HOME/Library/Application Support/ai-profiles/clone-watch.log"
+tail -f "$HOME/Library/Application Support/claude-switch/clone-watch.log"
 ```
 
 The clone's signature (three of the four checks, by hand):
@@ -79,7 +79,7 @@ codesign --verify --deep --verbose=1 "$P/app.noindex/"*.app && spctl --assess --
 The automated check that clones the real Claude.app, verifies it and deletes it, without launching it:
 
 ```bash
-cd apps/ai-profiles/src-tauri && AI_PROFILES_E2E=1 cargo test a_built_clone_keeps_the_vendor_signature -- --nocapture
+cd apps/claude-switch/src-tauri && CLAUDE_SWITCH_E2E=1 cargo test a_built_clone_keeps_the_vendor_signature -- --nocapture
 ```
 
 ---
@@ -151,7 +151,7 @@ These five decide whether the mode is worth having. About 30 minutes.
 
 **B4 — Who asks for permissions (★)**
 - Steps: use the microphone (dictation) or attach a folder in Cowork, in the clone. Do it after each of the three ways in: the GUI, the launcher in Spotlight, and a relaunch by the clone watch.
-- Expected: the prompt names **"Claude"**, not ai-profiles or the `Claude (CloneTest)` launcher.
+- Expected: the prompt names **"Claude"**, not claude-switch or the `Claude (CloneTest)` launcher.
 - If it fails: one of the paths launches outside LaunchServices. Record which.
 
 **B5 — Running side by side**
@@ -266,17 +266,17 @@ These five decide whether the mode is worth having. About 30 minutes.
   1. Switch the watch off for a moment:
 
      ```bash
-     launchctl bootout "gui/$(id -u)/app.ai-profiles.clone-watch"
+     launchctl bootout "gui/$(id -u)/app.claude-switch.clone-watch"
      ```
 
   2. Click the tile as in G1 and wait more than 30 s.
   3. Switch the watch back on:
 
      ```bash
-     launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/app.ai-profiles.clone-watch.plist"
+     launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/app.claude-switch.clone-watch.plist"
      ```
 
-- Expected: it isn't quit; only the "Running without its profile…" notification arrives. Pressing Open in ai-profiles shows a "Quit and reopen" toast that puts it right. Opening from the launcher in Spotlight shows a confirmation dialog.
+- Expected: it isn't quit; only the "Running without its profile…" notification arrives. Pressing Open in claude-switch shows a "Quit and reopen" toast that puts it right. Opening from the launcher in Spotlight shows a confirmation dialog.
 
 **G5 — The background item**
 - Steps: when the watch is installed the first time, look for macOS's "Background Items Added" notification. Switch it off in System Settings → General → Login Items & Extensions, then run the state command from 0.3.
@@ -309,7 +309,7 @@ These five decide whether the mode is worth having. About 30 minutes.
 **I1** — During verification, keep this running in another terminal:
 
 ```bash
-sudo fs_usage -w -f filesys | grep -E 'ai-profiles|launcher' | grep -E 'Application Support/Claude[/ ]|Claude-3p|/\.claude'
+sudo fs_usage -w -f filesys | grep -E 'claude-switch|launcher' | grep -E 'Application Support/Claude[/ ]|Claude-3p|/\.claude'
 ```
 
 - Expected: no write by our processes to those paths.
@@ -324,7 +324,7 @@ sudo fs_usage -w -f filesys | grep -E 'ai-profiles|launcher' | grep -E 'Applicat
 - **Remove the watch by hand**:
 
   ```bash
-  launchctl bootout "gui/$(id -u)/app.ai-profiles.clone-watch"; rm -f "$HOME/Library/LaunchAgents/app.ai-profiles.clone-watch.plist"
+  launchctl bootout "gui/$(id -u)/app.claude-switch.clone-watch"; rm -f "$HOME/Library/LaunchAgents/app.claude-switch.clone-watch.plist"
   ```
 
 - **Delete the clone by hand**: quit the profile first, then run the command below. The clone is a cache and is made again on the next launch.

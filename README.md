@@ -40,9 +40,9 @@ Claude profiles can run from a **signed clone**: a copy of Claude.app that keeps
   </picture>
 
 - **What it creates**:
-  - `~/Library/Application Support/ai-profiles/profiles/<id>/app.noindex/Claude (<Name>).app` — the clone. It's a cache: delete it and it is made again on the next launch.
+  - `~/Library/Application Support/claude-switch/profiles/<id>/app.noindex/Claude (<Name>).app` — the clone. It's a cache: delete it and it is made again on the next launch.
   - `/Applications/Claude (<Name>).app` — the launcher. It hands launches to the app, and opens the stock Claude if the app is gone.
-  - `~/Library/LaunchAgents/app.ai-profiles.clone-watch.plist` — the clone watch, installed only while some profile uses a signed clone.
+  - `~/Library/LaunchAgents/app.claude-switch.clone-watch.plist` — the clone watch, installed only while some profile uses a signed clone.
 - **Your data stays where it is**: the clone runs on the profile's own `gui-data` (`--user-data-dir`) and `cli-config` (`CLAUDE_CONFIG_DIR`). Account data is never moved or deleted automatically, and a running clone is never replaced.
 - **Already running?** Opening the profile brings its window forward.
 - **Reopened by an update or the Dock?** macOS starts the clone without the profile's arguments. Within 20 seconds it is quit and reopened as the profile; an older one is only quit after asking, and an update that left a profile closed is reported in a notification.
@@ -64,10 +64,10 @@ Build it from source:
 
 ```sh
 pnpm install
-pnpm --filter ai-profiles tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
+pnpm --filter claude-switch tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
 ```
 
-Then copy `apps/ai-profiles/src-tauri/target/release/bundle/macos/ai-profiles.app` to `/Applications`. The build isn't notarized, so open it the first time with right-click → Open. The app keeps its data in `~/Library/Application Support/ai-profiles/`. This repository publishes no releases, so the app never updates itself; build a new version to upgrade.
+Then copy `apps/claude-switch/src-tauri/target/release/bundle/macos/claude-switch.app` to `/Applications`. The build isn't notarized, so open it the first time with right-click → Open. The app keeps its data in `~/Library/Application Support/claude-switch/`. This repository publishes no releases, so the app never updates itself; build a new version to upgrade.
 
 ## Using it
 
@@ -95,7 +95,7 @@ Anything executable or credentialed stays isolated: a hook added for one account
 The inherited entries are symlinks, created only over an empty path. To give a profile its own copy, replace the link with a real directory:
 
 ```sh
-cd ~/Library/Application\ Support/ai-profiles/profiles/<id>/cli-config
+cd ~/Library/Application\ Support/claude-switch/profiles/<id>/cli-config
 rm skills && mkdir skills
 ```
 
@@ -115,7 +115,7 @@ The first refresh asks for Keychain access; choose "Always Allow".
 Each profile lists its local coding sessions: Claude Code for Claude profiles (the CLI and the desktop app's Code tab), Codex for ChatGPT profiles. Chats on claude.ai and in ChatGPT live on the server and don't appear here.
 
 - **Move a session to another account** of the same app, including your default install, and carry on there with its full history. Nothing is deleted: the session is copied, then archived at the source, so **Restore** undoes a move. A file the move would overwrite is backed up first.
-- **Archive and restore.** Desktop sessions use the desktop app's own archive flag, CLI-only Claude sessions move into `<config>/ai-profiles-archive/` (out of reach of Claude Code's 30-day cleanup), and Codex sessions use Codex's own archive.
+- **Archive and restore.** Desktop sessions use the desktop app's own archive flag, CLI-only Claude sessions move into `<config>/claude-switch-archive/` (out of reach of Claude Code's 30-day cleanup), and Codex sessions use Codex's own archive.
 - **Search and filter** by title, folder or last prompt, Desktop or CLI, sorted by last use.
 
 A session open in a terminal can't be moved or archived until it is closed. If the desktop app has it open, the confirmation offers to quit that profile's instance, and only that one.
@@ -125,7 +125,7 @@ A session open in a terminal can't be moved or archived until it is closed. If t
 On first launch, or later from Settings → Data → "Detect and import…" (⌘I), the app can adopt your existing `~/.claude` and `~/Library/Application Support/Claude` (or `~/.codex` and `~/Library/Application Support/Codex`) as your first profile. It:
 
 1. copies your data into the new profile,
-2. moves the originals into `~/Library/Application Support/ai-profiles/migration-backup-<timestamp>/`,
+2. moves the originals into `~/Library/Application Support/claude-switch/migration-backup-<timestamp>/`,
 3. creates the profile's launcher and CLI wrapper.
 
 Afterwards use `claude-<slug>` (or `codex-<slug>`) for that account. Claude profiles ask you to sign in once, since the Keychain entry follows the config dir.
@@ -133,15 +133,15 @@ Afterwards use `claude-<slug>` (or `codex-<slug>`) for that account. Claude prof
 Backups are kept for 7 days. To undo an import before then, delete the profile and move the originals back:
 
 ```sh
-mv ~/Library/Application\ Support/ai-profiles/migration-backup-<timestamp>/.claude ~/.claude
-mv ~/Library/Application\ Support/ai-profiles/migration-backup-<timestamp>/Claude ~/Library/Application\ Support/Claude
+mv ~/Library/Application\ Support/claude-switch/migration-backup-<timestamp>/.claude ~/.claude
+mv ~/Library/Application\ Support/claude-switch/migration-backup-<timestamp>/Claude ~/Library/Application\ Support/Claude
 ```
 
 ## Development
 
 ```sh
-(cd apps/ai-profiles/src-tauri && cargo test -- --test-threads=1)
-NODE_OPTIONS=--no-webstorage pnpm --filter ai-profiles test   # needed on Node 25+, whose built-in localStorage clashes with happy-dom
+(cd apps/claude-switch/src-tauri && cargo test -- --test-threads=1)
+NODE_OPTIONS=--no-webstorage pnpm --filter claude-switch test   # needed on Node 25+, whose built-in localStorage clashes with happy-dom
 ```
 
 `pnpm install` also installs lefthook git hooks. On current stable clippy (1.93), the pre-push hook's `cargo clippy --all-targets` fails on two lints in existing test code (`test_support.rs`, `profiles.rs`). CI checks without `--all-targets` and passes. To skip the hooks, install with `pnpm install --ignore-scripts`, or push with `LEFTHOOK=0 git push` once they're installed.

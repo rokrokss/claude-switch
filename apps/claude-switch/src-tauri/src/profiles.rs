@@ -1,0 +1,1196 @@
+use std::collections::HashMap;
+use std::fs;
+use std::io::Write;
+use std::path::Path;
+use std::sync::{Mutex, MutexGuard, PoisonError};
+
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+
+use crate::app_kind::{spec, AppKind};
+use crate::error::{AppError, AppResult};
+use crate::paths::{
+    cli_wrapper_path, ensure_app_dir, gui_launcher_path, profile_dir, profiles_json_path,
+    resolve_gui_app, stock_cli_config_dir, stock_gui_support_dir,
+};
+use crate::slug::slugify;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Surfaces {
+    pub gui: bool,
+    pub cli: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Profile {
+    pub id: String,
+    #[serde(default)]
+    pub app: AppKind,
+    pub name: String,
+    pub slug: String,
+    pub color: String,
+    pub created_at: String,
+    pub surfaces: Surfaces,
+    /// Whether the desktop launcher is a wrapper bundle with a Dock identity of
+    /// its own (its own icon, label and pinnable tile) rather than a script that
+    /// opens the stock app. Off unless asked for: building a wrapper re-signs a
+    /// copy of the app, and converting an existing profile costs a re-login, so
+    /// profiles saved before this field existed stay as they were.
+    #[serde(default)]
+    pub distinct_dock_icon: bool,
+    /// Whether the desktop app runs from a signed clone: an APFS copy of the
+    /// vendor app kept under the profile's own directory, signature untouched,
+    /// told apart by a Finder custom icon (see [`crate::launchers::clone`]).
+    /// Never together with `distinct_dock_icon`, and only for an app whose spec
+    /// supports it. Off unless asked for; versions of this app that predate the
+    /// field ignore it and give the profile the plain script launcher.
+    #[serde(default)]
+    pub signed_clone: bool,
+    /// Set whenever the user opens the desktop app or copies the CLI
+    /// command for this profile. `None` until the first such interaction.
+    #[serde(default)]
+    pub last_used_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfilePatch {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Switching this rebuilds the launcher in the other shape.
+    #[serde(default)]
+    pub distinct_dock_icon: Option<bool>,
+    /// Switching this rebuilds the launcher, and makes or drops the clone.
+    #[serde(default)]
+    pub signed_clone: Option<bool>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Surface {
+    Gui,
+    Cli,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfilePaths {
+    pub data_dir: String,
+    pub gui_data_dir: String,
+    pub cli_config_dir: String,
+    pub gui_launcher_path: Option<String>,
+    pub cli_wrapper_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct Store {
+    profiles: Vec<Profile>,
+}
+
+/// Held for the whole of a load, change and save of `profiles.json`.
+///
+/// Commands that build launchers run off the main thread, so two of these can be
+/// in flight at once. Without the lock each would load the same list and the
+/// later save would silently drop the earlier one's change (and both write
+/// through the same temporary file). Reading needs no lock: a save is an atomic
+/// rename, so a read sees the list from before it or from after.
+static STORE_LOCK: Mutex<()> = Mutex::new(());
+
+/// Take [`STORE_LOCK`]. Keep the guard until the save is done.
+pub fn lock_store() -> MutexGuard<'static, ()> {
+    // A panic under the lock leaves nothing half-written (saves are renames), so
+    // a poisoned lock is as good as any other.
+    STORE_LOCK.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+pub fn load() -> AppResult<Vec<Profile>> {
+    let path = profiles_json_path()?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = fs::read_to_string(&path)?;
+    if raw.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    let store: Store = serde_json::from_str(&raw)?;
+    Ok(store.profiles)
+}
+
+pub fn save_all(profiles: &[Profile]) -> AppResult<()> {
+    ensure_app_dir()?;
+    let path = profiles_json_path()?;
+    let store = Store {
+        profiles: profiles.to_vec(),
+    };
+    let body = serde_json::to_vec_pretty(&store)?;
+    atomic_write(&path, &body)?;
+    Ok(())
+}
+
+fn atomic_write(path: &Path, body: &[u8]) -> AppResult<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| AppError::NotFound(format!("path {} has no parent", path.display())))?;
+    fs::create_dir_all(parent)?;
+    let tmp = parent.join(
+        path.file_name()
+            .map(|name| format!(".{}.tmp", name.to_string_lossy()))
+            .unwrap_or_else(|| ".tmp".to_string()),
+    );
+    {
+        let mut file = fs::File::create(&tmp)?;
+        file.write_all(body)?;
+        file.sync_all()?;
+    }
+    fs::rename(&tmp, path)?;
+    Ok(())
+}
+
+pub fn create(
+    app: AppKind,
+    name: &str,
+    color: &str,
+    surfaces: Surfaces,
+    distinct_dock_icon: bool,
+    signed_clone: bool,
+) -> AppResult<Profile> {
+    let trimmed = name.trim();
+    validate_name(trimmed)?;
+    validate_desktop_mode(app, distinct_dock_icon, signed_clone)?;
+    if !is_valid_hex_color(color) {
+        return Err(AppError::Validation(format!(
+            "color must be a 7-char hex like #7C3AED, got '{color}'"
+        )));
+    }
+    let slug = slugify(trimmed);
+    if slug.is_empty() {
+        return Err(AppError::Validation(
+            "name produced an empty slug after sanitisation".to_string(),
+        ));
+    }
+
+    let _store = lock_store();
+    let mut existing = load()?;
+    if slug_taken(&existing, app, &slug, None) {
+        return Err(AppError::Validation(format!(
+            "a profile with slug '{slug}' already exists"
+        )));
+    }
+
+    let profile = Profile {
+        id: Uuid::new_v4().to_string(),
+        app,
+        name: trimmed.to_string(),
+        slug,
+        color: color.to_string(),
+        created_at: Utc::now().to_rfc3339(),
+        surfaces,
+        distinct_dock_icon,
+        signed_clone,
+        last_used_at: None,
+    };
+
+    let dir = profile_dir(&profile.id)?;
+    if profile.surfaces.gui {
+        fs::create_dir_all(dir.join("gui-data"))?;
+    }
+    if profile.surfaces.cli {
+        fs::create_dir_all(dir.join("cli-config"))?;
+    }
+
+    // Generate launchers BEFORE persisting, so a launcher failure rolls back cleanly.
+    if profile.surfaces.gui {
+        if let Err(err) = crate::launchers::gui::generate(&profile, env!("CARGO_PKG_VERSION")) {
+            let _ = std::fs::remove_dir_all(&dir);
+            return Err(err);
+        }
+    }
+
+    if profile.surfaces.cli {
+        if let Err(err) = crate::launchers::cli::generate(&profile) {
+            if profile.surfaces.gui {
+                let _ = crate::launchers::gui::remove(&profile.name, profile.app.spec());
+            }
+            let _ = std::fs::remove_dir_all(&dir);
+            return Err(err);
+        }
+    }
+
+    existing.push(profile.clone());
+    if let Err(err) = save_all(&existing) {
+        if profile.surfaces.cli {
+            let _ = crate::launchers::cli::remove(&profile.slug, profile.app.spec());
+        }
+        if profile.surfaces.gui {
+            let _ = crate::launchers::gui::remove(&profile.name, profile.app.spec());
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        return Err(err);
+    }
+    Ok(profile)
+}
+
+/// Checks the desktop launch mode a profile of `app` asks for: a signed clone
+/// only where the app supports one, and never alongside a wrapper — the two
+/// are different launchers at the same path.
+fn validate_desktop_mode(
+    app: AppKind,
+    distinct_dock_icon: bool,
+    signed_clone: bool,
+) -> AppResult<()> {
+    if !signed_clone {
+        return Ok(());
+    }
+    if !app.spec().supports_signed_clone || !cfg!(target_os = "macos") {
+        return Err(AppError::Validation(format!(
+            "a signed clone is not available for {}",
+            app.spec().display_name
+        )));
+    }
+    if distinct_dock_icon {
+        return Err(AppError::Validation(
+            "a profile can't have both a distinct Dock icon and a signed clone".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn is_valid_hex_color(color: &str) -> bool {
+    if color.len() != 7 || !color.starts_with('#') {
+        return false;
+    }
+    color.chars().skip(1).all(|ch| ch.is_ascii_hexdigit())
+}
+
+/// Checks an already-trimmed display name. The name becomes part of a path
+/// (`/Applications/<App> (<name>).app`), so `/`, a leading `.` and control
+/// characters are rejected — they'd let a name escape `/Applications` or
+/// smuggle a newline into generated files.
+pub fn validate_name(name: &str) -> AppResult<()> {
+    if name.is_empty() {
+        return Err(AppError::Validation("name must not be empty".to_string()));
+    }
+    if name.contains('/') || name.starts_with('.') || name.chars().any(char::is_control) {
+        return Err(AppError::Validation(
+            "name must not contain '/', control characters, or start with '.'".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+/// True when an existing profile already claims `slug` for the same `app`.
+/// Uniqueness is scoped per app, so a ChatGPT "personal" can coexist with a
+/// Claude "personal". `exclude_id` skips a profile by id — used by `update`
+/// so renaming a profile to its own slug doesn't collide with itself.
+fn slug_taken(existing: &[Profile], app: AppKind, slug: &str, exclude_id: Option<&str>) -> bool {
+    existing.iter().any(|profile| {
+        profile.app == app && profile.slug == slug && Some(profile.id.as_str()) != exclude_id
+    })
+}
+
+/// `original` with `patch` applied, validated the way `create` validates a new
+/// profile, plus that a renamed profile doesn't take another profile's slug.
+/// `all` is every saved profile, `original` included.
+fn patched(original: &Profile, patch: ProfilePatch, all: &[Profile]) -> AppResult<Profile> {
+    let new_name = patch
+        .name
+        .as_deref()
+        .unwrap_or(&original.name)
+        .trim()
+        .to_string();
+    validate_name(&new_name)?;
+    let new_color = patch.color.unwrap_or_else(|| original.color.clone());
+    if !is_valid_hex_color(&new_color) {
+        return Err(AppError::Validation(format!(
+            "color must be #RRGGBB, got '{new_color}'"
+        )));
+    }
+    let new_slug = slugify(&new_name);
+    if new_slug.is_empty() {
+        return Err(AppError::Validation(
+            "name produced an empty slug after sanitisation".into(),
+        ));
+    }
+    if new_slug != original.slug
+        && slug_taken(all, original.app, &new_slug, Some(original.id.as_str()))
+    {
+        return Err(AppError::Validation(format!(
+            "a profile with slug '{new_slug}' already exists"
+        )));
+    }
+
+    let distinct_dock_icon = patch
+        .distinct_dock_icon
+        .unwrap_or(original.distinct_dock_icon);
+    let signed_clone = patch.signed_clone.unwrap_or(original.signed_clone);
+    validate_desktop_mode(original.app, distinct_dock_icon, signed_clone)?;
+
+    Ok(Profile {
+        id: original.id.clone(),
+        app: original.app,
+        name: new_name,
+        slug: new_slug,
+        color: new_color,
+        created_at: original.created_at.clone(),
+        surfaces: original.surfaces.clone(),
+        distinct_dock_icon,
+        signed_clone,
+        last_used_at: original.last_used_at.clone(),
+    })
+}
+
+pub fn update(id: &str, patch: ProfilePatch) -> AppResult<Profile> {
+    let _store = lock_store();
+    let mut all = load()?;
+    let position = all
+        .iter()
+        .position(|profile| profile.id == id)
+        .ok_or_else(|| AppError::NotFound(format!("profile {id} not found")))?;
+    let original = all[position].clone();
+    let updated = patched(&original, patch, &all)?;
+
+    if updated.surfaces.gui {
+        crate::launchers::gui::generate(&updated, env!("CARGO_PKG_VERSION"))?;
+    }
+    if updated.surfaces.cli {
+        if let Err(err) = crate::launchers::cli::generate(&updated) {
+            if updated.surfaces.gui {
+                let _ = crate::launchers::gui::remove(&updated.name, updated.app.spec());
+            }
+            return Err(err);
+        }
+    }
+
+    all[position] = updated.clone();
+    if let Err(err) = save_all(&all) {
+        if updated.surfaces.cli {
+            let _ = crate::launchers::cli::remove(&updated.slug, updated.app.spec());
+        }
+        if updated.surfaces.gui {
+            let _ = crate::launchers::gui::remove(&updated.name, updated.app.spec());
+        }
+        return Err(err);
+    }
+
+    if updated.name != original.name && original.surfaces.gui {
+        let _ = crate::launchers::gui::remove(&original.name, original.app.spec());
+    }
+    if updated.slug != original.slug && original.surfaces.cli {
+        let _ = crate::launchers::cli::remove(&original.slug, original.app.spec());
+    }
+
+    Ok(updated)
+}
+
+pub fn delete(id: &str, move_to_trash: bool) -> AppResult<()> {
+    let _store = lock_store();
+    let mut all = load()?;
+    let position = all
+        .iter()
+        .position(|profile| profile.id == id)
+        .ok_or_else(|| AppError::NotFound(format!("profile {id} not found")))?;
+    let profile = all[position].clone();
+
+    if profile.surfaces.gui {
+        let _ = crate::launchers::gui::remove(&profile.name, profile.app.spec());
+    }
+    if profile.surfaces.cli {
+        let _ = crate::launchers::cli::remove(&profile.slug, profile.app.spec());
+    }
+
+    let dir = crate::paths::profile_dir(&profile.id)?;
+    if dir.exists() {
+        if move_to_trash {
+            trash::delete(&dir).map_err(|err| {
+                AppError::Validation(format!("failed to move {} to Trash: {err}", dir.display()))
+            })?;
+        } else {
+            std::fs::remove_dir_all(&dir)?;
+        }
+    }
+
+    all.remove(position);
+    save_all(&all)?;
+    Ok(())
+}
+
+pub fn toggle_surface(id: &str, surface: Surface, enabled: bool) -> AppResult<Profile> {
+    let _store = lock_store();
+    let mut all = load()?;
+    let position = all
+        .iter()
+        .position(|profile| profile.id == id)
+        .ok_or_else(|| AppError::NotFound(format!("profile {id} not found")))?;
+    let mut profile = all[position].clone();
+
+    let already = match surface {
+        Surface::Gui => profile.surfaces.gui,
+        Surface::Cli => profile.surfaces.cli,
+    };
+    if already == enabled {
+        return Ok(profile);
+    }
+
+    let dir = crate::paths::profile_dir(&profile.id)?;
+    if enabled {
+        match surface {
+            Surface::Gui => {
+                fs::create_dir_all(dir.join("gui-data"))?;
+                profile.surfaces.gui = true;
+                crate::launchers::gui::generate(&profile, env!("CARGO_PKG_VERSION"))?;
+            }
+            Surface::Cli => {
+                fs::create_dir_all(dir.join("cli-config"))?;
+                profile.surfaces.cli = true;
+                crate::launchers::cli::generate(&profile)?;
+            }
+        }
+    } else {
+        match surface {
+            Surface::Gui => {
+                let _ = crate::launchers::gui::remove(&profile.name, profile.app.spec());
+                // A clone is only ever a cache of the vendor app: without a
+                // desktop surface there is nothing to keep it for.
+                crate::launchers::clone::remove_unless_in_use(&profile.id);
+                profile.surfaces.gui = false;
+            }
+            Surface::Cli => {
+                let _ = crate::launchers::cli::remove(&profile.slug, profile.app.spec());
+                profile.surfaces.cli = false;
+            }
+        }
+    }
+
+    all[position] = profile.clone();
+    save_all(&all)?;
+    Ok(profile)
+}
+
+/// Reorder profiles.json to match the given id sequence. `ids` must be
+/// a strict permutation of the existing profile ids — same count, no
+/// duplicates, no unknown ids. Returns the freshly-ordered list.
+///
+/// The display order is the canonical source for `Mod+1`..`Mod+N` (and
+/// any future positional shortcut), so a single atomic write here
+/// updates both the visible list and the keybinding indices in one go.
+pub fn reorder(ids: &[String]) -> AppResult<Vec<Profile>> {
+    let _store = lock_store();
+    let all = load()?;
+    if ids.len() != all.len() {
+        return Err(AppError::Validation(format!(
+            "expected {} ids in reorder, got {}",
+            all.len(),
+            ids.len()
+        )));
+    }
+    let mut seen = std::collections::HashSet::with_capacity(ids.len());
+    for id in ids {
+        if !seen.insert(id.as_str()) {
+            return Err(AppError::Validation(format!(
+                "duplicate id in reorder: {id}"
+            )));
+        }
+    }
+    let mut by_id: HashMap<String, Profile> = HashMap::with_capacity(all.len());
+    for profile in all {
+        by_id.insert(profile.id.clone(), profile);
+    }
+    let mut reordered = Vec::with_capacity(ids.len());
+    for id in ids {
+        match by_id.remove(id) {
+            Some(profile) => reordered.push(profile),
+            None => {
+                return Err(AppError::Validation(format!(
+                    "unknown profile id in reorder: {id}"
+                )))
+            }
+        }
+    }
+    save_all(&reordered)?;
+    Ok(reordered)
+}
+
+/// Stamp `last_used_at` with the current time on the profile with the
+/// given id and persist. Returns the updated profile so callers (IPC
+/// handlers) can hand it back to the React side without an extra load.
+pub fn touch_last_used(id: &str) -> AppResult<Profile> {
+    let _store = lock_store();
+    let mut all = load()?;
+    let position = all
+        .iter()
+        .position(|profile| profile.id == id)
+        .ok_or_else(|| AppError::NotFound(format!("profile {id} not found")))?;
+    all[position].last_used_at = Some(Utc::now().to_rfc3339());
+    let updated = all[position].clone();
+    save_all(&all)?;
+    Ok(updated)
+}
+
+/// Paths for the synthetic "default" entry representing the user's
+/// unmigrated stock install of `kind`. Returns None for both
+/// `gui_launcher_path` (when the stock app bundle isn't detected) and
+/// `cli_wrapper_path` (the stock CLI has no claude-switch wrapper).
+fn default_paths(kind: AppKind) -> AppResult<ProfilePaths> {
+    let spec = spec(kind);
+    // The default entry launches the stock app bundle, not its data directory.
+    // Resolve to the application bundle and expose it only when it exists so
+    // "Open" / "Launcher" act on a launchable app.
+    let resolved = resolve_gui_app(spec);
+    Ok(ProfilePaths {
+        data_dir: stock_cli_config_dir(spec)?.display().to_string(),
+        gui_data_dir: stock_gui_support_dir(spec)?.display().to_string(),
+        cli_config_dir: stock_cli_config_dir(spec)?.display().to_string(),
+        gui_launcher_path: resolved.map(|app| app.bundle_path.display().to_string()),
+        cli_wrapper_path: None,
+    })
+}
+
+pub fn paths(id: &str) -> AppResult<ProfilePaths> {
+    if let Some(kind) = AppKind::from_default_id(id) {
+        return default_paths(kind);
+    }
+    let all = load()?;
+    let profile = all
+        .iter()
+        .find(|candidate| candidate.id == id)
+        .ok_or_else(|| AppError::NotFound(format!("profile {id} not found")))?;
+    let data_dir = profile_dir(&profile.id)?;
+    let spec = profile.app.spec();
+    Ok(ProfilePaths {
+        data_dir: data_dir.display().to_string(),
+        gui_data_dir: data_dir.join("gui-data").display().to_string(),
+        cli_config_dir: data_dir.join("cli-config").display().to_string(),
+        gui_launcher_path: Some(gui_launcher_path(&profile.name, spec).display().to_string()),
+        cli_wrapper_path: Some(cli_wrapper_path(&profile.slug, spec)?.display().to_string()),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::APP_DIR_TEST_LOCK as TEST_LOCK;
+
+    fn purge_for_test() {
+        let _ = std::fs::remove_dir_all(crate::paths::app_data_dir().unwrap());
+    }
+
+    #[test]
+    fn default_paths_for_claude_resolve_to_stock_locations() {
+        let paths = default_paths(AppKind::Claude).expect("home dir resolvable");
+        assert!(paths.data_dir.ends_with("/.claude"));
+        assert!(paths.cli_config_dir.ends_with("/.claude"));
+        assert!(paths
+            .gui_data_dir
+            .ends_with("/Library/Application Support/Claude"));
+        assert!(paths.cli_wrapper_path.is_none(), "default has no wrapper");
+        // gui_launcher_path is Some only if stock Claude.app is installed, so
+        // don't require a value (the test host may lack it). But when present
+        // it must be the launchable .app bundle, never the data directory —
+        // otherwise "Open Claude" just reveals a folder in Finder.
+        if let Some(launcher) = &paths.gui_launcher_path {
+            assert_ne!(
+                launcher, &paths.gui_data_dir,
+                "launcher must not be the data directory"
+            );
+            assert!(
+                launcher.ends_with(".app"),
+                "launcher must be an .app bundle"
+            );
+        }
+    }
+
+    #[test]
+    fn default_paths_for_codex_resolve_to_stock_codex_locations() {
+        let paths = default_paths(AppKind::Codex).expect("home resolvable");
+        assert!(paths.cli_config_dir.ends_with("/.codex"));
+        assert!(paths
+            .gui_data_dir
+            .ends_with("/Library/Application Support/Codex"));
+        assert!(paths.cli_wrapper_path.is_none());
+    }
+
+    #[test]
+    fn paths_for_reserved_default_id_does_not_consult_managed_profiles_store() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        let result = paths("default:claude").expect("default id resolves");
+        assert!(result.cli_wrapper_path.is_none());
+        purge_for_test();
+    }
+
+    #[test]
+    fn paths_recognises_codex_default_id() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        let result = paths("default:codex").expect("default id resolves");
+        assert!(result.cli_config_dir.ends_with("/.codex"));
+        purge_for_test();
+    }
+
+    #[test]
+    fn hex_color_validator_accepts_correct_format() {
+        assert!(is_valid_hex_color("#7C3AED"));
+        assert!(is_valid_hex_color("#000000"));
+        assert!(is_valid_hex_color("#ffffff"));
+    }
+
+    #[test]
+    fn hex_color_validator_rejects_bad_input() {
+        assert!(!is_valid_hex_color("7C3AED"));
+        assert!(!is_valid_hex_color("#7C3AE"));
+        assert!(!is_valid_hex_color("#GGGGGG"));
+        assert!(!is_valid_hex_color(""));
+    }
+
+    fn fixture_profile(id: &str, name: &str) -> Profile {
+        Profile {
+            id: id.into(),
+            app: AppKind::Claude,
+            name: name.into(),
+            slug: name.to_lowercase(),
+            color: "#7C3AED".into(),
+            created_at: "2026-05-20T12:00:00Z".into(),
+            surfaces: Surfaces {
+                gui: false,
+                cli: false,
+            },
+            distinct_dock_icon: false,
+            signed_clone: false,
+            last_used_at: None,
+        }
+    }
+
+    // --- slug uniqueness is scoped per app (a Codex "personal" may coexist
+    // with a Claude "personal") ---
+
+    #[test]
+    fn slug_taken_is_false_when_slug_belongs_to_a_different_app() {
+        // fixture_profile sets app = Claude, slug = "personal".
+        let existing = vec![fixture_profile("a", "Personal")];
+        assert!(!slug_taken(&existing, AppKind::Codex, "personal", None));
+    }
+
+    #[test]
+    fn slug_taken_is_true_for_same_app_and_slug() {
+        let existing = vec![fixture_profile("a", "Personal")];
+        assert!(slug_taken(&existing, AppKind::Claude, "personal", None));
+    }
+
+    #[test]
+    fn slug_taken_excludes_the_given_id() {
+        // Renaming profile "a" to its own slug must not collide with itself.
+        let existing = vec![fixture_profile("a", "Personal")];
+        assert!(!slug_taken(
+            &existing,
+            AppKind::Claude,
+            "personal",
+            Some("a")
+        ));
+    }
+
+    #[test]
+    fn reorder_writes_the_requested_permutation() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        save_all(&[
+            fixture_profile("a", "A"),
+            fixture_profile("b", "B"),
+            fixture_profile("c", "C"),
+        ])
+        .unwrap();
+
+        let reordered = reorder(&["c".into(), "a".into(), "b".into()]).unwrap();
+        assert_eq!(
+            reordered
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["c", "a", "b"]
+        );
+        let persisted = load().unwrap();
+        assert_eq!(
+            persisted
+                .iter()
+                .map(|profile| profile.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["c", "a", "b"]
+        );
+        purge_for_test();
+    }
+
+    #[test]
+    fn reorder_rejects_wrong_count() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        save_all(&[fixture_profile("a", "A"), fixture_profile("b", "B")]).unwrap();
+        let err = reorder(&["a".into()]).unwrap_err();
+        match err {
+            AppError::Validation(msg) => assert!(msg.contains("got 1")),
+            other => panic!("expected Validation, got {other:?}"),
+        }
+        purge_for_test();
+    }
+
+    #[test]
+    fn reorder_rejects_duplicates() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        save_all(&[fixture_profile("a", "A"), fixture_profile("b", "B")]).unwrap();
+        let err = reorder(&["a".into(), "a".into()]).unwrap_err();
+        match err {
+            AppError::Validation(msg) => assert!(msg.contains("duplicate")),
+            other => panic!("expected Validation, got {other:?}"),
+        }
+        purge_for_test();
+    }
+
+    #[test]
+    fn reorder_rejects_unknown_id() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        save_all(&[fixture_profile("a", "A"), fixture_profile("b", "B")]).unwrap();
+        let err = reorder(&["a".into(), "ghost".into()]).unwrap_err();
+        match err {
+            AppError::Validation(msg) => assert!(msg.contains("ghost")),
+            other => panic!("expected Validation, got {other:?}"),
+        }
+        purge_for_test();
+    }
+
+    #[test]
+    fn touch_last_used_stamps_only_the_named_profile_and_persists() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        save_all(&[fixture_profile("a", "A"), fixture_profile("b", "B")]).unwrap();
+
+        let touched = touch_last_used("b").unwrap();
+        assert!(touched.last_used_at.is_some());
+
+        let persisted = load().unwrap();
+        assert_eq!(persisted[0].last_used_at, None);
+        assert_eq!(persisted[1].last_used_at, touched.last_used_at);
+        purge_for_test();
+    }
+
+    #[test]
+    fn changes_made_at_the_same_time_do_not_lose_each_other() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        let ids: Vec<String> = (0..12).map(|index| format!("p{index}")).collect();
+        let saved: Vec<Profile> = ids.iter().map(|id| fixture_profile(id, id)).collect();
+        save_all(&saved).unwrap();
+
+        // Twelve loads that would each have seen the same list.
+        let threads: Vec<_> = ids
+            .iter()
+            .cloned()
+            .map(|id| std::thread::spawn(move || touch_last_used(&id).unwrap()))
+            .collect();
+        for thread in threads {
+            thread.join().unwrap();
+        }
+
+        let unstamped: Vec<String> = load()
+            .unwrap()
+            .into_iter()
+            .filter(|profile| profile.last_used_at.is_none())
+            .map(|profile| profile.id)
+            .collect();
+        assert_eq!(unstamped, Vec::<String>::new());
+        purge_for_test();
+    }
+
+    #[test]
+    fn touch_last_used_rejects_an_unknown_id() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        save_all(&[fixture_profile("a", "A")]).unwrap();
+        let err = touch_last_used("ghost").unwrap_err();
+        match err {
+            AppError::NotFound(msg) => assert!(msg.contains("ghost")),
+            other => panic!("expected NotFound, got {other:?}"),
+        }
+        purge_for_test();
+    }
+
+    #[test]
+    fn profile_roundtrips_through_json() {
+        let original = Profile {
+            id: "11111111-1111-1111-1111-111111111111".to_string(),
+            app: AppKind::Claude,
+            name: "Personal".to_string(),
+            slug: "personal".to_string(),
+            color: "#7C3AED".to_string(),
+            created_at: "2026-05-20T12:00:00Z".to_string(),
+            surfaces: Surfaces {
+                gui: true,
+                cli: true,
+            },
+            distinct_dock_icon: false,
+            signed_clone: false,
+            last_used_at: None,
+        };
+        let raw = serde_json::to_string(&original).unwrap();
+        let parsed: Profile = serde_json::from_str(&raw).unwrap();
+        assert_eq!(parsed, original);
+        assert!(raw.contains(r#""createdAt""#));
+    }
+
+    #[test]
+    fn profiles_saved_before_the_dock_setting_load_with_it_off() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        // A profiles.json written by a version that predates the field.
+        let saved = r##"{"profiles":[{"id":"a","app":"claude","name":"Old","slug":"old",
+            "color":"#7C3AED","createdAt":"2026-05-20T12:00:00Z",
+            "surfaces":{"gui":true,"cli":false}}]}"##;
+        ensure_app_dir().unwrap();
+        fs::write(profiles_json_path().unwrap(), saved).unwrap();
+
+        let loaded = load().unwrap();
+
+        assert_eq!(loaded.len(), 1);
+        assert!(!loaded[0].distinct_dock_icon);
+        purge_for_test();
+    }
+
+    #[test]
+    fn the_dock_setting_is_stored_in_camel_case() {
+        let mut profile = fixture_profile("a", "A");
+        profile.distinct_dock_icon = true;
+
+        let raw = serde_json::to_string(&profile).unwrap();
+
+        assert!(raw.contains(r#""distinctDockIcon":true"#), "{raw}");
+        let parsed: Profile = serde_json::from_str(&raw).unwrap();
+        assert!(parsed.distinct_dock_icon);
+    }
+
+    fn patch(name: Option<&str>, color: Option<&str>, dock: Option<bool>) -> ProfilePatch {
+        ProfilePatch {
+            name: name.map(str::to_owned),
+            color: color.map(str::to_owned),
+            distinct_dock_icon: dock,
+            signed_clone: None,
+        }
+    }
+
+    #[test]
+    fn patched_changes_the_dock_setting_only_when_the_patch_carries_it() {
+        let mut original = fixture_profile("a", "Personal");
+        let all = vec![original.clone()];
+
+        let untouched = patched(&original, patch(None, None, None), &all).unwrap();
+        assert!(!untouched.distinct_dock_icon);
+
+        let turned_on = patched(&original, patch(None, None, Some(true)), &all).unwrap();
+        assert!(turned_on.distinct_dock_icon);
+
+        original.distinct_dock_icon = true;
+        let kept = patched(&original, patch(Some("Renamed"), None, None), &all).unwrap();
+        assert!(
+            kept.distinct_dock_icon,
+            "an unrelated edit must not switch it off"
+        );
+
+        let turned_off = patched(&original, patch(None, None, Some(false)), &all).unwrap();
+        assert!(!turned_off.distinct_dock_icon);
+    }
+
+    #[test]
+    fn patched_keeps_everything_the_patch_does_not_name() {
+        let mut original = fixture_profile("a", "Personal");
+        original.last_used_at = Some("2026-06-01T00:00:00Z".into());
+        let all = vec![original.clone()];
+
+        let updated = patched(&original, patch(None, None, Some(true)), &all).unwrap();
+
+        assert_eq!(
+            updated,
+            Profile {
+                distinct_dock_icon: true,
+                ..original
+            }
+        );
+    }
+
+    #[test]
+    fn patched_applies_the_same_rules_as_create() {
+        let original = fixture_profile("a", "Personal");
+        let other = fixture_profile("b", "Work");
+        let all = vec![original.clone(), other];
+
+        let empty_name = patched(&original, patch(Some("  "), None, None), &all);
+        assert!(matches!(empty_name, Err(AppError::Validation(_))));
+
+        let bad_color = patched(&original, patch(None, Some("purple"), None), &all);
+        assert!(matches!(bad_color, Err(AppError::Validation(_))));
+
+        let taken = patched(&original, patch(Some("Work"), None, None), &all);
+        match taken {
+            Err(AppError::Validation(message)) => assert!(message.contains("already exists")),
+            other => panic!("expected a slug collision, got {other:?}"),
+        }
+
+        // Keeping its own slug is not a collision.
+        assert!(patched(&original, patch(Some("Personal"), None, None), &all).is_ok());
+    }
+
+    /// Opt-in: builds real wrappers under /Applications from the installed
+    /// Claude, so gated behind CLAUDE_SWITCH_E2E=1. Follows one profile through
+    /// creation with a wrapper, switching the setting off and on, and deletion,
+    /// checking which launcher shape is on disk each time.
+    #[test]
+    fn the_dock_setting_survives_create_toggle_and_delete_in_either_launcher_shape() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        if std::env::var("CLAUDE_SWITCH_E2E").is_err() {
+            eprintln!("skipping; set CLAUDE_SWITCH_E2E=1 to run");
+            return;
+        }
+        if resolve_gui_app(&crate::app_kind::CLAUDE).is_none() {
+            eprintln!("Claude not installed; skipping");
+            return;
+        }
+
+        let created = create(
+            AppKind::Claude,
+            "PhaseFiveLife",
+            "#7C3AED",
+            Surfaces {
+                gui: true,
+                cli: false,
+            },
+            true,
+            false,
+        )
+        .unwrap();
+        let launcher = gui_launcher_path(&created.name, created.app.spec());
+        let wrapped = |launcher: &Path| launcher.join("Contents/MacOS/Claude.bin").is_file();
+        let scripted = |launcher: &Path| launcher.join("Contents/MacOS/launcher").is_file();
+        assert!(created.distinct_dock_icon);
+        assert!(wrapped(&launcher));
+        assert!(load().unwrap()[0].distinct_dock_icon, "saved with the flag");
+
+        let switched_off = update(&created.id, patch(None, None, Some(false))).unwrap();
+        assert!(!switched_off.distinct_dock_icon);
+        assert!(scripted(&launcher) && !wrapped(&launcher));
+
+        let switched_on = update(&created.id, patch(None, None, Some(true))).unwrap();
+        assert!(switched_on.distinct_dock_icon);
+        assert!(wrapped(&launcher) && !scripted(&launcher));
+
+        delete(&created.id, false).unwrap();
+        assert!(
+            !launcher.exists(),
+            "a wrapper is removed along with the profile"
+        );
+        assert!(load().unwrap().is_empty());
+        purge_for_test();
+    }
+
+    #[test]
+    fn a_default_entry_cannot_be_given_a_wrapper() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+
+        // Default entries are not saved profiles, so nothing can be updated.
+        let result = update("default:claude", patch(None, None, Some(true)));
+
+        assert!(matches!(result, Err(AppError::NotFound(_))));
+        purge_for_test();
+    }
+
+    #[test]
+    fn update_changes_name_and_slug_atomically() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+
+        if std::env::var("CLAUDE_SWITCH_E2E").is_err() {
+            eprintln!("skipping; set CLAUDE_SWITCH_E2E=1 to run");
+            return;
+        }
+
+        let created = create(
+            AppKind::Claude,
+            "Original",
+            "#7C3AED",
+            Surfaces {
+                gui: false,
+                cli: true,
+            },
+            false,
+            false,
+        )
+        .unwrap();
+
+        let patched = update(
+            &created.id,
+            ProfilePatch {
+                name: Some("Renamed".into()),
+                color: None,
+                distinct_dock_icon: None,
+                signed_clone: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(patched.name, "Renamed");
+        assert_eq!(patched.slug, "renamed");
+        assert_eq!(patched.color, "#7C3AED");
+
+        let old_wrapper =
+            crate::paths::cli_wrapper_path("original", &crate::app_kind::CLAUDE).unwrap();
+        let new_wrapper =
+            crate::paths::cli_wrapper_path("renamed", &crate::app_kind::CLAUDE).unwrap();
+        assert!(!old_wrapper.exists());
+        assert!(new_wrapper.exists());
+
+        delete(&patched.id, false).unwrap();
+        purge_for_test();
+    }
+
+    #[test]
+    fn update_rejects_slug_collision() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        if std::env::var("CLAUDE_SWITCH_E2E").is_err() {
+            eprintln!("skipping; set CLAUDE_SWITCH_E2E=1 to run");
+            return;
+        }
+
+        let first = create(
+            AppKind::Claude,
+            "Alpha",
+            "#7C3AED",
+            Surfaces {
+                gui: false,
+                cli: false,
+            },
+            false,
+            false,
+        )
+        .unwrap();
+        let second = create(
+            AppKind::Claude,
+            "Beta",
+            "#3B82F6",
+            Surfaces {
+                gui: false,
+                cli: false,
+            },
+            false,
+            false,
+        )
+        .unwrap();
+
+        let err = update(
+            &second.id,
+            ProfilePatch {
+                name: Some("Alpha".into()),
+                color: None,
+                distinct_dock_icon: None,
+                signed_clone: None,
+            },
+        )
+        .unwrap_err();
+        match err {
+            AppError::Validation(msg) => assert!(msg.contains("already exists")),
+            other => panic!("expected Validation, got {other:?}"),
+        }
+
+        delete(&first.id, false).unwrap();
+        delete(&second.id, false).unwrap();
+        purge_for_test();
+    }
+
+    #[test]
+    fn toggle_surface_off_keeps_data_dir() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        if std::env::var("CLAUDE_SWITCH_E2E").is_err() {
+            eprintln!("skipping; set CLAUDE_SWITCH_E2E=1 to run");
+            return;
+        }
+
+        let profile = create(
+            AppKind::Claude,
+            "ToggleTest",
+            "#10B981",
+            Surfaces {
+                gui: false,
+                cli: true,
+            },
+            false,
+            false,
+        )
+        .unwrap();
+        let cli_config = crate::paths::cli_config_dir(&profile.id).unwrap();
+        std::fs::write(cli_config.join("session.json"), b"hello").unwrap();
+
+        toggle_surface(&profile.id, Surface::Cli, false).unwrap();
+        assert!(
+            cli_config.join("session.json").exists(),
+            "data dir must survive toggle-off"
+        );
+        assert!(
+            !crate::paths::cli_wrapper_path(&profile.slug, &crate::app_kind::CLAUDE)
+                .unwrap()
+                .exists()
+        );
+
+        delete(&profile.id, false).unwrap();
+        purge_for_test();
+    }
+
+    #[test]
+    fn delete_removes_profile_and_launchers() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge_for_test();
+        if std::env::var("CLAUDE_SWITCH_E2E").is_err() {
+            eprintln!("skipping; set CLAUDE_SWITCH_E2E=1 to run");
+            return;
+        }
+
+        let profile = create(
+            AppKind::Claude,
+            "DeleteMe",
+            "#EF4444",
+            Surfaces {
+                gui: false,
+                cli: true,
+            },
+            false,
+            false,
+        )
+        .unwrap();
+        let wrapper =
+            crate::paths::cli_wrapper_path(&profile.slug, &crate::app_kind::CLAUDE).unwrap();
+        assert!(wrapper.exists());
+
+        delete(&profile.id, false).unwrap();
+        assert!(!wrapper.exists());
+        assert!(load().unwrap().is_empty());
+        purge_for_test();
+    }
+
+    #[test]
+    fn validate_name_rejects_path_and_control_characters() {
+        for bad in [
+            "",
+            "../../x",
+            "a/b",
+            ".hidden",
+            "Work\nrm -rf ~",
+            "tab\there",
+        ] {
+            assert!(validate_name(bad).is_err(), "{bad:?} should be rejected");
+        }
+        for good in ["Personal", "Work (ACME)", "Zażółć", "a.b"] {
+            assert!(validate_name(good).is_ok(), "{good:?} should be accepted");
+        }
+    }
+}

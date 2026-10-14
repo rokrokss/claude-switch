@@ -2,19 +2,19 @@
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
   "ignoreExports": [
     // shadcn primitives: kept identical to `shadcn add` output, so unused sub-parts are expected.
-    { "file": "apps/ai-profiles/src/design/ui/**", "exports": ["*"] }
+    { "file": "apps/claude-switch/src/design/ui/**", "exports": ["*"] }
   ],
   "boundaries": {
     "zones": [
-      { "name": "design", "patterns": ["apps/ai-profiles/src/design/**"] },
+      { "name": "design", "patterns": ["apps/claude-switch/src/design/**"] },
       {
         "name": "app",
         "patterns": [
-          "apps/ai-profiles/src/components/**",
-          "apps/ai-profiles/src/features/**",
-          "apps/ai-profiles/src/lib/**",
-          "apps/ai-profiles/src/test/**",
-          "apps/ai-profiles/src/*.{ts,tsx}"
+          "apps/claude-switch/src/components/**",
+          "apps/claude-switch/src/features/**",
+          "apps/claude-switch/src/lib/**",
+          "apps/claude-switch/src/test/**",
+          "apps/claude-switch/src/*.{ts,tsx}"
         ]
       }
     ],

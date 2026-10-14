@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@ai-profiles/design-tokens/tokens.css";
+@import "@claude-switch/design-tokens/tokens.css";
 
 @import "@fontsource-variable/geist/index.css";
 @import "@fontsource-variable/geist-mono/index.css";
