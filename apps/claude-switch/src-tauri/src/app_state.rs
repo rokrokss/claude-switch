@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::app_kind::AppKind;
 use crate::error::{AppError, AppResult};
 use crate::paths::{app_state_json_path, ensure_app_dir};
+use crate::settings::{Settings, SettingsPatch};
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -55,6 +56,9 @@ pub struct AppState {
     /// lists them all the same. Absent means shown.
     #[serde(default)]
     pub hidden_from_menu_bar: BTreeSet<String>,
+    /// The menu bar's, its panel's and their features' settings.
+    #[serde(default)]
+    pub settings: Settings,
 }
 
 /// Renames one app's stock-install entry. An empty (or all-whitespace) name
@@ -114,6 +118,8 @@ pub struct AppStatePatch {
     pub dismissed_repair: Option<DismissedRepair>,
     #[serde(default)]
     pub menu_bar: Option<MenuBarVisibility>,
+    #[serde(default)]
+    pub settings: Option<SettingsPatch>,
 }
 
 pub fn load() -> AppResult<AppState> {
@@ -192,6 +198,9 @@ pub fn apply(patch: AppStatePatch) -> AppResult<AppState> {
             state.hidden_from_menu_bar.insert(visibility.id);
         }
     }
+    if let Some(settings) = patch.settings {
+        settings.apply_to(&mut state.settings);
+    }
     save(&state)?;
     Ok(state)
 }
@@ -202,7 +211,8 @@ pub fn forget_profile(id: &str) -> AppResult<()> {
     let mut state = load()?;
     let dismissal = state.dismissed_repair_sessions.remove(id).is_some();
     let hidden = state.hidden_from_menu_bar.remove(id);
-    if !dismissal && !hidden {
+    let settings = state.settings.forget(id);
+    if !dismissal && !hidden && !settings {
         return Ok(());
     }
     save(&state)
@@ -222,7 +232,7 @@ fn validate_default_profile_name(name: &str) -> AppResult<()> {
     Ok(())
 }
 
-fn atomic_write(path: &Path, body: &[u8]) -> AppResult<()> {
+pub(crate) fn atomic_write(path: &Path, body: &[u8]) -> AppResult<()> {
     let parent = path
         .parent()
         .ok_or_else(|| AppError::NotFound(format!("path {} has no parent", path.display())))?;
@@ -296,6 +306,7 @@ mod tests {
             default_profile_names: BTreeMap::from([(AppKind::Claude, "Personal".into())]),
             dismissed_repair_sessions: BTreeMap::from([("p1".into(), vec!["s1".into()])]),
             hidden_from_menu_bar: BTreeSet::from(["default:claude".into()]),
+            settings: Settings::default(),
         };
         save(&state).unwrap();
         let loaded = load().unwrap();
@@ -317,6 +328,7 @@ mod tests {
             default_profile_names: BTreeMap::new(),
             dismissed_repair_sessions: BTreeMap::new(),
             hidden_from_menu_bar: BTreeSet::new(),
+            settings: Settings::default(),
         })
         .unwrap();
 
@@ -348,6 +360,7 @@ mod tests {
             default_profile_names: BTreeMap::new(),
             dismissed_repair_sessions: BTreeMap::new(),
             hidden_from_menu_bar: BTreeSet::new(),
+            settings: Settings::default(),
         })
         .unwrap();
 
@@ -412,6 +425,7 @@ mod tests {
             default_profile_names: BTreeMap::new(),
             dismissed_repair_sessions: BTreeMap::new(),
             hidden_from_menu_bar: BTreeSet::new(),
+            settings: Settings::default(),
         })
         .unwrap();
         let after = apply(AppStatePatch {

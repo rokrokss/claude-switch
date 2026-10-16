@@ -1,12 +1,14 @@
 pub(crate) mod codex;
 pub(crate) mod credentials;
 pub(crate) mod dead_credentials;
+pub(crate) mod metrics;
+pub(crate) mod pace;
 pub(crate) mod quota;
 pub(crate) mod refresh;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfileUsage {
     pub quota: Option<QuotaUsage>,
@@ -14,7 +16,7 @@ pub struct ProfileUsage {
     pub fetched_at: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuotaUsage {
     pub primary: Option<Window>,
@@ -35,7 +37,7 @@ pub struct QuotaUsage {
 /// Money spent against a plan's usage-credit allowance. Amounts are in the
 /// currency's minor units (pence, cents) exactly as the upstream payload
 /// reports them — no float arithmetic happens on this side of the wire.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Spend {
     /// Amount consumed this period, in minor units.
@@ -66,7 +68,7 @@ pub struct ResetCredit {
     pub expires_at: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Window {
     /// Supplied by Codex; absent for providers with fixed window labels.
@@ -81,7 +83,7 @@ pub struct Window {
     pub resets_at: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum QuotaError {
     NoCredentials,

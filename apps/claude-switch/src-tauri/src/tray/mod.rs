@@ -17,23 +17,25 @@
 //! nothing drawn for a window without data — follow OpenUsage's menu bar
 //! (MIT, <https://github.com/robinebers/openusage>).
 
+mod cache;
 #[cfg(target_os = "macos")]
 mod render;
 mod strip;
 
-use std::collections::BTreeSet;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use chrono::Utc;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Rect, WebviewWindow, WindowEvent};
 
 use crate::app_kind::{default_id, AppKind};
+use crate::app_state::AppState;
 use crate::error::AppResult;
+use crate::usage::metrics::{self, Metric};
 use crate::usage::{ProfileUsage, QuotaError};
 use crate::{app_state, commands, migration, profiles};
 
@@ -46,8 +48,15 @@ const OPEN_ID: &str = "tray-open";
 const QUIT_ID: &str = "tray-quit";
 /// Carries the entries to the panel whenever they change.
 const USAGE_EVENT: &str = "tray-usage";
+/// Carries the settings to the panel whenever they change.
+const SETTINGS_EVENT: &str = "settings-changed";
 
 const POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
+/// After a fetch that failed for a passing reason (no network, an unexpected
+/// answer), the next comes this much sooner.
+const RETRY_AFTER: Duration = Duration::from_secs(60);
+/// A profile whose fetch takes longer than this is given up on until the next.
+const FETCH_DEADLINE: Duration = Duration::from_secs(120);
 /// Opening the panel fetches again only if the last fetch is older than this.
 const REFRESH_ON_OPEN_AFTER: Duration = Duration::from_secs(60);
 /// A click on the item this soon after the panel was hidden is the click that
@@ -58,7 +67,7 @@ const PANEL_MARGIN: f64 = 6.0;
 const PANEL_CORNER_RADIUS: f64 = 12.0;
 
 /// A profile the item reports on, as the panel shows it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrayEntry {
     pub id: String,
@@ -67,9 +76,13 @@ pub struct TrayEntry {
     /// The CLI command the profile signs in with, named in the panel's
     /// messages: `claude`, or a profile's `claude-<slug>` wrapper.
     pub command: String,
+    /// The account's plan as its app names it, e.g. `Max 20x`, when known.
+    pub plan: Option<String>,
     /// The last usage that came back with a quota, kept through failed
     /// fetches. `None` until one has.
     pub usage: Option<ProfileUsage>,
+    /// What that usage and the profile's local history report.
+    pub metrics: Vec<Metric>,
     /// Why the latest fetch brought no quota, if it didn't.
     pub error: Option<QuotaError>,
 }
@@ -85,7 +98,10 @@ pub struct TrayState {
 
 /// Puts the item in the menu bar and starts polling. Called once, from setup.
 pub fn setup(app: &tauri::App) -> tauri::Result<()> {
-    app.manage(TrayState::default());
+    // The last figures shown, drawn at once while the first fetch runs.
+    let state = TrayState::default();
+    *state.entries.lock().unwrap() = cache::load();
+    app.manage(state);
 
     let menu = Menu::with_items(
         app,
@@ -130,11 +146,17 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
         });
     }
 
+    redraw(app.handle());
     let handle = app.handle().clone();
     tauri::async_runtime::spawn(async move {
         loop {
-            refresh(&handle).await;
-            tokio::time::sleep(POLL_INTERVAL).await;
+            let passing_failure = refresh(&handle).await;
+            let wait = if passing_failure {
+                RETRY_AFTER
+            } else {
+                POLL_INTERVAL
+            };
+            tokio::time::sleep(wait).await;
         }
     });
     Ok(())
@@ -149,12 +171,13 @@ pub fn show_main_window(app: &AppHandle) {
     }
 }
 
-/// The entries the panel shows, as of the last fetch; `None` until the
-/// first has finished.
+/// The entries the panel shows, as of the last fetch or, before it, as last
+/// saved; `None` while there are neither.
 #[tauri::command]
 pub fn tray_usage(state: tauri::State<'_, TrayState>) -> Option<Vec<TrayEntry>> {
     let fetched = state.refreshed_at.lock().unwrap().is_some();
-    fetched.then(|| state.entries.lock().unwrap().clone())
+    let entries = state.entries.lock().unwrap();
+    (fetched || !entries.is_empty()).then(|| for_panel(&entries))
 }
 
 /// From the panel: hides it and shows the main window.
@@ -191,7 +214,11 @@ fn toggle_panel(app: &AppHandle, icon: Rect) {
     let _ = panel.show();
     let _ = panel.set_focus();
     // Redraws its "updated … ago" lines at once; a fetch may follow.
-    let _ = app.emit_to(PANEL_WINDOW, USAGE_EVENT, &*state.entries.lock().unwrap());
+    let _ = app.emit_to(
+        PANEL_WINDOW,
+        USAGE_EVENT,
+        for_panel(&state.entries.lock().unwrap()),
+    );
     let stale = state
         .refreshed_at
         .lock()
@@ -316,7 +343,8 @@ fn targets() -> AppResult<Vec<Target>> {
 }
 
 /// Fetches every profile's usage and shows it in the item and the panel.
-async fn refresh(app: &AppHandle) {
+/// True when a fetch failed for a reason that may pass soon.
+async fn refresh(app: &AppHandle) -> bool {
     let state = app.state::<TrayState>();
     let _refreshing = state.refreshing.lock().await;
     let targets = match targets() {
@@ -326,7 +354,7 @@ async fn refresh(app: &AppHandle) {
                 "claude-switch: could not list the profiles for the menu bar: {}",
                 err.message()
             );
-            return;
+            return true;
         }
     };
     let previous = state.entries.lock().unwrap().clone();
@@ -334,53 +362,103 @@ async fn refresh(app: &AppHandle) {
     // One at a time: fetched together, profiles have tripped the usage
     // endpoint's rate limit.
     for target in targets {
-        let fetched = commands::profile_usage(&target.id, false).await;
-        let last = previous
-            .iter()
-            .find(|entry| entry.id == target.id)
-            .and_then(|entry| entry.usage.clone());
+        let fetched =
+            tokio::time::timeout(FETCH_DEADLINE, commands::profile_usage(&target.id, false)).await;
+        let last = previous.iter().find(|entry| entry.id == target.id);
+        let last_usage = last.and_then(|entry| entry.usage.clone());
         let (usage, error) = match fetched {
-            Ok(usage) if usage.quota.is_some() => (Some(usage), None),
-            Ok(usage) => (last, Some(usage.quota_error.unwrap_or(QuotaError::Unknown))),
-            Err(_) => (last, Some(QuotaError::Unknown)),
+            Ok(Ok(usage)) if usage.quota.is_some() => (Some(usage), None),
+            Ok(Ok(usage)) => (
+                last_usage,
+                Some(usage.quota_error.unwrap_or(QuotaError::Unknown)),
+            ),
+            Ok(Err(_)) => (last_usage, Some(QuotaError::Unknown)),
+            Err(_) => (last_usage, Some(QuotaError::Network)),
         };
+        let metrics = usage
+            .as_ref()
+            .map(|usage| metrics::from_usage(target.app, usage))
+            .unwrap_or_default();
         entries.push(TrayEntry {
             id: target.id,
             app: target.app,
             name: target.name,
             command: target.command,
+            plan: last.and_then(|entry| entry.plan.clone()),
             usage,
+            metrics,
             error,
         });
     }
+    after_refresh(app, &previous, &entries);
+    if let Err(err) = cache::save(&entries) {
+        eprintln!(
+            "claude-switch: could not save the menu bar's figures: {}",
+            err.message()
+        );
+    }
+    let passing_failure = entries.iter().any(|entry| {
+        matches!(
+            entry.error,
+            Some(QuotaError::Network | QuotaError::Unknown | QuotaError::Forbidden)
+        )
+    });
     *state.entries.lock().unwrap() = entries.clone();
     *state.refreshed_at.lock().unwrap() = Some(Instant::now());
     show(app, entries);
+    passing_failure
 }
 
-/// Redraws the item from the usage last fetched, fetching nothing: for when
-/// the user hides a profile from the menu bar or shows it again. Before the
-/// first fetch there is nothing to draw but the mark already there.
-pub fn redraw(app: &AppHandle) {
-    let state = app.state::<TrayState>();
-    if state.refreshed_at.lock().unwrap().is_none() {
-        return;
+/// Runs after every fetch with the entries before and after it: where what
+/// reacts to a change in usage (notifications) hooks in.
+fn after_refresh(_app: &AppHandle, _previous: &[TrayEntry], _next: &[TrayEntry]) {}
+
+/// `entries` as sent to the panel: each meter with its state as of now.
+fn for_panel(entries: &[TrayEntry]) -> Vec<TrayEntry> {
+    let now = Utc::now();
+    entries
+        .iter()
+        .map(|entry| TrayEntry {
+            metrics: metrics::with_states(&entry.metrics, now),
+            ..entry.clone()
+        })
+        .collect()
+}
+
+/// The user changed what the item or the panel shows: redraws the one and
+/// tells the other, fetching nothing.
+pub fn settings_changed(app: &AppHandle, state: &AppState) {
+    let _ = app.emit_to(PANEL_WINDOW, SETTINGS_EVENT, &state.settings);
+    redraw(app);
+}
+
+/// Redraws the item from the figures it has, fetching nothing. With none yet
+/// there is nothing to draw but the mark already there.
+fn redraw(app: &AppHandle) {
+    let entries = app.state::<TrayState>().entries.lock().unwrap().clone();
+    if !entries.is_empty() {
+        draw(app, &entries);
     }
-    let entries = state.entries.lock().unwrap().clone();
-    draw(app, &entries);
 }
 
 fn show(app: &AppHandle, entries: Vec<TrayEntry>) {
-    let _ = app.emit_to(PANEL_WINDOW, USAGE_EVENT, &entries);
+    let _ = app.emit_to(PANEL_WINDOW, USAGE_EVENT, for_panel(&entries));
     draw(app, &entries);
 }
 
-/// Draws the item for `entries`, less those hidden from the menu bar.
+/// Draws the item for `entries`, as the user's settings say: less the
+/// profiles hidden from the menu bar, with the metrics starred for the rest.
 fn draw(app: &AppHandle, entries: &[TrayEntry]) {
-    let entries = strip::in_menu_bar(entries, &hidden_from_menu_bar());
+    // Unreadable settings draw as the defaults did before there were any.
+    let state = app_state::load().unwrap_or_default();
+    let entries = strip::in_menu_bar(entries, &state.hidden_from_menu_bar);
+    let options = strip::Options {
+        menu_bar: &state.settings.menu_bar,
+        meter_style: state.settings.display.meter_style,
+    };
     let now = Utc::now();
-    let strip = strip::build(&entries, now);
-    let tooltip = strip::tooltip(&entries, now);
+    let strip = strip::build(&entries, &options, now);
+    let tooltip = strip::tooltip(&entries, &options, now);
     let handle = app.clone();
     // AppKit draws on the main thread.
     let _ = app.run_on_main_thread(move || {
@@ -391,14 +469,6 @@ fn draw(app: &AppHandle, entries: &[TrayEntry]) {
         let _ = tray.set_icon_as_template(true);
         let _ = tray.set_tooltip(Some(tooltip));
     });
-}
-
-/// The entry ids the user took out of the menu bar. If the state can't be
-/// read, none: every profile shows, as it did before the setting existed.
-fn hidden_from_menu_bar() -> BTreeSet<String> {
-    app_state::load()
-        .map(|state| state.hidden_from_menu_bar)
-        .unwrap_or_default()
 }
 
 /// The strip drawn, or claude-switch's mark when it has nothing to show.

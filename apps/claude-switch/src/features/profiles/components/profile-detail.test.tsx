@@ -18,6 +18,7 @@ import {
   updateAppState,
 } from '@/lib/commands'
 import { queryKeys } from '@/lib/query/keys'
+import { defaultSettings } from '@/lib/settings'
 import { renderWithQuery } from '@/test/render-with-query'
 
 import { DeleteProfileDialog } from './delete-profile-dialog'
@@ -74,6 +75,7 @@ const appState: AppState = {
   defaultProfileNames: {},
   dismissedRepairSessions: {},
   hiddenFromMenuBar: [],
+  settings: defaultSettings,
 }
 
 const guiDataDir = '/Users/ada/Library/Application Support/claude-switch/profiles/p1/gui-data'

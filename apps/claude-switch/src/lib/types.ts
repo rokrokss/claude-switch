@@ -172,6 +172,10 @@ export type AppState = {
    * all the same.
    */
   hiddenFromMenuBar: Array<string>
+  /**
+   * The menu bar's, its panel's and their features' settings.
+   */
+  settings: Settings
 }
 
 export type AppStatePatch = {
@@ -200,6 +204,10 @@ export type AppStatePatch = {
    * Shows one entry in the menu bar's strip, or takes it out.
    */
   menuBar?: { id: string; shown: boolean }
+  /**
+   * Replaces the settings groups it carries.
+   */
+  settings?: Partial<Settings>
 }
 
 /**
@@ -302,13 +310,106 @@ export type TrayEntry = {
    */
   command: string
   /**
+   * The account's plan as its app names it, e.g. `Max 20x`, when known.
+   */
+  plan: string | null
+  /**
    * The last usage that came back with a quota, kept through failed fetches.
    */
   usage: ProfileUsage | null
   /**
+   * What that usage and the profile's local history report.
+   */
+  metrics: Array<Metric>
+  /**
    * Why the latest fetch brought no quota, if it didn't.
    */
   error: QuotaError | null
+}
+
+export type MetricUnit = { type: 'percent' } | { type: 'count' } | { type: 'money'; currency: string }
+
+/**
+ * How a meter is faring, worked out by the backend when the entries were sent.
+ * Every state keys off the share used, whichever way the meter is shown.
+ */
+type MeterState =
+  | { kind: 'spent' }
+  | { kind: 'runningOut'; runsOutAt: string | null; projectedFraction: number }
+  | { kind: 'closeToLimit'; sparePercent: number; projectedFraction: number }
+  | { kind: 'healthy'; projectedFraction: number }
+  | { kind: 'level'; severity: 'normal' | 'warning' | 'critical' }
+
+type MetricBase = {
+  /**
+   * Stable: what stars and layouts refer to, e.g. `session`, `weekly.fable`.
+   */
+  id: string
+  label: string
+  state?: MeterState
+}
+
+export type Metric =
+  | (MetricBase & {
+      kind: 'meter'
+      used: number
+      limit: number
+      unit: MetricUnit
+      resetsAt: string | null
+      periodSecs: number | null
+      /**
+       * The window opens with the first message, and none has been sent.
+       */
+      notStarted: boolean
+    })
+  | (MetricBase & {
+      kind: 'values'
+      values: Array<{ amount: number; unit: MetricUnit }>
+      /**
+       * When each counted item lapses, soonest first.
+       */
+      expiresAt?: Array<string>
+    })
+
+/**
+ * Mirrors `Settings` in src-tauri/src/settings.rs; one group per Settings section.
+ */
+export type Settings = {
+  menuBar: {
+    style: 'text' | 'bars'
+    /**
+     * Starred metric ids by entry id. An entry without one shows session and weekly.
+     */
+    stars: Record<string, Array<string>>
+    shortcut: string | null
+  }
+  display: {
+    meterStyle: 'used' | 'left'
+    resetDisplay: 'countdown' | 'exact'
+    alwaysShowPacing: boolean
+    timeFormat: 'auto' | '12h' | '24h'
+    density: 'default' | 'compact'
+    reduceAnimations: boolean
+    increaseTransparency: boolean
+    totalSpend: {
+      shown: boolean
+      metric: 'cost' | 'costPerMillionTokens' | 'tokens'
+      period: 'today' | 'yesterday' | 'last30Days'
+    }
+  }
+  layout: {
+    /**
+     * By entry id. An entry without one shows its app's default layout.
+     */
+    profiles: Record<string, { alwaysVisible: Array<string>; onDemand: Array<string> }>
+    expanded: Array<string>
+  }
+  notifications: { almostOut: boolean; cuttingItClose: boolean; willRunOut: boolean }
+  privacy: { hideWhileScreenSharing: boolean }
+  integrations: { localApi: boolean }
+  sync: { icloud: boolean }
+  updates: { checkAutomatically: boolean; beta: boolean }
+  advanced: { logLevel: 'error' | 'warning' | 'info' | 'debug'; codexFallbackModel: string | null }
 }
 
 /** The account a profile is signed in under, from what its CLI keeps on disk. */

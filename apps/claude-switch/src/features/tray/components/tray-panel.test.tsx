@@ -30,6 +30,8 @@ function makeEntry(overrides: Partial<TrayEntry> = {}): TrayEntry {
     app: 'claude',
     name: 'Work',
     command: 'claude-work',
+    plan: null,
+    metrics: [],
     usage: {
       quota: {
         primary: { utilization: 18, resetsAt: null },

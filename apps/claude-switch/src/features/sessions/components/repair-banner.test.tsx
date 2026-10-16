@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@/design'
 import { checkSessionRepair, loadAppState, repairSessions, updateAppState } from '@/lib/commands'
 import { queryKeys } from '@/lib/query/keys'
+import { defaultSettings } from '@/lib/settings'
 import { renderWithQuery } from '@/test/render-with-query'
 
 import { RepairBanner } from './repair-banner'
@@ -33,6 +34,7 @@ function appState(dismissedRepairSessions: AppState['dismissedRepairSessions'] =
     defaultProfileNames: {},
     dismissedRepairSessions,
     hiddenFromMenuBar: [],
+    settings: defaultSettings,
   }
 }
 

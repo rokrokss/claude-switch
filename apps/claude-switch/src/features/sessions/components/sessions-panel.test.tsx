@@ -14,6 +14,7 @@ import {
   moveSession,
   planSessionMove,
 } from '@/lib/commands'
+import { defaultSettings } from '@/lib/settings'
 import { makeRetryingClient, renderWithQuery } from '@/test/render-with-query'
 
 import { makeSession } from '../test/make-session'
@@ -132,6 +133,7 @@ beforeEach(() => {
     defaultProfileNames: {},
     dismissedRepairSessions: {},
     hiddenFromMenuBar: [],
+    settings: defaultSettings,
   })
   vi.mocked(listSessions).mockReset()
   vi.mocked(archiveSession).mockReset().mockResolvedValue(undefined)

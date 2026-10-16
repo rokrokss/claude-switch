@@ -72,6 +72,8 @@ export function computeOptimisticAppState(previous: AppState, patch: AppStatePat
     defaultProfileNames: withDefaultProfileName(previous.defaultProfileNames, patch.defaultProfileName),
     dismissedRepairSessions: withDismissedRepair(previous.dismissedRepairSessions, patch.dismissedRepair),
     hiddenFromMenuBar: withMenuBar(previous.hiddenFromMenuBar, patch.menuBar),
+    // Each group a patch carries replaces the group whole, as on the Rust side.
+    settings: { ...previous.settings, ...patch.settings },
   }
 }
 

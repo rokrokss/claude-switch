@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { act, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { defaultSettings } from '@/lib/settings'
 import { renderHookWithQuery } from '@/test/render-with-query'
 
 import { computeOptimisticAppState, useAppState } from './use-app-state'
@@ -19,6 +20,7 @@ function makeAppState(overrides: Partial<AppState> = {}): AppState {
     defaultProfileNames: {},
     dismissedRepairSessions: {},
     hiddenFromMenuBar: [],
+    settings: defaultSettings,
     ...overrides,
   }
 }
@@ -187,5 +189,17 @@ describe('computeOptimisticAppState', () => {
     const shown = computeOptimisticAppState(again, { menuBar: { id: 'p1', shown: true } })
     expect(shown.hiddenFromMenuBar).toEqual(['p2'])
     expect(computeOptimisticAppState(shown, { welcomeShown: true }).hiddenFromMenuBar).toEqual(['p2'])
+  })
+
+  it('replaces the settings groups a patch carries and keeps the rest', () => {
+    const previous = makeAppState({
+      settings: { ...defaultSettings, notifications: { almostOut: true, cuttingItClose: false, willRunOut: false } },
+    })
+    const next = computeOptimisticAppState(previous, {
+      settings: { display: { ...defaultSettings.display, meterStyle: 'left' } },
+    })
+    expect(next.settings.display.meterStyle).toBe('left')
+    expect(next.settings.notifications.almostOut).toBe(true)
+    expect(next.settings.menuBar).toEqual(defaultSettings.menuBar)
   })
 })

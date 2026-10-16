@@ -16,6 +16,7 @@ mod path_setup;
 mod paths;
 mod profiles;
 mod sessions;
+mod settings;
 mod shared_config;
 mod slug;
 #[cfg(test)]
