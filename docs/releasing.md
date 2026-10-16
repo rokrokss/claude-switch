@@ -53,7 +53,7 @@ The script's defaults can be overridden with `SIGNING_KEY`, `TAURI_SIGNING_PRIVA
 
 ### Why the script repacks the app
 
-The bundler makes `claude-switch.app.tar.gz` while it builds, before the app is notarized. Tauri can't notarize with a notarytool keychain profile, so the script notarizes afterwards. Stapling then writes the ticket into the app (`Contents/CodeResources`), and the script packs and signs the tarball again from the stapled app.
+The bundler makes `claude-switch.app.tar.gz` while it builds, before the app is notarized. The script notarizes afterwards, with the notarytool keychain profile. Stapling then writes the ticket into the app (`Contents/CodeResources`), and the script packs and signs the tarball again from the stapled app.
 
 ## Updating from 1.4.0
 
