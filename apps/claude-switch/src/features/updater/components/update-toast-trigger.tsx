@@ -14,8 +14,8 @@ import { useUpdater } from '../api/use-updater'
  * if the same version's "available" status re-renders (e.g. the parent
  * re-renders without a new check landing).
  */
-export function UpdateToastTrigger() {
-  const { status, installAndRestart } = useUpdater()
+export function UpdateToastTrigger({ automatic = true }: { automatic?: boolean }) {
+  const { status, installAndRestart } = useUpdater({ automatic })
   const toast = useToast()
   const toastedVersionRef = useRef<string | null>(null)
 

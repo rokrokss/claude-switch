@@ -34,7 +34,8 @@ async function runCheckInto(setStatus: StatusSetter): Promise<void> {
 }
 
 /**
- * Polls Tauri's updater plugin on mount and again every six hours. Exposes
+ * Polls Tauri's updater plugin on mount and again every six hours, unless
+ * `automatic` is off (Settings → Advanced). Exposes
  * a discriminated `status` plus manual `check` / `installAndRestart`
  * triggers so the toast component and Settings → System can drive their
  * own UI from the same source of truth.
@@ -49,7 +50,7 @@ async function runCheckInto(setStatus: StatusSetter): Promise<void> {
  * effect must run exactly once on mount and own the interval lifecycle,
  * regardless of how often React re-renders.
  */
-export function useUpdater() {
+export function useUpdater({ automatic = true }: { automatic?: boolean } = {}) {
   const [status, setStatus] = useState<UpdaterStatus>({ kind: 'idle' })
 
   async function manualCheck() {
@@ -74,12 +75,16 @@ export function useUpdater() {
   }
 
   useEffect(() => {
+    // Off in Settings: only the manual check looks for updates.
+    if (!automatic) {
+      return
+    }
     void runCheckInto(setStatus)
     const interval = setInterval(() => {
       void runCheckInto(setStatus)
     }, sixHoursMs)
     return () => clearInterval(interval)
-  }, [])
+  }, [automatic])
 
   return { status, check: manualCheck, installAndRestart }
 }

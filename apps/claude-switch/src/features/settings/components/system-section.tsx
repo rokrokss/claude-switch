@@ -11,6 +11,7 @@ import { useDependencies } from '@/features/dependencies/api/use-dependencies'
 import { hookInstallMessage, rcDisplay, shellHookStatus, updateAction } from '@/features/settings/lib/system-status'
 import { type UpdaterStatus, useUpdater } from '@/features/updater/api/use-updater'
 import { appIds, appSpecs } from '@/lib/app-registry'
+import { useAppState } from '@/lib/app-state/use-app-state'
 import { detectShell, installPathHook } from '@/lib/commands'
 
 type Row = {
@@ -97,7 +98,8 @@ function buildRows(
  */
 export function SystemSection() {
   const dependencies = useDependencies()
-  const updater = useUpdater()
+  const appState = useAppState()
+  const updater = useUpdater({ automatic: appState.state.settings.updates.checkAutomatically })
   const { version } = useAppMetadata()
   const [shell, setShell] = useState<Shell | null>(null)
 

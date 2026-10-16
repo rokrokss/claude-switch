@@ -117,7 +117,7 @@ function AppContent() {
   return (
     <div className="relative flex h-full flex-col">
       <TitleBarDragStrip />
-      <UpdateToastTrigger />
+      <UpdateToastTrigger automatic={appState.state.settings.updates.checkAutomatically} />
       <PathSetupBannerHost />
       {/* The empty-state screen owns the whole window when there are no entries
           yet — no sidebar, no panes. As soon as the first profile/default entry

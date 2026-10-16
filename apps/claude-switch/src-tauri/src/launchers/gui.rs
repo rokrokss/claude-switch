@@ -514,6 +514,28 @@ mod tests {
         fs::write(macos.join("launcher"), body).unwrap();
     }
 
+    /// Give the launcher-shaped `bundle` the architectures a script launcher
+    /// asks to run as.
+    fn with_architectures(bundle: &Path) {
+        let info_path = bundle.join("Contents/Info.plist");
+        let mut info = ::plist::Value::from_file(&info_path)
+            .unwrap()
+            .into_dictionary()
+            .unwrap();
+        info.insert(
+            "LSArchitecturePriority".into(),
+            ::plist::Value::Array(
+                plist::ARCHITECTURE_PRIORITY
+                    .iter()
+                    .map(|arch| (*arch).into())
+                    .collect(),
+            ),
+        );
+        ::plist::Value::Dictionary(info)
+            .to_file_xml(&info_path)
+            .unwrap();
+    }
+
     /// The `Info.plist` entries of a wrapper that exports its config home.
     const WRAPPER_CONFIG_ENV: [(&str, &str); 2] = [
         (profile_shim::CONFIG_ENV_NAME_KEY, "CLAUDE_CONFIG_DIR"),
@@ -535,6 +557,7 @@ mod tests {
             ],
         );
         with_launcher_script(&script, &profile);
+        with_architectures(&script);
         assert!(!outdated(&profile, &script, "1.3.0"));
         assert!(outdated(&profile, &script, "1.4.0"));
 
@@ -585,6 +608,7 @@ mod tests {
                 ("CFBundleVersion", "1.3.0"),
             ],
         );
+        with_architectures(&script);
         fs::create_dir_all(script.join("Contents/MacOS")).unwrap();
         fs::write(
             script.join("Contents/MacOS/launcher"),
@@ -668,6 +692,7 @@ mod tests {
                 ("CFBundleVersion", "1.3.0"),
             ],
         );
+        with_architectures(&bundle);
         let macos = bundle.join("Contents/MacOS");
         fs::create_dir_all(&macos).unwrap();
 
@@ -694,6 +719,30 @@ mod tests {
         // A handoff to an claude-switch that has gone: rebuilt.
         fs::remove_file(&host).unwrap();
         assert!(outdated(&cloned, &bundle, "1.3.0"));
+    }
+
+    #[test]
+    fn a_script_launcher_that_names_no_architectures_is_outdated() {
+        let dir = tempfile::tempdir().unwrap();
+        let profile = fixture();
+        let ours = plist::bundle_identifier(&profile);
+        let script = launcher_bundle(
+            dir.path(),
+            "Script.app",
+            &[
+                ("CFBundleIdentifier", &ours),
+                ("CFBundleExecutable", "launcher"),
+                ("CFBundleVersion", "1.3.0"),
+            ],
+        );
+        with_launcher_script(&script, &profile);
+        assert!(
+            outdated(&profile, &script, "1.3.0"),
+            "would run under Rosetta"
+        );
+
+        with_architectures(&script);
+        assert!(!outdated(&profile, &script, "1.3.0"));
     }
 
     #[test]

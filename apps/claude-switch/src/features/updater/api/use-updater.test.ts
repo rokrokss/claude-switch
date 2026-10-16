@@ -22,6 +22,15 @@ afterEach(() => {
 })
 
 describe('useUpdater', () => {
+  it('checks nothing by itself when automatic checks are off', async () => {
+    const { result } = renderHook(() => useUpdater({ automatic: false }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(7 * 60 * 60 * 1000)
+    })
+    expect(mockCheck).not.toHaveBeenCalled()
+    expect(result.current.status.kind).toBe('idle')
+  })
+
   it('reports up-to-date when check returns null', async () => {
     mockCheck.mockResolvedValueOnce(null)
     const { result } = renderHook(() => useUpdater())

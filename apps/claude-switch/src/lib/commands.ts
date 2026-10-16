@@ -185,6 +185,13 @@ export function refreshUsage(): Promise<void> {
 }
 
 /**
+ * Where claude-switch writes its log.
+ */
+export function getLogFile(): Promise<string | null> {
+  return invoke<string | null>('log_file')
+}
+
+/**
  * Whether claude-switch opens at login, as macOS has it.
  */
 export function getLoginItem(): Promise<LoginItem> {

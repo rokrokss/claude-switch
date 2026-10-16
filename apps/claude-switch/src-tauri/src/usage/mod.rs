@@ -195,13 +195,30 @@ pub async fn build_with_renewal(
 ) -> ProfileUsage {
     // Not due, nothing to renew with, or a passing failure: the fetch says
     // what that means.
-    let _ = oauth::renew(cli_config_dir, None).await;
+    let ahead = oauth::renew(cli_config_dir, None).await;
+    if ahead != oauth::Renewal::Unchanged {
+        crate::logging::info(
+            "auth",
+            &format!(
+                "renewing {} ahead of time: {ahead:?}",
+                cli_config_dir.display()
+            ),
+        );
+    }
     let first = build(cli_config_dir, provider).await;
     if !matches!(first.quota_error, Some(QuotaError::Unauthorized)) {
         return first;
     }
     let refused = credentials::read_access_token(cli_config_dir).ok();
-    match oauth::renew(cli_config_dir, refused.as_deref()).await {
+    let renewal = oauth::renew(cli_config_dir, refused.as_deref()).await;
+    crate::logging::info(
+        "auth",
+        &format!(
+            "a refused sign-in at {}: {renewal:?}",
+            cli_config_dir.display()
+        ),
+    );
+    match renewal {
         oauth::Renewal::Renewed => build(cli_config_dir, provider).await,
         oauth::Renewal::Dead => {
             if let Some(token) = refused {

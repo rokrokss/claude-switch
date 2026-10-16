@@ -40,7 +40,7 @@ use crate::error::AppResult;
 use crate::settings::MenuBarStyle;
 use crate::usage::metrics::{self, Metric};
 use crate::usage::{ProfileUsage, QuotaError};
-use crate::{app_state, commands, migration, profiles};
+use crate::{app_state, commands, logging, migration, profiles};
 
 /// Label of the main window.
 pub const MAIN_WINDOW: &str = "main";
@@ -178,6 +178,7 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
     redraw(app.handle());
     watch_screen_capture(app.handle().clone());
     if let Ok(state) = app_state::load() {
+        logging::set_level(state.settings.advanced.log_level);
         apply_shortcut(app.handle(), state.settings.menu_bar.shortcut.as_deref());
     }
     let handle = app.handle().clone();
@@ -473,9 +474,9 @@ async fn fetch_all(app: &AppHandle) -> bool {
     let targets = match targets() {
         Ok(targets) => targets,
         Err(err) => {
-            eprintln!(
-                "claude-switch: could not list the profiles for the menu bar: {}",
-                err.message()
+            logging::error(
+                "menu bar",
+                &format!("could not list the profiles: {}", err.message()),
             );
             return true;
         }
@@ -520,11 +521,23 @@ async fn fetch_all(app: &AppHandle) -> bool {
     }
     after_refresh(app, &previous, &entries);
     if let Err(err) = cache::save(&entries) {
-        eprintln!(
-            "claude-switch: could not save the menu bar's figures: {}",
-            err.message()
+        logging::warn(
+            "menu bar",
+            &format!("could not save the figures: {}", err.message()),
         );
     }
+    for entry in &entries {
+        if let Some(error) = entry.error {
+            logging::warn(
+                "usage",
+                &format!(
+                    "{} ({}): no usage this time: {error:?}",
+                    entry.name, entry.id
+                ),
+            );
+        }
+    }
+    logging::info("usage", &format!("fetched {} profiles", entries.len()));
     let passing_failure = entries.iter().any(|entry| {
         matches!(
             entry.error,
@@ -557,6 +570,7 @@ fn for_panel(entries: &[TrayEntry]) -> Vec<TrayEntry> {
 /// tells the other, fetching nothing.
 pub fn settings_changed(app: &AppHandle, state: &AppState) {
     let _ = app.emit_to(PANEL_WINDOW, SETTINGS_EVENT, &state.settings);
+    logging::set_level(state.settings.advanced.log_level);
     apply_shortcut(app, state.settings.menu_bar.shortcut.as_deref());
     redraw(app);
 }
@@ -578,7 +592,7 @@ fn apply_shortcut(app: &AppHandle, shortcut: Option<&str>) {
     if let Some(new) = shortcut.filter(|new| !new.is_empty()) {
         match app.global_shortcut().register(new) {
             Ok(()) => *registered = Some(new.to_owned()),
-            Err(err) => eprintln!("claude-switch: could not register the shortcut {new}: {err}"),
+            Err(err) => logging::warn("shortcut", &format!("could not register {new}: {err}")),
         }
     }
 }
