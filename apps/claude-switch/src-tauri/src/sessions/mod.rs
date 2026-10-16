@@ -21,7 +21,8 @@ use crate::app_kind::AppKind;
 
 pub use actions::{ActionCheck, SessionAction};
 pub use claude::repair::RepairReport;
-pub use home::home_for;
+pub use claude::usage_owners::transcript_owners;
+pub use home::{home_for, homes_of};
 pub use list::{list_sessions, SessionList};
 pub use move_plan::{MovePlan, MoveReport};
 

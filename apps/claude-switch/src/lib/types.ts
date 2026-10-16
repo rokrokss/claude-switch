@@ -327,7 +327,39 @@ export type TrayEntry = {
   error: QuotaError | null
 }
 
-export type MetricUnit = { type: 'percent' } | { type: 'count' } | { type: 'money'; currency: string }
+export type MetricUnit =
+  | { type: 'percent' }
+  | { type: 'count' }
+  | { type: 'money'; currency: string }
+  | { type: 'tokens' }
+
+/**
+ * One model's share of a period's spend, in USD to the cent. For `Other`, `variants` lists the models folded into it.
+ */
+type ModelSpend = {
+  model: string
+  tokens: number
+  cost: number
+  variants?: Array<ModelSpend>
+}
+
+/**
+ * What spend estimated from the local logs is made of.
+ */
+type SpendBreakdown = {
+  /**
+   * Most expensive first; models under 5% of the period, and any past the fifth, fold into `Other`.
+   */
+  models: Array<ModelSpend>
+  /**
+   * Models no price list knows. Their tokens aren't counted, unless priced at a fallback model's rates.
+   */
+  unknownModels?: Array<string>
+  /**
+   * The fallback models whose rates priced part of the period.
+   */
+  fallbackModels?: Array<string>
+}
 
 /**
  * How a meter is faring, worked out by the backend when the entries were sent.
@@ -369,6 +401,18 @@ export type Metric =
        * When each counted item lapses, soonest first.
        */
       expiresAt?: Array<string>
+      /**
+       * Of spend read from the local logs (`today`, `yesterday`, `last30`).
+       */
+      breakdown?: SpendBreakdown
+    })
+  | (MetricBase & {
+      kind: 'chart'
+      unit: MetricUnit
+      /**
+       * A reading per local day (`YYYY-MM-DD`), oldest first.
+       */
+      points: Array<{ date: string; value: number }>
     })
 
 /**

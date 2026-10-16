@@ -25,7 +25,7 @@ mod strip;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use chrono::Utc;
+use chrono::{Local, Utc};
 use serde::{Deserialize, Serialize};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
@@ -36,6 +36,7 @@ use crate::app_kind::{default_id, AppKind};
 use crate::app_state::AppState;
 use crate::error::AppResult;
 use crate::usage::metrics::{self, Metric};
+use crate::usage::spend;
 use crate::usage::{ProfileUsage, QuotaError};
 use crate::{app_state, commands, migration, profiles};
 
@@ -57,6 +58,9 @@ const POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
 const RETRY_AFTER: Duration = Duration::from_secs(60);
 /// A profile whose fetch takes longer than this is given up on until the next.
 const FETCH_DEADLINE: Duration = Duration::from_secs(120);
+/// How long a refresh waits, after the quota fetches, for the local logs to
+/// be read. A slower read shows when it finishes.
+const HISTORY_WAIT: Duration = Duration::from_secs(5);
 /// Opening the panel fetches again only if the last fetch is older than this.
 const REFRESH_ON_OPEN_AFTER: Duration = Duration::from_secs(60);
 /// A click on the item this soon after the panel was hidden is the click that
@@ -358,6 +362,10 @@ async fn refresh(app: &AppHandle) -> bool {
         }
     };
     let previous = state.entries.lock().unwrap().clone();
+    // Price lists refresh on the side; a read of the logs never waits on
+    // them. The read runs while usage is fetched.
+    tauri::async_runtime::spawn(spend::pricing::store::refresh());
+    let mut history = spend::start_scan();
     let mut entries = Vec::with_capacity(targets.len());
     // One at a time: fetched together, profiles have tripped the usage
     // endpoint's rate limit.
@@ -392,6 +400,28 @@ async fn refresh(app: &AppHandle) -> bool {
             error,
         });
     }
+    let histories = history.within(HISTORY_WAIT).await;
+    let now = Local::now();
+    for entry in &mut entries {
+        let spent = match &histories {
+            Some(histories) => spend::metrics_for(histories, &entry.id, &now),
+            // Until the read finishes, what the last one found.
+            None => previous
+                .iter()
+                .find(|last| last.id == entry.id)
+                .map(|last| spend_metrics(&last.metrics))
+                .unwrap_or_default(),
+        };
+        entry.metrics.extend(spent);
+    }
+    if histories.is_none() {
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Some(histories) = history.finished().await {
+                show_history(&handle, &histories).await;
+            }
+        });
+    }
     after_refresh(app, &previous, &entries);
     if let Err(err) = cache::save(&entries) {
         eprintln!(
@@ -409,6 +439,49 @@ async fn refresh(app: &AppHandle) -> bool {
     *state.refreshed_at.lock().unwrap() = Some(Instant::now());
     show(app, entries);
     passing_failure
+}
+
+/// The metrics of `metrics` read from the local logs.
+fn spend_metrics(metrics: &[Metric]) -> Vec<Metric> {
+    metrics
+        .iter()
+        .filter(|metric| spend::is_spend_metric(&metric.id))
+        .cloned()
+        .collect()
+}
+
+/// Shows a read of the local logs that finished after its refresh did.
+async fn show_history(app: &AppHandle, histories: &spend::Histories) {
+    let state = app.state::<TrayState>();
+    let _refreshing = state.refreshing.lock().await;
+    let now = Local::now();
+    let entries: Vec<TrayEntry> = state
+        .entries
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            let mut metrics: Vec<Metric> = entry
+                .metrics
+                .iter()
+                .filter(|metric| !spend::is_spend_metric(&metric.id))
+                .cloned()
+                .collect();
+            metrics.extend(spend::metrics_for(histories, &entry.id, &now));
+            TrayEntry {
+                metrics,
+                ..entry.clone()
+            }
+        })
+        .collect();
+    if let Err(err) = cache::save(&entries) {
+        eprintln!(
+            "claude-switch: could not save the menu bar's figures: {}",
+            err.message()
+        );
+    }
+    *state.entries.lock().unwrap() = entries.clone();
+    show(app, entries);
 }
 
 /// Runs after every fetch with the entries before and after it: where what

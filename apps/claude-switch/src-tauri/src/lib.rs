@@ -184,6 +184,7 @@ pub fn run() {
             tray::tray_usage,
             tray::open_main_window,
             tray::quit_app,
+            usage::spend::codex_fallback_models,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

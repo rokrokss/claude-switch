@@ -42,10 +42,13 @@ icns = "0.4.0"
 plist = "1.9.0"
 trash = "5.2.6"
 tauri-plugin-clipboard-manager = "2"
+regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip", "brotli", "deflate"] }
 sha2 = "0.10"
-tokio = { version = "1", features = ["rt", "macros", "process", "time"] }
+tokio = { version = "1", features = ["rt", "macros", "process", "sync", "time"] }
 portable-pty = "0.9.0"
+# Codex compresses finished rollouts to `.jsonl.zst`; the spend scan reads them.
+ruzstd = "0.8"
 profile-shim = { path = "shim" }
 
 [dev-dependencies]

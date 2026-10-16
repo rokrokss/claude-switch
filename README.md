@@ -200,7 +200,7 @@ Claude Code names its Keychain entry after the config directory, which changes w
 Claude: the undocumented quota endpoint may have changed shape. Codex: the `codex` CLI isn't on your `PATH`, or its protocol changed.
 
 **Does it send my data anywhere?**
-No. There is no analytics, telemetry or remote logging. Its network requests are the usage lookups above, made with each profile's own credentials, and the update check: it reads `latest.json` from this repository's latest release, and downloads the update only when you install it.
+No. There is no analytics, telemetry or remote logging. Its network requests are the usage lookups above, made with each profile's own credentials; the update check, which reads `latest.json` from this repository's latest release and downloads the update only when you install it; and, about once an hour, three public price lists it estimates local spend with: LiteLLM's (from raw.githubusercontent.com), models.dev's, and claude-switch's own (from claude-switch.shizue.net). The price list requests carry no usage data: what your sessions cost is worked out on your Mac from their logs.
 
 **Can I run it next to another build of this app?**
 Not on the same data directory. A build that doesn't know `signedClone` drops the field when it saves, and that profile falls back to the stock launcher (its data is safe).
