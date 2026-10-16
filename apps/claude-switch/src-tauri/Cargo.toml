@@ -71,12 +71,20 @@ objc2-app-kit = { version = "0.3", features = [
 ] }
 objc2-foundation = { version = "0.3", features = [
     "NSAppleEventDescriptor",
+    "NSArray",
+    "NSBundle",
     "NSData",
     "objc2-core-services",
     "libc",
     "NSDate",
     "NSError",
+    "NSString",
+    "NSURL",
 ] }
+# Hand the `claude://` scheme to claude-switch while a profile signs in, the way
+# Claude takes it (launchers::link_handler). Already present via objc2-foundation.
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFString"] }
+objc2-core-services = { version = "0.3", default-features = false, features = ["std", "LaunchServices", "LSInfo"] }
 
 # Profile for the `profile-shim` binary build.rs embeds. One copy is written
 # into every wrapper bundle, so it is built for size.

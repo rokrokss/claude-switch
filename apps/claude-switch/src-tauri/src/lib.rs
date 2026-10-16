@@ -154,6 +154,22 @@ pub fn run() {
             commands::check_session_repair,
             commands::repair_sessions,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, event| {
+            // claude:// links reach claude-switch only while a profile signs in
+            // (see `launchers::link_handler`); they belong to Claude.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = event {
+                let scheme = launchers::link_handler::SCHEME;
+                for url in urls.iter().filter(|url| url.scheme() == scheme) {
+                    if let Err(err) = launchers::link_handler::forward(url.as_str()) {
+                        eprintln!(
+                            "claude-switch: could not pass a {scheme}:// link on to Claude: {}",
+                            err.message()
+                        );
+                    }
+                }
+            }
+        });
 }

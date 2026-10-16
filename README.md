@@ -47,7 +47,7 @@ Claude profiles can run from a **signed clone**: a copy of Claude.app that keeps
 - **Already running?** Opening the profile brings its window forward.
 - **Reopened by an update or the Dock?** macOS starts the clone without the profile's arguments. Within 20 seconds it is quit and reopened as the profile; an older one is only quit after asking, and an update that left a profile closed is reported in a notification.
 - **Claude Desktop updated?** Nothing to update here. Claude's version, executable, signing requirement and icon are read from the installed app every time, and clones catch up on their next launch.
-- **First sign-in**: quit every other Claude window first. The `claude://` sign-in link goes to whichever Claude is running.
+- **First sign-in**: while the profile runs signed out, claude-switch opens `claude://` links in Claude's place. Claude then does its Google sign-in in a system sheet that answers the profile's own window, instead of a `claude://` link that would land in whichever Claude is running. Links that come in meanwhile are passed on to Claude, and the scheme goes back to Claude once the profile has signed in or quit.
 
 More: [design](docs/signed-clone-design.md) · [verification guide](docs/signed-clone-verification.md)
 

@@ -280,7 +280,7 @@ fn open_instance_of(
 /// Claude Code session's variables when claude-switch runs inside one. Every app
 /// claude-switch starts is started through this, so no launch can leave them in.
 /// A profile's own config home is set on the command afterwards, and wins.
-fn open_command() -> Command {
+pub(crate) fn open_command() -> Command {
     let mut command = Command::new("open");
     for key in crate::inherited_env::current() {
         command.env_remove(key);

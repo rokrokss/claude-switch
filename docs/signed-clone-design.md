@@ -234,11 +234,27 @@ A Claude Desktop update never requires rebuilding or updating claude-switch. Not
 
 ### 5.9 Known limitations
 
-- The bundle ID is shared, so a `claude://` sign-in callback goes to whichever instance LaunchServices picks. For a profile's **first sign-in, quit every other Claude** (the existing modes have the same limitation).
+- The bundle ID is shared, so a `claude://` link goes to whichever instance LaunchServices picks. Google sign-in is kept off that path while a signed-clone profile signs in (§5.10). Script-mode profiles have no watch to do this: for their **first sign-in, quit every other Claude**.
 - Notification settings, default-app choices and login items are shared with the original.
 - The original and every clone share the ShipIt cache (`~/Library/Caches/com.anthropic.claudefordesktop.ShipIt`) (check F4).
 - A clone that updated itself becomes a separate copy of about 650 MB. It is not excluded from Time Machine.
 - With a development build (`tauri dev`), the watch points at the development binary. Running the installed app corrects it.
+
+### 5.10 First sign-in (`link_handler`)
+
+Measured with Claude 2.42304.0 (2026-10-16):
+
+- **How Claude chooses.** For Google sign-in (`/login/app-google-auth`), Claude asks Electron's `app.isDefaultProtocolClient("claude")`. That compares the bundle ID of the app LaunchServices would open `claude://` with to its own.
+  - If they match, Claude signs in through the default browser, which returns the result as `claude://login/google-auth?code=…&hop_nonce=…`.
+  - If they don't, Claude signs in through an `ASWebAuthenticationSession`, which returns the result to the process that started it.
+- **Why a clone failed.** A clone has the stock app's bundle ID, so it always took the browser path. LaunchServices gave the link to the running stock app, which rejected it because the nonce didn't match ("Google sign-in code does not answer a sign-in this app started; ignoring"). The profile was left signed out.
+- **The fix.** `claude-switch.app` declares the `claude` scheme (`src-tauri/Info.plist`). On every look, the clone watch checks whether a signed-clone profile runs signed out (`accounts::desktop_signed_in` on its `gui-data`).
+  - If one does and Claude is the handler, the watch makes claude-switch the handler, using `LSSetDefaultHandlerForURLScheme`, as Electron does.
+  - Once none does, the watch makes Claude the handler again.
+  - A handler the user chose (anything other than Claude or claude-switch) is never touched.
+  - Every Claude makes itself the handler again when its window loads, so the watch takes it back on its next look, within 2 s.
+- **Links in the meantime.** Any `claude://` link that reaches claude-switch while it is the handler is passed on with `open -b <Claude's bundle ID>`. That is the instance LaunchServices would have picked anyway. If claude-switch isn't running, LaunchServices starts it to take the link.
+- **Verified by hand.** A throwaway bundle that declared `claude` was made the handler. Clicking Google sign-in in the clone then logged `Not the claude:// handler; keeping ASWebAuth`, and the profile signed in.
 
 ---
 
@@ -248,6 +264,7 @@ A Claude Desktop update never requires rebuilding or updating claude-switch. Not
 |------|------|
 | `src-tauri/src/launchers/clone.rs` | Refresh plan (`plan`), building and verifying (`ensure`, `build`, `verify`), the icon, ownership, stray detection and quitting |
 | `src-tauri/src/launchers/clone_watch.rs` | LaunchAgent plist, `sync`, the `--watch-clones` loop, notifications |
+| `src-tauri/src/launchers/link_handler.rs`, `src-tauri/Info.plist` | Holding the `claude://` scheme while a profile signs in, and forwarding links to Claude meanwhile (§5.10) |
 | `src-tauri/src/launch.rs` | `open_profile_with`, `open_signed_clone`, `CloneEffects` and `launch_clone_with` (fallback), `open_instance_of` |
 | `src-tauri/src/launchers/script.rs` | `handoff_launcher_script`, `hands_off`, `handoff_host` |
 | `src-tauri/src/launchers/gui.rs` | The `generate` branch, `outdated`'s handoff-shape and host-path checks, `hands_off` |

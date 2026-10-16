@@ -194,6 +194,14 @@ fn warm_up_within(shim: &Path, limit: Duration) {
     }
 }
 
+/// The `CFBundleIdentifier` of the app at `bundle`, if it can be read.
+pub fn bundle_identifier(bundle: &Path) -> Option<String> {
+    let info = read_info_plist(bundle).ok()?;
+    info.get("CFBundleIdentifier")
+        .and_then(Value::as_string)
+        .map(str::to_owned)
+}
+
 /// The `CFBundleVersion` of the app at `bundle`, if it can be read.
 pub fn bundle_version(bundle: &Path) -> Option<String> {
     let info = read_info_plist(bundle).ok()?;

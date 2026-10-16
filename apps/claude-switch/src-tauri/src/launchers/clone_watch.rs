@@ -24,6 +24,9 @@
 //!   could catch it, so the profile just disappears. Whether it was meant to
 //!   come back can't be told from outside (an update also installs, silently,
 //!   when the user quits), so it is reported, not reopened.
+//! - **A profile signing in**: while one runs signed out, claude-switch opens
+//!   `claude://` links, so that its Google sign-in comes back to it rather than
+//!   to the stock app (see [`link_handler`]).
 //!
 //! The agent is installed while some profile has a signed clone and removed when
 //! none has (see [`sync`]). It can also be switched off in System Settings →
@@ -41,7 +44,7 @@ use plist::{Dictionary, Value};
 use crate::app_kind::CLAUDE;
 use crate::error::{AppError, AppResult};
 use crate::launch;
-use crate::launchers::{clone, wrapper};
+use crate::launchers::{clone, link_handler, wrapper};
 use crate::paths::{app_data_dir, clone_bundle_path, resolve_gui_app};
 use crate::profiles::{self, Profile};
 
@@ -88,6 +91,18 @@ pub fn plist_body(host: &Path, log: &Path) -> AppResult<Vec<u8>> {
     // At login too: windows reopened then start clones without their profile.
     dict.insert("RunAtLoad".into(), Value::Boolean(true));
     dict.insert("KeepAlive".into(), Value::Boolean(true));
+    // Nothing reads it. It makes the body of each version differ, so that
+    // [`sync`] restarts a watch an earlier version started: replacing the app
+    // leaves the old executable running until it exits.
+    let mut environment = Dictionary::new();
+    environment.insert(
+        "CLAUDE_SWITCH_VERSION".into(),
+        Value::String(env!("CARGO_PKG_VERSION").into()),
+    );
+    dict.insert(
+        "EnvironmentVariables".into(),
+        Value::Dictionary(environment),
+    );
     dict.insert(
         "StandardOutPath".into(),
         Value::String(log.display().to_string()),
@@ -245,6 +260,11 @@ struct Watch {
 impl Watch {
     fn look(&mut self, version: &str) -> AppResult<()> {
         let profiles: Vec<Profile> = profiles::load()?.into_iter().filter(watched).collect();
+        // Before the early return, so that the scheme goes back to Claude even
+        // when the last such profile has just gone.
+        if let Err(err) = link_handler::sync(&profiles) {
+            eprintln!("claude-switch: clone watch: {}", err.message());
+        }
         if profiles.is_empty() {
             return Ok(());
         }
@@ -385,6 +405,14 @@ mod tests {
         assert_eq!(
             dict.get("KeepAlive").and_then(Value::as_boolean),
             Some(true)
+        );
+        assert_eq!(
+            dict.get("EnvironmentVariables")
+                .and_then(Value::as_dictionary)
+                .and_then(|environment| environment.get("CLAUDE_SWITCH_VERSION"))
+                .and_then(Value::as_string),
+            Some(env!("CARGO_PKG_VERSION")),
+            "a new version restarts the watch"
         );
     }
 

@@ -145,6 +145,12 @@ fn desktop_sign_in(gui_data: &Path) -> Desktop {
     }
 }
 
+/// Whether the Claude desktop app with data at `gui_data` is signed in, as far
+/// as its files say. One that has never run, or whose files don't say, isn't.
+pub(crate) fn desktop_signed_in(gui_data: &Path) -> bool {
+    matches!(desktop_sign_in(gui_data), Desktop::SignedIn(_))
+}
+
 /// The account with id `id`, as a Claude desktop app with data at `gui_data`
 /// recorded it. Each Cowork session there runs its own CLI, whose
 /// `.claude.json` lives at
