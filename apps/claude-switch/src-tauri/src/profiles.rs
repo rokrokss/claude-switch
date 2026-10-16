@@ -786,8 +786,7 @@ mod tests {
 
         // Twelve loads that would each have seen the same list.
         let threads: Vec<_> = ids
-            .iter()
-            .cloned()
+            .into_iter()
             .map(|id| std::thread::spawn(move || touch_last_used(&id).unwrap()))
             .collect();
         for thread in threads {

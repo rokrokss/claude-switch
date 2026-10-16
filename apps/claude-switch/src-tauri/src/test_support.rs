@@ -6,8 +6,6 @@
 //! other — a per-module mutex would still let cross-module tests race.
 //! This module hosts the global mutex they all lock.
 
-#![cfg(test)]
-
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
