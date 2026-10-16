@@ -57,7 +57,7 @@ const controlClasses =
  * reachable state of the pane keeps exactly one obvious action.
  */
 const filledClasses =
-  'border-[1.5px] border-ink bg-mint text-accent-ink shadow-button-primary hover:bg-mint-hover active:translate-x-px active:translate-y-px active:shadow-none'
+  'border-[1.5px] border-white/60 bg-mint text-accent-ink shadow-glass-button dark:border-ink dark:shadow-button-primary hover:bg-mint-hover active:translate-x-px active:translate-y-px active:shadow-none'
 
 const outlinedClasses =
   'border border-border bg-white/60 text-ink-soft hover:border-border-strong hover:bg-white dark:bg-white/[0.05] dark:hover:bg-white/[0.09]'
@@ -140,7 +140,7 @@ export function ProfileDetailSurfacesPanel({
 
   return (
     <>
-      <div className="overflow-hidden rounded-[10px] border border-border bg-white/50 dark:bg-white/[0.035]">
+      <div className="glass overflow-hidden rounded-[10px] border border-border bg-white/50 dark:bg-white/[0.035]">
         <SurfaceRow
           enabled={guiEnabled}
           glyph={<Monitor aria-hidden className="h-3.5 w-3.5" strokeWidth={1.85} />}

@@ -53,7 +53,7 @@ export function NotificationsSection() {
           Notifications
         </span>
       </div>
-      <div className="rounded-xl border border-border bg-white py-1 dark:bg-cream-2">
+      <div className="glass rounded-xl border border-border bg-white py-1 dark:bg-cream-2">
         {triggers.map((trigger) => (
           <div
             key={trigger.key}

@@ -92,8 +92,8 @@ export function Dialog({
             newer dialog, backdrop included, paints over everything of an older one. */}
         <DialogPrimitive.Overlay
           className={cn(
-            'fixed inset-0 z-50 bg-[rgba(26,24,21,0.18)] backdrop-blur-sm backdrop-saturate-150 data-[state=closed]:opacity-0 dark:bg-[rgba(0,0,0,0.55)]',
-            stacked && 'bg-[rgba(26,24,21,0.42)] dark:bg-[rgba(0,0,0,0.72)]',
+            'fixed inset-0 z-50 bg-[rgba(23,35,45,0.14)] backdrop-blur-sm backdrop-saturate-150 data-[state=closed]:opacity-0 dark:bg-[rgba(0,0,0,0.55)]',
+            stacked && 'bg-[rgba(23,35,45,0.34)] dark:bg-[rgba(0,0,0,0.72)]',
           )}
         />
         <DialogPrimitive.Content
@@ -105,7 +105,7 @@ export function Dialog({
           }}
           className={cn(
             'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 outline-none',
-            'w-[min(440px,calc(100%-64px))] rounded-xl border border-[color:rgba(40,30,20,0.1)] bg-cream',
+            'glass-thick w-[min(440px,calc(100%-64px))] rounded-xl border border-[color:rgba(40,30,20,0.1)] bg-cream',
             'shadow-modal animate-[design-modal-in_0.22s_cubic-bezier(0.16,1,0.3,1)]',
             'flex max-h-[calc(100%-64px)] flex-col overflow-hidden',
             'dark:border-white/[0.06]',

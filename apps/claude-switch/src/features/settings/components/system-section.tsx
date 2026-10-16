@@ -122,7 +122,7 @@ export function SystemSection() {
         <span className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-strong">System</span>
         <RefreshControl onRefresh={refresh} />
       </div>
-      <div className="rounded-xl border border-border bg-white py-1 dark:bg-cream-2">
+      <div className="glass rounded-xl border border-border bg-white py-1 dark:bg-cream-2">
         {rows.map((row, index) => (
           <StatusRow
             // biome-ignore lint/suspicious/noArrayIndexKey: rows are a stable ordered list with no insert/reorder semantics

@@ -117,7 +117,7 @@ export function ProfileCard({
   return (
     <section
       className={cn(
-        'rounded-[10px] border border-border-soft bg-white/40 dark:bg-white/[0.03]',
+        'glass rounded-[10px] border border-border-soft bg-white/40 dark:bg-white/[0.03]',
         compact ? 'px-2.5 py-1.5' : 'px-3 py-2',
       )}
     >

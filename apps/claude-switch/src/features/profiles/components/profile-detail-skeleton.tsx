@@ -30,7 +30,7 @@ export function ProfileDetailSkeleton() {
         </div>
       }
     >
-      <div className="mb-3.5 rounded-[10px] border border-border-soft bg-white/30 px-[13px] py-[9px] dark:bg-white/[0.02]">
+      <div className="glass mb-3.5 rounded-[10px] border border-border-soft bg-white/30 px-[13px] py-[9px] dark:bg-white/[0.02]">
         <div className="mb-1.5 flex min-h-[22px] items-center justify-between gap-3.5">
           <Skeleton shape="text" className="h-2.5 w-12" />
           <Skeleton shape="text" className="h-2.5 w-20" />
@@ -49,7 +49,7 @@ export function ProfileDetailSkeleton() {
         </div>
       </div>
 
-      <div className="mb-3.5 overflow-hidden rounded-[10px] pane-wide:mb-6 border border-border bg-white/50 dark:bg-white/[0.035]">
+      <div className="glass mb-3.5 overflow-hidden rounded-[10px] pane-wide:mb-6 border border-border bg-white/50 dark:bg-white/[0.035]">
         {[0, 1].map((surface) => (
           <div
             key={surface}

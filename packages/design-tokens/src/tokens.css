@@ -10,12 +10,16 @@
  * This file is the only place hex literals live.
  *
  * Palette: the shizue system (../shizue store/src/base.css, ../shizue-plot
- * docs/design/shizue-ui.md) — cream canvas, white surfaces, ink text and
- * borders, mint for the primary action. Mapped by role: `base` is shizue's
- * canvas, `cream` its surface, `cream-2` its raised surface, `border` its
- * line. `cream-3`, `border-soft`, `border-strong` and `muted-strong` sit
- * between those, since shizue has no step there. The profile palette and the
- * Claude orange / ChatGPT violet stay: they identify apps and profiles.
+ * docs/design/shizue-ui.md), mapped by role: `base` is the canvas, `cream`
+ * the surface, `cream-2` the raised surface, `border` the line. `cream-3`,
+ * `border-soft`, `border-strong` and `muted-strong` sit between those. The
+ * dark theme keeps shizue's deep green; the light theme is a pale, cool
+ * retone for glass (the `.glass` surfaces in the app's design CSS): a misty
+ * canvas, slate ink, and a softer mint. Every light text colour holds WCAG AA
+ * (4.5:1) on the surfaces it sits on, status colours included, so the meter
+ * fills that share them run a little deeper than pastel. The profile palette,
+ * the chart series and the Claude orange / ChatGPT violet stay: they identify
+ * apps, profiles and series.
  */
 
 @theme {
@@ -33,39 +37,39 @@
 
   /* ---------- Surface ---------- */
   --color-cream: #ffffff;
-  --color-cream-2: #efeacb;
-  --color-cream-3: #e6e0bd;
-  --color-base: #f6f3dc;
+  --color-cream-2: #ecf0f5;
+  --color-cream-3: #e1e7ef;
+  --color-base: #f2f5f9;
 
   /* ---------- Content ---------- */
-  --color-ink: #10302b;
-  --color-ink-soft: #3c5652;
-  --color-muted: #50645b;
-  --color-muted-strong: #7a8c84;
+  --color-ink: #17232d;
+  --color-ink-soft: #3a4653;
+  --color-muted: #4f5a68;
+  --color-muted-strong: #596472;
 
   /* ---------- Brand (shizue mint) ----------
      Mint is a fill, never small text on light: text and focus use `link` /
      `focus`, and the ink on mint stays ink in both themes. */
-  --color-mint: #32ccbc;
-  --color-mint-2: #90f7ec;
-  --color-mint-hover: #cbfbf6;
-  --color-mint-soft: #cbfbf6;
-  --color-accent-ink: #10302b;
-  --color-link: #126b61;
-  --color-focus: #126b61;
+  --color-mint: #7fdccf;
+  --color-mint-2: #b8efe7;
+  --color-mint-hover: #a9e9df;
+  --color-mint-soft: #d6f4ef;
+  --color-accent-ink: #17232d;
+  --color-link: #0f6b64;
+  --color-focus: #0f6b64;
 
   /* ---------- Accent + status ---------- */
   --color-orange: #d97757;
   --color-orange-deep: #bf6240;
   --color-chatgpt: #6b6bd6;
-  --color-green: #5b8f5a;
-  --color-red: #b43e35;
-  --color-amber: #c19a4a;
+  --color-green: #2a7a52;
+  --color-red: #b5382f;
+  --color-amber: #a85400;
 
   /* ---------- Chrome borders ---------- */
-  --color-border: #c9d1bf;
-  --color-border-soft: #dde2d2;
-  --color-border-strong: #b3bea8;
+  --color-border: #d6dde6;
+  --color-border-soft: #e4e9f0;
+  --color-border-strong: #bcc6d2;
 
   /* ---------- Profile palette ---------- */
   --color-profile-orange: #d97757;
@@ -105,6 +109,28 @@
   /* shizue's primary action: an ink border and a short solid shadow. */
   --shadow-button-primary: 2px 2px 0 var(--color-ink);
   --shadow-pulse-success: 0 0 0 3px rgba(91, 143, 90, 0.16);
+
+  /* ---------- Glass (light theme only) ----------
+     The `.glass` surfaces: a frosted white fill, a lit rim, a lit top edge,
+     and a soft lift. `-thick` is for what floats over content (dialogs,
+     menus, toasts), where the text behind must not show through. The glass
+     primary action trades shizue's solid shadow for a lit top edge and a
+     soft mint glow.
+
+     Tailwind writes a shadow token's value into its utility, so a shadow
+     can't be swapped per theme here: the dark overrides of the shadows
+     above never reach their utilities. A light-only shadow is its own token,
+     worn beside `dark:` the shadow the dark theme keeps. */
+  --color-glass: rgba(255, 255, 255, 0.58);
+  --color-glass-thick: rgba(255, 255, 255, 0.82);
+  --color-glass-rim: rgba(255, 255, 255, 0.75);
+  --shadow-glass:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 0 0 1px rgba(23, 35, 45, 0.05), 0 1px 2px rgba(23, 35, 45, 0.04),
+    0 10px 28px -16px rgba(23, 35, 45, 0.2);
+  --shadow-glass-thick:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 0 0 1px rgba(23, 35, 45, 0.07), 0 18px 44px -18px rgba(23, 35, 45, 0.32);
+  --shadow-glass-button:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 2px rgba(23, 35, 45, 0.08), 0 6px 16px -8px rgba(15, 107, 100, 0.45);
 
   /* ---------- Icon sizes ---------- */
   --size-icon-xs: 12px;
@@ -179,8 +205,11 @@
   --color-muted: #a3bab6;
   --color-muted-strong: #7d9590;
 
+  --color-mint: #32ccbc;
+  --color-mint-2: #90f7ec;
   --color-mint-hover: #90f7ec;
   --color-mint-soft: #1a4540;
+  --color-accent-ink: #10302b;
   --color-link: #90f7ec;
   --color-focus: #90f7ec;
 

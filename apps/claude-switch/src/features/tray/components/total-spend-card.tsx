@@ -62,7 +62,7 @@ export function TotalSpendCard({ entries, settings, onChange, onNotice }: Props)
       <ContextMenuTrigger asChild>
         <section
           aria-label="Total spend"
-          className="rounded-[10px] border border-border-soft bg-white/40 px-3 py-2 dark:bg-white/[0.03]"
+          className="glass rounded-[10px] border border-border-soft bg-white/40 px-3 py-2 dark:bg-white/[0.03]"
         >
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-[13px] font-semibold text-ink">Total spend</h2>

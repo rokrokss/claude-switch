@@ -41,7 +41,7 @@ export function TrayPanel() {
   return (
     <ThemeProvider mode={themeMode}>
       <PartyContext.Provider value={party}>
-        <div className="h-full overflow-y-auto bg-base text-ink">
+        <div className="h-full overflow-y-auto text-ink dark:bg-base">
           <div ref={contentRef} className="flex flex-col gap-2 p-2.5">
             {updateVersion ? (
               <Banner
@@ -132,7 +132,7 @@ function FirstRunHint() {
     }
   }
   return (
-    <div className="relative rounded-[10px] border border-border-soft bg-white/40 px-3 py-2 pr-7 text-[12px] dark:bg-white/[0.03]">
+    <div className="glass relative rounded-[10px] border border-border-soft bg-white/40 px-3 py-2 pr-7 text-[12px] dark:bg-white/[0.03]">
       <p className="font-medium">Every profile's usage, at a glance</p>
       <p className="mt-0.5 text-muted-strong">
         Choose what the menu bar shows and what each card lists in{' '}

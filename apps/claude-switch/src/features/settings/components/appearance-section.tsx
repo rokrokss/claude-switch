@@ -89,7 +89,7 @@ function MenuBarPanelAppearance() {
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-border bg-white dark:bg-cream-2">
+    <div className="glass mt-3 rounded-xl border border-border bg-white dark:bg-cream-2">
       <SettingRow
         title="Panel density"
         description="Compact fits more profiles in the menu bar's panel."

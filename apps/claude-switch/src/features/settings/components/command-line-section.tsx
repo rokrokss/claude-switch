@@ -58,7 +58,7 @@ export function CommandLineSection() {
           Command line
         </span>
       </div>
-      <div className="rounded-xl border border-border bg-white dark:bg-cream-2">
+      <div className="glass rounded-xl border border-border bg-white dark:bg-cream-2">
         <div className="flex items-start gap-3 border-b border-border-soft p-3">
           <span className="flex-1">
             <span className="block font-mono text-[12.5px] font-medium text-ink">claude-switch usage</span>
