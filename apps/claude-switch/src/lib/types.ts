@@ -280,6 +280,27 @@ export type ProfileUsage = {
   fetchedAt: string
 }
 
+/**
+ * A profile the menu bar reports on, as of its last usage fetch.
+ */
+export type TrayEntry = {
+  id: string
+  app: AppId
+  name: string
+  /**
+   * The CLI command the profile signs in with, e.g. `claude-work`.
+   */
+  command: string
+  /**
+   * The last usage that came back with a quota, kept through failed fetches.
+   */
+  usage: ProfileUsage | null
+  /**
+   * Why the latest fetch brought no quota, if it didn't.
+   */
+  error: QuotaError | null
+}
+
 /** The account a profile is signed in under, from what its CLI keeps on disk. */
 export type ProfileAccount = {
   email: string | null

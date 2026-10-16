@@ -586,8 +586,19 @@ static CLAUDE_DEAD_CREDS: OnceLock<usage::dead_credentials::DeadCredentialRegist
 
 #[tauri::command]
 pub async fn get_profile_usage(profile_id: String) -> AppResult<ProfileUsage> {
-    let app = resolve_app(&profile_id)?;
-    let config_dir = resolve_cli_config_dir(&profile_id)?;
+    profile_usage(&profile_id, true).await
+}
+
+/// The usage `get_profile_usage` reports. With `refresh_sign_in` off, a
+/// Claude profile whose access token has lapsed reports `Unauthorized`
+/// instead of having `claude` started to refresh it: the menu bar polls with
+/// nobody watching, and leaves that to a window the user has open.
+pub(crate) async fn profile_usage(
+    profile_id: &str,
+    refresh_sign_in: bool,
+) -> AppResult<ProfileUsage> {
+    let app = resolve_app(profile_id)?;
+    let config_dir = resolve_cli_config_dir(profile_id)?;
     let app_spec = spec(app);
     if !app_spec.has_usage {
         return Ok(ProfileUsage {
@@ -604,6 +615,9 @@ pub async fn get_profile_usage(profile_id: String) -> AppResult<ProfileUsage> {
                 CLAUDE_DEAD_CREDS.get_or_init(usage::dead_credentials::DeadCredentialRegistry::new);
             let provider = ClaudeQuotaProvider::new(user_agent, cache, dead_credentials)
                 .map_err(|_| AppError::Io(std::io::Error::other("could not build HTTP client")))?;
+            if !refresh_sign_in {
+                return Ok(usage::build(&config_dir, &provider).await);
+            }
             let refresher = CLAUDE_REFRESHER.get_or_init(usage::refresh::ClaudeCliRefresher::new);
             Ok(
                 usage::build_with_cli_refresh(&config_dir, &provider, refresher, dead_credentials)

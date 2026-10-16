@@ -32,6 +32,15 @@ export default defineConfig(async () => ({
     },
   },
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
+  // The main window's page, and the menu bar panel's (src-tauri/src/tray).
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        tray: path.resolve(__dirname, 'tray.html'),
+      },
+    },
+  },
   test: {
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],

@@ -20,10 +20,11 @@ mod shared_config;
 mod slug;
 #[cfg(test)]
 mod test_support;
+mod tray;
 mod usage;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
-use tauri::Emitter;
+use tauri::{Emitter, WindowEvent};
 
 /// Custom menu identifier for the App menu's "About claude-switch" entry.
 /// The default macOS About item opens a tiny system panel; we replace it
@@ -39,7 +40,12 @@ pub fn run() {
         // the app itself after `downloadAndInstall` finishes — Tauri 2's
         // updater plugin does NOT relaunch on its own.
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_window_state::Builder::new().build())
+        // The menu bar panel is placed under the item each time it opens.
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_denylist(&[tray::PANEL_WINDOW])
+                .build(),
+        )
         .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             // Bring the desktop launchers an earlier version built up to this
@@ -110,7 +116,19 @@ pub fn run() {
             )?;
             let menu = Menu::with_items(app, &[&app_submenu, &edit_submenu])?;
             app.set_menu(menu)?;
+
+            tray::setup(app)?;
             Ok(())
+        })
+        // Closing the main window leaves claude-switch running in the menu
+        // bar; the item, the Dock icon or Quit bring it back or end it.
+        .on_window_event(|window, event| {
+            if window.label() == tray::MAIN_WINDOW {
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+            }
         })
         .on_menu_event(|app, event| {
             if event.id().as_ref() == OPEN_ABOUT_ID {
@@ -153,10 +171,20 @@ pub fn run() {
             commands::move_session,
             commands::check_session_repair,
             commands::repair_sessions,
+            tray::tray_usage,
+            tray::open_main_window,
+            tray::quit_app,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app, event| {
+        .run(|app, event| {
+            // A click on the Dock icon brings back a main window that was
+            // closed to the menu bar.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                tray::show_main_window(app);
+                return;
+            }
             // claude:// links reach claude-switch only while a profile signs in
             // (see `launchers::link_handler`); they belong to Claude.
             #[cfg(target_os = "macos")]

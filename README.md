@@ -40,7 +40,7 @@ Claude profiles can run from a **signed clone**: a copy of Claude.app that keeps
 
 - **A profile per account.** Each one gets a desktop launcher, `/Applications/Claude (<Name>).app`, and a CLI command, `claude-<slug>`. Both open with that account's login, history and settings, isolated from the others.
 - **Its own Dock tile.** A Claude profile can run from a signed clone wearing the profile's color, from a re-signed copy with its own icon and name, or simply from the stock app.
-- **Usage at a glance.** Each profile shows its current quota: the 5-hour and weekly windows.
+- **Usage at a glance.** Each profile shows its current quota, the 5-hour and weekly windows, on its page and in the menu bar.
 - **Sessions that move.** List a profile's Claude Code and Codex sessions, archive them, or move one to another account and carry on there.
 - **Your existing setup, imported.** Already using Claude Desktop or Claude Code? Bring it into your first profile.
 
@@ -145,6 +145,8 @@ A profile's detail page shows its current quota, refreshed every 5 minutes while
 - **Codex**: the 5-hour and weekly windows, read through `codex app-server` (`account/rateLimits/read`) from the profile's own `auth.json`.
 
 The first refresh asks for Keychain access; choose "Always Allow".
+
+The menu bar shows the same quota for every profile with a CLI: the app's mark beside the share used of its 5-hour and weekly windows (hover over it to see which profile is which). Click it for each profile's meters, or right-click to open or quit claude-switch. It refreshes every 5 minutes whether or not the window is open, and closing the window leaves claude-switch running in the menu bar; quit from there or with ⌘Q. These background refreshes never start `claude` to renew an expired sign-in. Open the profile's detail page, or run its command once, to do that.
 
 ### Sessions
 

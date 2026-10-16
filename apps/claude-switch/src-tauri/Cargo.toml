@@ -30,7 +30,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order", "raw_value"] }
 thiserror = "2"
@@ -61,19 +61,29 @@ tauri-plugin-window-state = "2"
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", features = [
+    "NSAttributedString",
     "NSBitmapImageRep",
+    "NSColor",
+    "NSFont",
+    "NSFontDescriptor",
     "NSGraphics",
     "NSGraphicsContext",
     "NSImage",
     "NSImageRep",
+    "NSResponder",
     "NSRunningApplication",
+    "NSStringDrawing",
+    "NSView",
+    "NSWindow",
     "NSWorkspace",
 ] }
 objc2-foundation = { version = "0.3", features = [
     "NSAppleEventDescriptor",
     "NSArray",
+    "NSAttributedString",
     "NSBundle",
     "NSData",
+    "NSDictionary",
     "objc2-core-services",
     "libc",
     "NSDate",

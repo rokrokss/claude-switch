@@ -24,6 +24,7 @@ import type {
   Shell,
   Surface,
   Surfaces,
+  TrayEntry,
 } from './types'
 
 import { invoke } from '@tauri-apps/api/core'
@@ -153,6 +154,22 @@ export function openCliLogin(id: string): Promise<void> {
 
 export function getProfileUsage(profileId: string): Promise<ProfileUsage> {
   return invoke<ProfileUsage>('get_profile_usage', { profileId })
+}
+
+/**
+ * The profiles the menu bar reports on, as of its last fetch; `null` until
+ * the first has finished.
+ */
+export function getTrayUsage(): Promise<Array<TrayEntry> | null> {
+  return invoke<Array<TrayEntry> | null>('tray_usage')
+}
+
+export function openMainWindow(): Promise<void> {
+  return invoke('open_main_window')
+}
+
+export function quitApp(): Promise<void> {
+  return invoke('quit_app')
 }
 
 /**

@@ -30,6 +30,23 @@
           "state": "followsWindowActiveState",
           "radius": 10
         }
+      },
+      {
+        "label": "tray",
+        "title": "claude-switch",
+        "url": "tray.html",
+        "width": 380,
+        "height": 420,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visibleOnAllWorkspaces": true,
+        "acceptFirstMouse": true,
+        "shadow": true
       }
     ],
     "security": {

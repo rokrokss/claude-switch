@@ -213,7 +213,7 @@ function formatRefreshIn(deltaMs: number): string | null {
   return `${totalSeconds}s`
 }
 
-function formatUpdatedAgo(ageMs: number): string {
+export function formatUpdatedAgo(ageMs: number): string {
   const minutes = Math.floor(ageMs / 60_000)
   if (minutes < 1) {
     return 'just now'
@@ -302,7 +302,7 @@ function ReloginButton({ profileId }: { profileId: string }) {
 
 // Terse reason appended to the "Couldn't refresh — …" note shown beside stale
 // meters. The full sentences in `quotaErrorMessage` are for the no-data case.
-function quotaErrorShort(quotaError: QuotaError): string {
+export function quotaErrorShort(quotaError: QuotaError): string {
   if (quotaError === 'no_credentials') {
     return 'sign-in needed'
   }
