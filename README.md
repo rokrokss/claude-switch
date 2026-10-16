@@ -62,7 +62,9 @@ More: [design](docs/signed-clone-design.md) · [verification guide](docs/signed-
 
 Download the `.dmg` from the [latest release](https://github.com/rokrokss/claude-switch/releases/latest), open it and drag claude-switch to Applications. It is a universal build for Apple Silicon and Intel Macs, signed with a Developer ID and notarized by Apple. The app keeps its data in `~/Library/Application Support/claude-switch/`.
 
-The app doesn't update itself: download the new release to upgrade.
+The app checks this repository's releases for a new version at launch and every 6 hours, and offers to restart and install it. It installs only updates signed with this project's key.
+
+**Updating from 1.4.0**: 1.4.0 shipped before the project had its own update key, so it can't verify updates. It will show the next release as available, but installing it from the app fails. Download that release's `.dmg` and drag claude-switch to Applications once. From then on, updates install from the app.
 
 Or build it from source:
 
@@ -71,7 +73,7 @@ pnpm install
 pnpm --filter claude-switch tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
 ```
 
-Then copy `apps/claude-switch/src-tauri/target/release/bundle/macos/claude-switch.app` to `/Applications`. A build from source isn't notarized, so open it the first time with right-click → Open.
+The `--config` override skips the signed update archive, which needs the release signing key. Then copy `apps/claude-switch/src-tauri/target/release/bundle/macos/claude-switch.app` to `/Applications`. A build from source isn't notarized, so open it the first time with right-click → Open.
 
 ## Using it
 
@@ -150,6 +152,8 @@ NODE_OPTIONS=--no-webstorage pnpm --filter claude-switch test   # needed on Node
 
 `pnpm install` also installs lefthook git hooks. On current stable clippy (1.93), the pre-push hook's `cargo clippy --all-targets` fails on two lints in existing test code (`test_support.rs`, `profiles.rs`). CI checks without `--all-targets` and passes. To skip the hooks, install with `pnpm install --ignore-scripts`, or push with `LEFTHOOK=0 git push` once they're installed.
 
+Releases are built, notarized and published from a Mac with `scripts/release.sh`. See [Releasing](docs/releasing.md).
+
 ## FAQ
 
 **Why does a profile ask me to sign in to Claude Code again after importing?**
@@ -162,7 +166,7 @@ Claude Code names its Keychain entry after the config directory, which changes w
 Claude: the undocumented quota endpoint may have changed shape. Codex: the `codex` CLI isn't on your `PATH`, or its protocol changed.
 
 **Does it send my data anywhere?**
-No. There is no analytics, telemetry or remote logging. Its network requests are the usage lookups above, made with each profile's own credentials, and the update check against this repository's Releases.
+No. There is no analytics, telemetry or remote logging. Its network requests are the usage lookups above, made with each profile's own credentials, and the update check: it reads `latest.json` from this repository's latest release, and downloads the update only when you install it.
 
 **Can I run it next to another build of this app?**
 Not on the same data directory. A build that doesn't know `signedClone` drops the field when it saves, and that profile falls back to the stock launcher (its data is safe).
