@@ -8,7 +8,6 @@ import { Skeleton } from '@/design'
 export function SettingsViewSkeleton() {
   return (
     <PaneLayout
-      className="dark:bg-background"
       header={
         <div className="flex items-center justify-between border-b border-border-soft pb-6">
           <Skeleton className="h-7 w-32" />

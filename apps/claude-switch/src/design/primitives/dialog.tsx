@@ -38,7 +38,7 @@ type DialogProps = {
 }
 
 /**
- * Cream-surfaced dialog matching the prototype: 14px radius, soft border,
+ * Glass-surfaced dialog (`.glass-thick`): 14px radius, lit rim,
  * tokenized animated entrance via the `design-modal-in` keyframe.
  *
  * Slot layout:
@@ -105,10 +105,9 @@ export function Dialog({
           }}
           className={cn(
             'fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 outline-none',
-            'glass-thick w-[min(440px,calc(100%-64px))] rounded-xl border border-[color:rgba(40,30,20,0.1)] bg-cream',
-            'shadow-modal animate-[design-modal-in_0.22s_cubic-bezier(0.16,1,0.3,1)]',
+            'glass-thick w-[min(440px,calc(100%-64px))] rounded-xl border',
+            'animate-[design-modal-in_0.22s_cubic-bezier(0.16,1,0.3,1)]',
             'flex max-h-[calc(100%-64px)] flex-col overflow-hidden',
-            'dark:border-white/[0.06]',
             className,
           )}
         >

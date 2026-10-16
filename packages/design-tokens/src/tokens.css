@@ -12,14 +12,15 @@
  * Palette: the shizue system (../shizue store/src/base.css, ../shizue-plot
  * docs/design/shizue-ui.md), mapped by role: `base` is the canvas, `cream`
  * the surface, `cream-2` the raised surface, `border` the line. `cream-3`,
- * `border-soft`, `border-strong` and `muted-strong` sit between those. The
- * dark theme keeps shizue's deep green; the light theme is a pale, cool
- * retone for glass (the `.glass` surfaces in the app's design CSS): a misty
- * canvas, slate ink, and a softer mint. Every light text colour holds WCAG AA
- * (4.5:1) on the surfaces it sits on, status colours included, so the meter
- * fills that share them run a little deeper than pastel. The profile palette,
- * the chart series and the Claude orange / ChatGPT violet stay: they identify
- * apps, profiles and series.
+ * `border-soft`, `border-strong` and `muted-strong` sit between those. Both
+ * themes draw their cards, panes and popovers as glass (the `.glass`
+ * surfaces in the app's design CSS, tokens under "Glass" below). The dark
+ * theme keeps shizue's deep green under it; the light theme is a pale, cool
+ * retone: a misty canvas, slate ink, and a softer mint. Every text colour
+ * holds WCAG AA (4.5:1) on the surfaces it sits on, status colours included,
+ * so the light meter fills that share them run a little deeper than pastel.
+ * The profile palette, the chart series and the Claude orange / ChatGPT
+ * violet stay: they identify apps, profiles and series.
  */
 
 @theme {
@@ -110,17 +111,18 @@
   --shadow-button-primary: 2px 2px 0 var(--color-ink);
   --shadow-pulse-success: 0 0 0 3px rgba(91, 143, 90, 0.16);
 
-  /* ---------- Glass (light theme only) ----------
-     The `.glass` surfaces: a frosted white fill, a lit rim, a lit top edge,
-     and a soft lift. `-thick` is for what floats over content (dialogs,
-     menus, toasts), where the text behind must not show through. The glass
-     primary action trades shizue's solid shadow for a lit top edge and a
-     soft mint glow.
+  /* ---------- Glass ----------
+     The `.glass` surfaces: a frosted fill, a lit rim, a lit top edge, and a
+     soft lift (the dark theme's values are in its block below). `-thick` is
+     for what floats over content (dialogs, menus, toasts), where the text
+     behind must not show through. The glass primary action trades shizue's
+     solid shadow for a lit top edge and a soft mint glow.
 
      Tailwind writes a shadow token's value into its utility, so a shadow
-     can't be swapped per theme here: the dark overrides of the shadows
-     above never reach their utilities. A light-only shadow is its own token,
-     worn beside `dark:` the shadow the dark theme keeps. */
+     worn as a utility can't be swapped per theme: the dark overrides of the
+     shadows above never reach their utilities, and `shadow-glass-button` is
+     the same in both themes. `.glass` reads its tokens with var(), so those
+     do follow the theme. */
   --color-glass: rgba(255, 255, 255, 0.58);
   --color-glass-thick: rgba(255, 255, 255, 0.82);
   --color-glass-rim: rgba(255, 255, 255, 0.75);
@@ -203,7 +205,7 @@
   --color-ink: #e9f6f3;
   --color-ink-soft: #c9dcd8;
   --color-muted: #a3bab6;
-  --color-muted-strong: #7d9590;
+  --color-muted-strong: #869d98;
 
   --color-mint: #32ccbc;
   --color-mint-2: #90f7ec;
@@ -244,4 +246,15 @@
   --shadow-window: 0 30px 60px -25px rgba(0, 0, 0, 0.55), 0 8px 22px -10px rgba(0, 0, 0, 0.4);
   --shadow-modal: 0 30px 60px -20px rgba(0, 0, 0, 0.65), 0 8px 24px -10px rgba(0, 0, 0, 0.4);
   --shadow-pulse-success: 0 0 0 3px rgba(123, 168, 118, 0.18);
+
+  /* Dark glass: a faint white fill and a hairline rim over the deep green,
+     lifted by black. The thick fill is near-opaque so text behind a dialog
+     or menu stays out of the way. */
+  --color-glass: rgba(255, 255, 255, 0.05);
+  --color-glass-thick: rgba(22, 36, 34, 0.86);
+  --color-glass-rim: rgba(255, 255, 255, 0.1);
+  --shadow-glass:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.2), 0 10px 28px -16px rgba(0, 0, 0, 0.6);
+  --shadow-glass-thick:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.35), 0 24px 52px -18px rgba(0, 0, 0, 0.7);
 }

@@ -97,7 +97,7 @@ type DetectedInstallCardProps = {
  */
 function DetectedInstallCard({ app, detected, showShortcut, onReimport }: DetectedInstallCardProps) {
   return (
-    <div className="glass flex items-center justify-between gap-4 rounded-xl border border-border bg-white px-4 py-3.5 dark:bg-cream-2">
+    <div className="glass flex items-center justify-between gap-4 rounded-xl border px-4 py-3.5">
       <div className="flex min-w-0 items-center gap-3">
         <span
           aria-hidden

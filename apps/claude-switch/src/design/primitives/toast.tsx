@@ -122,13 +122,12 @@ function ToastItemRoot({ toast, onDismiss }: ToastItemRootProps) {
         }
       }}
       className={cn(
-        'glass-thick flex items-start gap-3 rounded-xl border border-border bg-cream px-3.5 py-3 shadow-card-hover',
+        'glass-thick flex items-start gap-3 rounded-xl border px-3.5 py-3',
         'data-[state=open]:animate-[design-toast-in_0.22s_cubic-bezier(0.16,1,0.3,1)]',
         'data-[state=closed]:animate-[design-toast-out_0.16s_cubic-bezier(0.4,0,1,1)]',
         'data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)]',
         'data-[swipe=cancel]:translate-x-0 data-[swipe=cancel]:transition-transform',
         'data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)]',
-        'dark:bg-cream-2',
       )}
     >
       <span aria-hidden className="mt-0.5 shrink-0">

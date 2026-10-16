@@ -36,7 +36,6 @@ type Props = {
 export function SettingsView({ onClose, onOpenMigration, onOpenAbout }: Props) {
   return (
     <PaneLayout
-      className="dark:bg-background"
       header={
         <header className="flex items-center justify-between border-b border-border-soft pb-6">
           <h2 className="text-[22px] font-semibold tracking-[-0.012em] text-ink">Settings</h2>

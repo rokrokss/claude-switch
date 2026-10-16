@@ -83,7 +83,7 @@ export function Sidebar({ entries, selectedId, searchInputRef, onSelect, onCreat
   const canReorder = onReorder !== undefined && query.trim().length === 0
 
   return (
-    <aside className="glass relative flex w-[200px] shrink-0 flex-col border-r border-border bg-cream-2 px-2 pt-11 pb-3">
+    <aside className="glass relative flex w-[200px] shrink-0 flex-col border-r px-2 pt-11 pb-3">
       <SidebarBrandMark />
       <SidebarSearchInput value={query} inputRef={searchInputRef} onChange={setQuery} />
       {/* App groups are separated by a hairline rather than a text header. The

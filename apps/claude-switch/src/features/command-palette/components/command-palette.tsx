@@ -75,7 +75,7 @@ export function CommandPalette({
       }}
       label="Command palette"
       overlayClassName="fixed inset-0 z-40 bg-[rgba(23,35,45,0.14)] backdrop-blur-sm backdrop-saturate-150 dark:bg-[rgba(0,0,0,0.55)]"
-      contentClassName="glass-thick fixed left-1/2 top-[12vh] z-50 flex max-h-[calc(100%-128px)] w-[min(640px,calc(100%-64px))] -translate-x-1/2 flex-col overflow-hidden rounded-xl border border-[color:rgba(40,30,20,0.1)] bg-cream shadow-modal outline-none animate-[design-modal-in_0.22s_cubic-bezier(0.16,1,0.3,1)] dark:border-white/[0.06]"
+      contentClassName="glass-thick fixed left-1/2 top-[12vh] z-50 flex max-h-[calc(100%-128px)] w-[min(640px,calc(100%-64px))] -translate-x-1/2 flex-col overflow-hidden rounded-xl border outline-none animate-[design-modal-in_0.22s_cubic-bezier(0.16,1,0.3,1)]"
     >
       <div className="relative border-b border-border-soft">
         <Search
