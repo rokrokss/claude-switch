@@ -644,6 +644,31 @@ pub(crate) async fn profile_usage(
     }
 }
 
+/// Uses the Codex profile's rate-limit reset that lapses at `expires_at`
+/// (Unix seconds), then has the menu bar fetch its usage again.
+#[tauri::command]
+pub async fn use_codex_reset(
+    app: tauri::AppHandle,
+    profile_id: String,
+    expires_at: i64,
+) -> AppResult<usage::resets::ResetOutcome> {
+    if resolve_app(&profile_id)? != AppKind::Codex {
+        return Err(AppError::Validation(
+            "only Codex profiles have rate-limit resets to use".into(),
+        ));
+    }
+    let codex_home = resolve_cli_config_dir(&profile_id)?;
+    let outcome = usage::resets::use_reset(&codex_home, expires_at).await;
+    crate::logging::info(
+        "usage",
+        &format!("used a reset on {profile_id}: {outcome:?}"),
+    );
+    if outcome == usage::resets::ResetOutcome::Reset {
+        crate::tray::refresh_now(&app);
+    }
+    Ok(outcome)
+}
+
 /// The plan profile `profile_id` is signed in under, as its app names it
 /// (`Max 20x`), when its stored sign-in says.
 pub(crate) fn profile_plan(profile_id: &str) -> Option<String> {

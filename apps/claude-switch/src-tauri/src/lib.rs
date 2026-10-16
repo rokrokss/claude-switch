@@ -183,6 +183,7 @@ pub fn run() {
             commands::update_app_state,
             commands::get_app_metadata,
             commands::get_profile_usage,
+            commands::use_codex_reset,
             commands::open_external_url,
             commands::open_cli_login,
             commands::list_sessions,

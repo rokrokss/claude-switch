@@ -6,6 +6,7 @@ pub(crate) mod oauth;
 pub(crate) mod pace;
 pub(crate) mod quota;
 pub(crate) mod refresh;
+pub(crate) mod resets;
 
 use serde::{Deserialize, Serialize};
 

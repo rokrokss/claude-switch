@@ -1,4 +1,4 @@
-import type { Metric, Settings } from '@/lib/types'
+import type { Metric, ResetOutcome, Settings } from '@/lib/types'
 import type { Placed } from '../lib/layout'
 import type { Severity } from '../lib/pace'
 
@@ -17,6 +17,7 @@ import { openSettings, refreshUsage } from '@/lib/commands'
 import { formatDeadline, formatDuration, meterHeadline, shownFraction, valuesText } from '../lib/format'
 import { paceTick, projectionNote, severityOf } from '../lib/pace'
 import { canStar } from '../lib/stars'
+import { ResetsRow } from './resets-row'
 
 type Meter = Extract<Metric, { kind: 'meter' }>
 type Display = Settings['display']
@@ -32,6 +33,11 @@ type Props = {
   starred: boolean
   onDisplayChange: (display: Display) => void
   onStarToggle: () => void
+  /**
+   * Uses a rate-limit reset; given where the profile's resets can be used.
+   */
+  onUseReset?: (expiresAt: string) => Promise<ResetOutcome>
+  onNotice: (text: string) => void
 }
 
 const barTone: Record<Severity, string> = {
@@ -85,7 +91,15 @@ export function MetricRow({ starred, onStarToggle, ...props }: Props) {
  * The metric itself: a meter, a reading, or — for a metric the user placed
  * that the profile doesn't report — "No data".
  */
-function MetricBody({ placed, display, now, compact, onDisplayChange }: Omit<Props, 'starred' | 'onStarToggle'>) {
+function MetricBody({
+  placed,
+  display,
+  now,
+  compact,
+  onDisplayChange,
+  onUseReset,
+  onNotice,
+}: Omit<Props, 'starred' | 'onStarToggle'>) {
   const spacing = compact ? 'py-0.5' : 'py-1'
   if (placed.metric === null) {
     return (
@@ -96,6 +110,9 @@ function MetricBody({ placed, display, now, compact, onDisplayChange }: Omit<Pro
     )
   }
   if (placed.metric.kind === 'values') {
+    if (placed.metric.id === 'resets' && onUseReset) {
+      return <ResetsRow metric={placed.metric} now={now} spacing={spacing} onUse={onUseReset} onNotice={onNotice} />
+    }
     return <ValuesRow metric={placed.metric} now={now} spacing={spacing} />
   }
   return (

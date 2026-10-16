@@ -270,6 +270,12 @@ pub fn open_about(app: AppHandle) {
 /// next scheduled fetch.
 #[tauri::command]
 pub fn refresh_usage(app: AppHandle) {
+    refresh_now(&app);
+}
+
+/// Fetches every profile's usage now, in the background.
+pub fn refresh_now(app: &AppHandle) {
+    let app = app.clone();
     tauri::async_runtime::spawn(async move { refresh(&app).await });
 }
 

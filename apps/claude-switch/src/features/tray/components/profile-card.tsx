@@ -18,7 +18,7 @@ import {
   quotaErrorMessage,
   quotaErrorShort,
 } from '@/features/profiles/components/profile-detail-usage-card'
-import { openExternalUrl, openSettings, refreshUsage } from '@/lib/commands'
+import { claimCodexReset, openExternalUrl, openSettings, refreshUsage } from '@/lib/commands'
 
 import { cardLayout } from '../lib/layout'
 import { starsFor, toggleStar } from '../lib/stars'
@@ -92,6 +92,12 @@ export function ProfileCard({
         compact={compact}
         starred={!hidden && stars.includes(slot.id)}
         onDisplayChange={(display) => onSettingsChange({ display })}
+        onUseReset={
+          entry.app === 'codex'
+            ? (expiresAt) => claimCodexReset(entry.id, Math.floor(Date.parse(expiresAt) / 1000))
+            : undefined
+        }
+        onNotice={onNotice}
         onStarToggle={() => {
           const result = toggleStar(settings.menuBar, entry.id, slot.id)
           if ('refused' in result) {

@@ -3,7 +3,7 @@ import type { Metric, Settings, TrayEntry } from '@/lib/types'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { closePanel, openSettings, quitApp, refreshUsage } from '@/lib/commands'
+import { claimCodexReset, closePanel, openSettings, quitApp, refreshUsage } from '@/lib/commands'
 import { defaultSettings } from '@/lib/settings'
 
 import { usePanelSettings } from '../api/use-panel-settings'
@@ -18,6 +18,7 @@ vi.mock('../api/use-panel-settings', () => ({ usePanelSettings: vi.fn() }))
 vi.mock('../api/use-update-notice', () => ({ useUpdateNotice: vi.fn() }))
 
 vi.mock('@/lib/commands', () => ({
+  claimCodexReset: vi.fn(() => Promise.resolve('reset')),
   closePanel: vi.fn(() => Promise.resolve()),
   getAppMetadata: vi.fn(() => Promise.resolve({ version: '2.0.0' })),
   openAbout: vi.fn(() => Promise.resolve()),
@@ -218,6 +219,34 @@ describe('TrayPanel', () => {
     fireEvent.contextMenu(screen.getByText('Work'))
     fireEvent.click(await screen.findByText('Hide from menu bar'))
     expect(setShownInMenuBar).toHaveBeenCalledWith('work', false)
+  })
+
+  it('uses a Codex reset after a confirmation', async () => {
+    const lapses = new Date(Date.now() + 3 * 24 * hour).toISOString()
+    withSettings({ ...defaultSettings, layout: { ...defaultSettings.layout, expanded: ['codex'] } })
+    vi.mocked(useTrayEntries).mockReturnValue([
+      makeEntry({
+        id: 'codex',
+        app: 'codex',
+        name: 'ChatGPT',
+        metrics: [
+          {
+            id: 'resets',
+            label: 'Rate limit resets',
+            kind: 'values',
+            values: [{ amount: 1, unit: { type: 'count' } }],
+            expiresAt: [lapses],
+          },
+        ],
+      }),
+    ])
+    render(<TrayPanel />)
+    fireEvent.click(screen.getByText('Rate limit resets'))
+    fireEvent.click(screen.getByRole('button', { name: 'Use' }))
+    expect(claimCodexReset).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    expect(claimCodexReset).toHaveBeenCalledWith('codex', Math.floor(Date.parse(lapses) / 1000))
+    expect(await screen.findByRole('status')).toHaveTextContent('Reset used: your Codex limits start over.')
   })
 
   it('says when the next update comes, and updates on a click', async () => {

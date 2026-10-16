@@ -20,6 +20,7 @@ import type {
   ProfilePaths,
   ProfileUsage,
   RepairReport,
+  ResetOutcome,
   SessionAction,
   SessionList,
   Shell,
@@ -182,6 +183,14 @@ export function getTrayStatus(): Promise<TrayStatus> {
  */
 export function refreshUsage(): Promise<void> {
   return invoke('refresh_usage')
+}
+
+/**
+ * Uses the Codex profile's rate-limit reset lapsing at `expiresAt` (Unix
+ * seconds). It can't be undone.
+ */
+export function claimCodexReset(profileId: string, expiresAt: number): Promise<ResetOutcome> {
+  return invoke<ResetOutcome>('use_codex_reset', { profileId, expiresAt })
 }
 
 /**

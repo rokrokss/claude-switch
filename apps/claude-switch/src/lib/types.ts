@@ -328,6 +328,11 @@ export type TrayEntry = {
 }
 
 /**
+ * What using a Codex rate-limit reset did.
+ */
+export type ResetOutcome = 'reset' | 'nothingToReset' | 'noCredit' | 'failed'
+
+/**
  * Whether claude-switch opens at login, as macOS has it. `needsApproval`:
  * turned on, waiting to be allowed in System Settings. `unavailable`: this
  * copy can't be a login item (a development build).
