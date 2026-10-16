@@ -18,6 +18,7 @@ function makeAppState(overrides: Partial<AppState> = {}): AppState {
     dockIconAcknowledgedAt: null,
     defaultProfileNames: {},
     dismissedRepairSessions: {},
+    hiddenFromMenuBar: [],
     ...overrides,
   }
 }
@@ -175,5 +176,16 @@ describe('computeOptimisticAppState', () => {
       dismissedRepair: { profileId: 'p1', sessionIds: [] },
     })
     expect(forgotten.dismissedRepairSessions).toEqual({})
+  })
+
+  it('hides an entry from the menu bar once and shows it again', () => {
+    const previous = makeAppState({ hiddenFromMenuBar: ['p2'] })
+    const hidden = computeOptimisticAppState(previous, { menuBar: { id: 'p1', shown: false } })
+    expect(hidden.hiddenFromMenuBar).toEqual(['p1', 'p2'])
+    const again = computeOptimisticAppState(hidden, { menuBar: { id: 'p1', shown: false } })
+    expect(again.hiddenFromMenuBar).toEqual(['p1', 'p2'])
+    const shown = computeOptimisticAppState(again, { menuBar: { id: 'p1', shown: true } })
+    expect(shown.hiddenFromMenuBar).toEqual(['p2'])
+    expect(computeOptimisticAppState(shown, { welcomeShown: true }).hiddenFromMenuBar).toEqual(['p2'])
   })
 })

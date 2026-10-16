@@ -69,6 +69,7 @@ const appState: AppState = {
   dockIconAcknowledgedAt: null,
   defaultProfileNames: {},
   dismissedRepairSessions: {},
+  hiddenFromMenuBar: [],
 }
 
 const guiDataDir = '/Users/ada/Library/Application Support/Claude'
@@ -298,6 +299,26 @@ describe('DefaultProfileDetail — reveal destinations', () => {
     })
     await user.keyboard('{Alt>}2{/Alt}')
     expect(openInFinder).not.toHaveBeenCalled()
+  })
+})
+
+describe('DefaultProfileDetail — menu bar', () => {
+  it('is shown in the menu bar at first, and can be taken out from the menu', async () => {
+    const user = await openMenu()
+    const option = screen.getByRole('menuitemcheckbox', { name: 'Show in menu bar' })
+    expect(option).toBeChecked()
+    await user.click(option)
+    await waitFor(() => {
+      // mutationFn also receives TanStack's context argument; only the patch matters.
+      expect(vi.mocked(updateAppState).mock.calls[0]?.[0]).toEqual({
+        menuBar: { id: 'default:claude', shown: false },
+      })
+    })
+  })
+
+  it('is not offered without the CLI, which the menu bar reads usage through', async () => {
+    await openMenu({ entry: entry({ surfaces: { gui: true, cli: false } }) })
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Show in menu bar' })).not.toBeInTheDocument()
   })
 })
 

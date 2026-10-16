@@ -20,6 +20,7 @@ import { ProfileDetailOverflowMenu, ProfileDetailOverflowMenuFallback } from './
 import { ProfileDetailSurfacesPanel } from './profile-detail-surfaces-panel'
 import { ProfileDetailUsageCard } from './profile-detail-usage-card'
 import { useGuiLaunch } from './use-gui-launch'
+import { useMenuBarVisibility } from './use-menu-bar-visibility'
 
 type Props = {
   profile: Profile
@@ -34,6 +35,7 @@ type Props = {
 
 export function ProfileDetail({ profile, shortcutsEnabled, onEdit, onDelete }: Props) {
   const [actionError, setActionError] = useState<string | null>(null)
+  const menuBar = useMenuBarVisibility(profile.id, profile.app, profile.surfaces.cli, setActionError)
   const command = wrapperCommand(profile.app, profile.slug)
   const account = useProfileAccount(profile.id)
   const signedInAs = accountLabel(account)
@@ -67,7 +69,12 @@ export function ProfileDetail({ profile, shortcutsEnabled, onEdit, onDelete }: P
             // sidebar-provided data immediately, and only the menu waits on
             // the per-profile path resolution.
             <Suspense key={profile.id} fallback={<ProfileDetailOverflowMenuFallback />}>
-              <ProfileDetailOverflowMenu profileId={profile.id} onDelete={onDelete} onError={setActionError} />
+              <ProfileDetailOverflowMenu
+                profileId={profile.id}
+                onDelete={onDelete}
+                onError={setActionError}
+                {...menuBar}
+              />
             </Suspense>
           }
           onEdit={onEdit}

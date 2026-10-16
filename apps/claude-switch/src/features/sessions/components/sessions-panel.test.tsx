@@ -131,6 +131,7 @@ beforeEach(() => {
     dockIconAcknowledgedAt: null,
     defaultProfileNames: {},
     dismissedRepairSessions: {},
+    hiddenFromMenuBar: [],
   })
   vi.mocked(listSessions).mockReset()
   vi.mocked(archiveSession).mockReset().mockResolvedValue(undefined)

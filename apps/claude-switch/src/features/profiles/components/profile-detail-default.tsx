@@ -20,6 +20,7 @@ import { ProfileDetailSurfacesPanel } from './profile-detail-surfaces-panel'
 import { ProfileDetailUsageCard } from './profile-detail-usage-card'
 import { RenameDefaultProfileDialog } from './rename-default-profile-dialog'
 import { useGuiLaunch } from './use-gui-launch'
+import { useMenuBarVisibility } from './use-menu-bar-visibility'
 
 type Props = {
   entry: DefaultEntry
@@ -44,6 +45,7 @@ type Props = {
  */
 export function DefaultProfileDetail({ entry, onMigrate }: Props) {
   const [actionError, setActionError] = useState<string | null>(null)
+  const menuBar = useMenuBarVisibility(entry.id, entry.app, entry.surfaces.cli, setActionError)
   const [renaming, setRenaming] = useState(false)
   const appState = useAppState()
   const displayName = appSpecs[entry.app].displayName
@@ -83,6 +85,7 @@ export function DefaultProfileDetail({ entry, onMigrate }: Props) {
                 profileId={entry.id}
                 onError={setActionError}
                 onRename={() => setRenaming(true)}
+                {...menuBar}
               />
             </Suspense>
           }

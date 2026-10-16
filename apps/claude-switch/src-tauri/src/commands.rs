@@ -518,9 +518,16 @@ pub fn load_app_state() -> AppResult<AppState> {
     app_state::load()
 }
 
+/// A patch that hides a profile from the menu bar or shows it again redraws
+/// the item at once, rather than at its next fetch.
 #[tauri::command]
-pub fn update_app_state(patch: AppStatePatch) -> AppResult<AppState> {
-    app_state::apply(patch)
+pub fn update_app_state(app: tauri::AppHandle, patch: AppStatePatch) -> AppResult<AppState> {
+    let menu_bar_changed = patch.menu_bar.is_some();
+    let state = app_state::apply(patch)?;
+    if menu_bar_changed {
+        crate::tray::redraw(&app);
+    }
+    Ok(state)
 }
 
 /// Metadata the About dialog renders.

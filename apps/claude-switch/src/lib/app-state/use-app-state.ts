@@ -71,6 +71,7 @@ export function computeOptimisticAppState(previous: AppState, patch: AppStatePat
     dockIconAcknowledgedAt: patch.dockIconAcknowledgedAt ?? previous.dockIconAcknowledgedAt,
     defaultProfileNames: withDefaultProfileName(previous.defaultProfileNames, patch.defaultProfileName),
     dismissedRepairSessions: withDismissedRepair(previous.dismissedRepairSessions, patch.dismissedRepair),
+    hiddenFromMenuBar: withMenuBar(previous.hiddenFromMenuBar, patch.menuBar),
   }
 }
 
@@ -109,4 +110,18 @@ function withDismissedRepair(
     next[patch.profileId] = patch.sessionIds
   }
   return next
+}
+
+/**
+ * Mirrors the Rust side: showing an entry drops its id, hiding adds it once.
+ */
+function withMenuBar(
+  hidden: AppState['hiddenFromMenuBar'] | undefined,
+  patch: AppStatePatch['menuBar'],
+): AppState['hiddenFromMenuBar'] {
+  const next = (hidden ?? []).filter((id) => id !== patch?.id)
+  if (patch === undefined || patch.shown) {
+    return next
+  }
+  return [...next, patch.id].sort()
 }

@@ -5,6 +5,7 @@ import { MoreHorizontal } from 'lucide-react'
 import { ariaKeyshortcutsFor, cn, Kbd, useShortcut } from '@/design'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -30,6 +31,15 @@ type Props = {
    * from. Absent on managed profiles.
    */
   onRename?: () => void
+  /**
+   * Whether the entry's usage shows in the menu bar's strip.
+   */
+  shownInMenuBar?: boolean
+  /**
+   * Shows or hides the entry in the menu bar. Absent for an entry with no
+   * usage to show, which leaves the option out.
+   */
+  onShownInMenuBarChange?: (shown: boolean) => void
 }
 
 type RevealTarget = {
@@ -44,7 +54,8 @@ const triggerClasses = 'w-7 px-0 text-muted hover:not-disabled:text-ink'
 
 /**
  * Everything rare about a profile, behind one "…" trigger: the four
- * reveal-in-Finder destinations and Delete.
+ * reveal-in-Finder destinations, whether it shows in the menu bar, and
+ * Delete — or, for a stock install, Rename in its place.
  *
  * Each reveal row shows its real resolved path as secondary text — the path
  * is what stops "CLI config" and "CLI wrapper" being cryptic — and carries
@@ -60,7 +71,14 @@ const triggerClasses = 'w-7 px-0 text-muted hover:not-disabled:text-ink'
  * being switched on: the directories are there either way, and gating the
  * key while still offering the menu row would be inconsistent.
  */
-export function ProfileDetailOverflowMenu({ profileId, onError, onDelete, onRename }: Props) {
+export function ProfileDetailOverflowMenu({
+  profileId,
+  onError,
+  onDelete,
+  onRename,
+  shownInMenuBar = true,
+  onShownInMenuBarChange,
+}: Props) {
   const paths = useProfilePaths(profileId)
 
   async function reveal(path: string | null): Promise<void> {
@@ -122,13 +140,21 @@ export function ProfileDetailOverflowMenu({ profileId, onError, onDelete, onRena
             <span className="truncate font-mono text-[10px] text-muted-strong">{shortenHomePath(target.path)}</span>
           </DropdownMenuItem>
         ))}
+        {onRename === undefined && onShownInMenuBarChange === undefined ? null : <DropdownMenuSeparator />}
         {onRename === undefined ? null : (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="px-2 py-1.5 text-[12px]" onSelect={onRename}>
-              <span className="flex-1">Rename…</span>
-            </DropdownMenuItem>
-          </>
+          <DropdownMenuItem className="px-2 py-1.5 text-[12px]" onSelect={onRename}>
+            <span className="flex-1">Rename…</span>
+          </DropdownMenuItem>
+        )}
+        {onShownInMenuBarChange === undefined ? null : (
+          <DropdownMenuCheckboxItem
+            // Left padding only: the item keeps its right padding for the check mark.
+            className="py-1.5 pl-2 text-[12px]"
+            checked={shownInMenuBar}
+            onCheckedChange={onShownInMenuBarChange}
+          >
+            <span className="flex-1">Show in menu bar</span>
+          </DropdownMenuCheckboxItem>
         )}
         {onDelete === undefined ? null : (
           <>

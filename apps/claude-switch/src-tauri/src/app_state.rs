@@ -1,7 +1,7 @@
 //! Persisted app-level state — independent of profiles.json.
 //! Holds first-run flags and dismissal timestamps.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -50,6 +50,11 @@ pub struct AppState {
     /// stays away until a session not among them needs repair.
     #[serde(default)]
     pub dismissed_repair_sessions: BTreeMap<String, Vec<String>>,
+    /// The profiles the user took out of the menu bar's strip, by entry id: a
+    /// managed profile's id, or a stock install's `default:<app>`. The panel
+    /// lists them all the same. Absent means shown.
+    #[serde(default)]
+    pub hidden_from_menu_bar: BTreeSet<String>,
 }
 
 /// Renames one app's stock-install entry. An empty (or all-whitespace) name
@@ -70,6 +75,14 @@ const DEFAULT_PROFILE_NAME_MAX_CHARS: usize = 64;
 pub struct DismissedRepair {
     pub profile_id: String,
     pub session_ids: Vec<String>,
+}
+
+/// Shows one entry in the menu bar's strip, or takes it out.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MenuBarVisibility {
+    pub id: String,
+    pub shown: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -99,6 +112,8 @@ pub struct AppStatePatch {
     pub default_profile_name: Option<DefaultProfileName>,
     #[serde(default)]
     pub dismissed_repair: Option<DismissedRepair>,
+    #[serde(default)]
+    pub menu_bar: Option<MenuBarVisibility>,
 }
 
 pub fn load() -> AppResult<AppState> {
@@ -170,6 +185,13 @@ pub fn apply(patch: AppStatePatch) -> AppResult<AppState> {
                 .insert(dismissed.profile_id, dismissed.session_ids);
         }
     }
+    if let Some(visibility) = patch.menu_bar {
+        if visibility.shown {
+            state.hidden_from_menu_bar.remove(&visibility.id);
+        } else {
+            state.hidden_from_menu_bar.insert(visibility.id);
+        }
+    }
     save(&state)?;
     Ok(state)
 }
@@ -178,7 +200,9 @@ pub fn apply(patch: AppStatePatch) -> AppResult<AppState> {
 /// nothing when it keeps nothing.
 pub fn forget_profile(id: &str) -> AppResult<()> {
     let mut state = load()?;
-    if state.dismissed_repair_sessions.remove(id).is_none() {
+    let dismissal = state.dismissed_repair_sessions.remove(id).is_some();
+    let hidden = state.hidden_from_menu_bar.remove(id);
+    if !dismissal && !hidden {
         return Ok(());
     }
     save(&state)
@@ -271,6 +295,7 @@ mod tests {
             dock_icon_acknowledged_at: Some("2026-05-21T09:30:00Z".into()),
             default_profile_names: BTreeMap::from([(AppKind::Claude, "Personal".into())]),
             dismissed_repair_sessions: BTreeMap::from([("p1".into(), vec!["s1".into()])]),
+            hidden_from_menu_bar: BTreeSet::from(["default:claude".into()]),
         };
         save(&state).unwrap();
         let loaded = load().unwrap();
@@ -291,6 +316,7 @@ mod tests {
             dock_icon_acknowledged_at: Some("acknowledged".into()),
             default_profile_names: BTreeMap::new(),
             dismissed_repair_sessions: BTreeMap::new(),
+            hidden_from_menu_bar: BTreeSet::new(),
         })
         .unwrap();
 
@@ -321,6 +347,7 @@ mod tests {
             dock_icon_acknowledged_at: None,
             default_profile_names: BTreeMap::new(),
             dismissed_repair_sessions: BTreeMap::new(),
+            hidden_from_menu_bar: BTreeSet::new(),
         })
         .unwrap();
 
@@ -384,6 +411,7 @@ mod tests {
             dock_icon_acknowledged_at: None,
             default_profile_names: BTreeMap::new(),
             dismissed_repair_sessions: BTreeMap::new(),
+            hidden_from_menu_bar: BTreeSet::new(),
         })
         .unwrap();
         let after = apply(AppStatePatch {
@@ -538,5 +566,57 @@ mod tests {
     fn state_without_default_profile_names_still_loads() {
         let parsed: AppState = serde_json::from_str(r#"{"welcomeShown": true}"#).unwrap();
         assert!(parsed.default_profile_names.is_empty());
+    }
+
+    fn show_in_menu_bar(id: &str, shown: bool) -> AppResult<AppState> {
+        apply(AppStatePatch {
+            menu_bar: Some(MenuBarVisibility {
+                id: id.into(),
+                shown,
+            }),
+            ..AppStatePatch::default()
+        })
+    }
+
+    #[test]
+    fn hiding_from_the_menu_bar_is_kept_per_entry_until_shown_again() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge();
+        show_in_menu_bar("p1", false).unwrap();
+        show_in_menu_bar("default:codex", false).unwrap();
+        assert_eq!(
+            load().unwrap().hidden_from_menu_bar,
+            BTreeSet::from(["default:codex".to_string(), "p1".to_string()])
+        );
+
+        let after = show_in_menu_bar("p1", true).unwrap();
+        assert_eq!(
+            after.hidden_from_menu_bar,
+            BTreeSet::from(["default:codex".to_string()])
+        );
+        // Showing one that was never hidden changes nothing.
+        let unchanged = show_in_menu_bar("p2", true).unwrap();
+        assert_eq!(unchanged.hidden_from_menu_bar, after.hidden_from_menu_bar);
+        purge();
+    }
+
+    #[test]
+    fn forgetting_a_profile_drops_it_from_the_hidden_ones() {
+        let _guard = TEST_LOCK.lock().unwrap();
+        purge();
+        show_in_menu_bar("p1", false).unwrap();
+        show_in_menu_bar("p2", false).unwrap();
+        forget_profile("p1").unwrap();
+        assert_eq!(
+            load().unwrap().hidden_from_menu_bar,
+            BTreeSet::from(["p2".to_string()])
+        );
+        purge();
+    }
+
+    #[test]
+    fn state_without_hidden_entries_shows_every_profile() {
+        let parsed: AppState = serde_json::from_str(r#"{"welcomeShown": true}"#).unwrap();
+        assert!(parsed.hidden_from_menu_bar.is_empty());
     }
 }

@@ -2,6 +2,8 @@
 //! and the share used of each of its two windows. Pure, so the rules can be
 //! tested apart from the drawing.
 
+use std::collections::BTreeSet;
+
 use chrono::{DateTime, Utc};
 
 use super::TrayEntry;
@@ -21,6 +23,16 @@ pub struct Strip {
 pub struct Group {
     pub app: AppKind,
     pub values: Vec<String>,
+}
+
+/// The entries the strip and its tooltip draw on: all but those the user
+/// took out of the menu bar (`hidden`, by entry id), in the order given.
+pub fn in_menu_bar(entries: &[TrayEntry], hidden: &BTreeSet<String>) -> Vec<TrayEntry> {
+    entries
+        .iter()
+        .filter(|entry| !hidden.contains(&entry.id))
+        .cloned()
+        .collect()
 }
 
 /// The strip for `entries` at `now`. A window without data is left out, and
@@ -221,6 +233,64 @@ mod tests {
             None,
         )];
         assert_eq!(values(&build(&entries, now())), [["103%"]]);
+    }
+
+    fn hidden(ids: &[&str]) -> BTreeSet<String> {
+        ids.iter().map(|id| (*id).to_owned()).collect()
+    }
+
+    fn with_id(id: &str, mut entry: TrayEntry) -> TrayEntry {
+        entry.id = id.into();
+        entry.name = id.into();
+        entry
+    }
+
+    #[test]
+    fn leaves_out_the_profiles_hidden_from_the_menu_bar() {
+        let entries = [
+            with_id(
+                "personal",
+                entry(AppKind::Claude, Some(window(Some(1.0), None)), None),
+            ),
+            with_id(
+                "work",
+                entry(AppKind::Claude, Some(window(Some(2.0), None)), None),
+            ),
+            with_id(
+                "default:codex",
+                entry(AppKind::Codex, Some(window(Some(3.0), None)), None),
+            ),
+        ];
+        let shown = in_menu_bar(&entries, &hidden(&["work"]));
+        assert_eq!(values(&build(&shown, now())), [["1%"], ["3%"]]);
+        assert_eq!(
+            tooltip(&shown, now()),
+            "claude-switch\npersonal: 5-hour 1%\ndefault:codex: usage 3%"
+        );
+    }
+
+    #[test]
+    fn hiding_an_unknown_profile_changes_nothing() {
+        let entries = [entry(AppKind::Claude, Some(window(Some(1.0), None)), None)];
+        let shown = in_menu_bar(&entries, &hidden(&["gone"]));
+        assert_eq!(values(&build(&shown, now())), [["1%"]]);
+    }
+
+    #[test]
+    fn with_every_profile_hidden_the_strip_is_empty() {
+        let entries = [
+            with_id(
+                "a",
+                entry(AppKind::Claude, Some(window(Some(1.0), None)), None),
+            ),
+            with_id(
+                "b",
+                entry(AppKind::Codex, Some(window(Some(2.0), None)), None),
+            ),
+        ];
+        let shown = in_menu_bar(&entries, &hidden(&["a", "b"]));
+        assert!(build(&shown, now()).groups.is_empty());
+        assert_eq!(tooltip(&shown, now()), "claude-switch");
     }
 
     #[test]

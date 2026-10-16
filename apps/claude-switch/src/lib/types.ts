@@ -166,6 +166,12 @@ export type AppState = {
    * session not among them needs repair.
    */
   dismissedRepairSessions: Record<string, Array<string>>
+  /**
+   * The entries the user took out of the menu bar's strip, by id: a managed
+   * profile's id, or a stock install's `default:<app>`. The panel lists them
+   * all the same.
+   */
+  hiddenFromMenuBar: Array<string>
 }
 
 export type AppStatePatch = {
@@ -190,6 +196,10 @@ export type AppStatePatch = {
    * list forgets the dismissal.
    */
   dismissedRepair?: { profileId: string; sessionIds: Array<string> }
+  /**
+   * Shows one entry in the menu bar's strip, or takes it out.
+   */
+  menuBar?: { id: string; shown: boolean }
 }
 
 /**

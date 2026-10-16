@@ -2,8 +2,9 @@
 //! long as claude-switch runs, with its window open or not.
 //!
 //! The item shows each Claude and ChatGPT profile that reports usage as its
-//! app's mark beside the share used of its two windows ([`strip`]). A click
-//! opens a panel with each profile's meters (the `tray` window, `tray.html`);
+//! app's mark beside the share used of its two windows ([`strip`]), leaving
+//! out those the user hid from the menu bar. A click opens a panel with every
+//! profile's meters, hidden or not (the `tray` window, `tray.html`);
 //! a right-click offers to open claude-switch or quit it. Closing the main
 //! window only hides it, so the item stays.
 //!
@@ -20,6 +21,7 @@
 mod render;
 mod strip;
 
+use std::collections::BTreeSet;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -356,8 +358,26 @@ async fn refresh(app: &AppHandle) {
     show(app, entries);
 }
 
+/// Redraws the item from the usage last fetched, fetching nothing: for when
+/// the user hides a profile from the menu bar or shows it again. Before the
+/// first fetch there is nothing to draw but the mark already there.
+pub fn redraw(app: &AppHandle) {
+    let state = app.state::<TrayState>();
+    if state.refreshed_at.lock().unwrap().is_none() {
+        return;
+    }
+    let entries = state.entries.lock().unwrap().clone();
+    draw(app, &entries);
+}
+
 fn show(app: &AppHandle, entries: Vec<TrayEntry>) {
     let _ = app.emit_to(PANEL_WINDOW, USAGE_EVENT, &entries);
+    draw(app, &entries);
+}
+
+/// Draws the item for `entries`, less those hidden from the menu bar.
+fn draw(app: &AppHandle, entries: &[TrayEntry]) {
+    let entries = strip::in_menu_bar(entries, &hidden_from_menu_bar());
     let now = Utc::now();
     let strip = strip::build(&entries, now);
     let tooltip = strip::tooltip(&entries, now);
@@ -371,6 +391,14 @@ fn show(app: &AppHandle, entries: Vec<TrayEntry>) {
         let _ = tray.set_icon_as_template(true);
         let _ = tray.set_tooltip(Some(tooltip));
     });
+}
+
+/// The entry ids the user took out of the menu bar. If the state can't be
+/// read, none: every profile shows, as it did before the setting existed.
+fn hidden_from_menu_bar() -> BTreeSet<String> {
+    app_state::load()
+        .map(|state| state.hidden_from_menu_bar)
+        .unwrap_or_default()
 }
 
 /// The strip drawn, or claude-switch's mark when it has nothing to show.

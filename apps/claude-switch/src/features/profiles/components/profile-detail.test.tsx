@@ -1,4 +1,4 @@
-import type { Profile, ProfilePaths } from '@/lib/types'
+import type { AppState, Profile, ProfilePaths } from '@/lib/types'
 
 import { useState } from 'react'
 
@@ -9,11 +9,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ToastProvider } from '@/design'
 import {
   copyToClipboard,
+  loadAppState,
   openInFinder,
   openProfileInApp,
   profileAccount,
   profilePaths,
   touchProfileLastUsed,
+  updateAppState,
 } from '@/lib/commands'
 import { queryKeys } from '@/lib/query/keys'
 import { renderWithQuery } from '@/test/render-with-query'
@@ -41,6 +43,8 @@ vi.mock('@/lib/commands', async () => {
     openProfileInApp: vi.fn(async () => {}),
     copyToClipboard: vi.fn(async () => {}),
     touchProfileLastUsed: vi.fn(async () => {}),
+    loadAppState: vi.fn(),
+    updateAppState: vi.fn(),
     getProfileUsage: vi.fn(async () => ({
       quota: {
         primary: { utilization: 10, resetsAt: null },
@@ -59,6 +63,18 @@ vi.mock('@/lib/commands', async () => {
     })),
   }
 })
+
+const appState: AppState = {
+  welcomeShown: true,
+  migrationDismissedAt: null,
+  pathBannerDismissedAt: null,
+  themeMode: 'system',
+  selectedEntryId: null,
+  dockIconAcknowledgedAt: null,
+  defaultProfileNames: {},
+  dismissedRepairSessions: {},
+  hiddenFromMenuBar: [],
+}
 
 const guiDataDir = '/Users/ada/Library/Application Support/claude-switch/profiles/p1/gui-data'
 const cliConfigDir = '/Users/ada/Library/Application Support/claude-switch/profiles/p1/cli-config'
@@ -121,6 +137,36 @@ beforeEach(() => {
   vi.mocked(openProfileInApp).mockResolvedValue({ profile: profile(), wrapperBypass: null })
   vi.mocked(copyToClipboard).mockClear()
   vi.mocked(touchProfileLastUsed).mockClear()
+  vi.mocked(loadAppState).mockResolvedValue(appState)
+  vi.mocked(updateAppState).mockReset()
+  vi.mocked(updateAppState).mockResolvedValue(appState)
+})
+
+describe('ProfileDetail — menu bar', () => {
+  it('is shown in the menu bar at first, and can be taken out from the menu', async () => {
+    renderDetail()
+    const user = await openMenu()
+    const option = screen.getByRole('menuitemcheckbox', { name: 'Show in menu bar' })
+    expect(option).toBeChecked()
+    await user.click(option)
+    await waitFor(() => {
+      // mutationFn also receives TanStack's context argument; only the patch matters.
+      expect(vi.mocked(updateAppState).mock.calls[0]?.[0]).toEqual({ menuBar: { id: 'p1', shown: false } })
+    })
+  })
+
+  it('reads as hidden once taken out', async () => {
+    vi.mocked(loadAppState).mockResolvedValue({ ...appState, hiddenFromMenuBar: ['p1'] })
+    renderDetail()
+    await openMenu()
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Show in menu bar' })).not.toBeChecked()
+  })
+
+  it('is not offered without the CLI, which the menu bar reads usage through', async () => {
+    renderDetail({ profile: profile({ surfaces: { gui: true, cli: false } }) })
+    await openMenu()
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Show in menu bar' })).not.toBeInTheDocument()
+  })
 })
 
 describe('ProfileDetail — overflow menu', () => {
