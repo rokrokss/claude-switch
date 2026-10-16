@@ -90,7 +90,7 @@ export function SettingsFooterRow({ onOpenAbout }: Props) {
               disabled={submitting}
               variant="primary"
               size="sm"
-              trailingKbd={<Kbd variant="onOrange">⏎</Kbd>}
+              trailingKbd={<Kbd variant="onAccent">⏎</Kbd>}
               onClick={handleConfirm}
             >
               Reset

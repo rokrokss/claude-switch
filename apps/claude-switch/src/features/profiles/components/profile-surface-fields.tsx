@@ -205,7 +205,7 @@ function ToggleRow({ checked, disabled, title, description, nested = false, info
           'flex w-full items-start gap-3 p-3 text-left cursor-pointer transition-colors duration-(--duration-snap) ease-(--ease-natural)',
           'hover:not-disabled:bg-black/[0.02] dark:hover:not-disabled:bg-white/[0.03]',
           // Inside the row, so the card's edge does not clip it.
-          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-orange/40',
+          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus/40',
           'disabled:cursor-not-allowed disabled:opacity-60',
           // A nested option lines up with the title of the row above: past its
           // checkbox (16px) and the gap (12px), from the row's own padding (12px).
@@ -218,10 +218,10 @@ function ToggleRow({ checked, disabled, title, description, nested = false, info
           aria-hidden
           className={cn(
             'mt-px grid h-4 w-4 shrink-0 place-items-center rounded-[5px] border-[1.5px] transition-colors duration-(--duration-snap) ease-(--ease-natural)',
-            checked ? 'border-orange bg-orange' : 'border-border bg-cream',
+            checked ? 'border-ink bg-mint' : 'border-border bg-cream',
           )}
         >
-          {checked ? <Check className="h-[11px] w-[11px] text-white" strokeWidth={3} /> : null}
+          {checked ? <Check className="h-[11px] w-[11px] text-accent-ink" strokeWidth={3} /> : null}
         </span>
         <span className="flex-1">
           <span className="block text-[13px] font-medium text-ink">{title}</span>

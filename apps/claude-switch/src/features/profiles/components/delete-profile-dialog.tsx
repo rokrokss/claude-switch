@@ -66,7 +66,7 @@ export function DeleteProfileDialog({ open, profile, onClose, onConfirm }: Props
             type="checkbox"
             checked={moveToTrash}
             onChange={(event) => setMoveToTrash(event.target.checked)}
-            className="h-4 w-4 cursor-pointer accent-orange"
+            className="h-4 w-4 cursor-pointer accent-mint"
           />
           Move the data directory to Trash instead of deleting permanently
         </label>

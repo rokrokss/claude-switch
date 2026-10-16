@@ -9,7 +9,7 @@ export function softwareApplicationLd({ siteUrl, version }: SoftwareApplicationO
   return {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'ai-profiles',
+    name: 'claude-switch',
     description: 'Free, open-source profile manager for the Claude desktop app and the Claude Code CLI on macOS.',
     applicationCategory: 'DeveloperApplication',
     operatingSystem: 'macOS 12+',
@@ -21,10 +21,10 @@ export function softwareApplicationLd({ siteUrl, version }: SoftwareApplicationO
     softwareVersion: version,
     license: 'https://opensource.org/licenses/MIT',
     url: siteUrl,
-    downloadUrl: 'https://github.com/bartekczyz/ai-profiles/releases/latest',
+    downloadUrl: 'https://github.com/rokrokss/claude-switch/releases/latest',
     author: {
       '@type': 'Person',
-      name: 'Bartek Czyż',
+      name: 'Hyungrok Kim',
     },
   }
 }

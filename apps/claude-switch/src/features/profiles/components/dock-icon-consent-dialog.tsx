@@ -132,7 +132,7 @@ export function DockIconConsentDialog({ open, app, onClose, onConfirm }: Props) 
       onSubmit={onConfirm === undefined ? onClose : handleConfirm}
       foot={
         onConfirm === undefined ? (
-          <Button variant="primary" size="sm" trailingKbd={<Kbd variant="onOrange">⏎</Kbd>} onClick={onClose}>
+          <Button variant="primary" size="sm" trailingKbd={<Kbd variant="onAccent">⏎</Kbd>} onClick={onClose}>
             Close
           </Button>
         ) : (
@@ -143,7 +143,7 @@ export function DockIconConsentDialog({ open, app, onClose, onConfirm }: Props) 
             <Button
               variant="primary"
               size="sm"
-              trailingKbd={<Kbd variant="onOrange">⏎</Kbd>}
+              trailingKbd={<Kbd variant="onAccent">⏎</Kbd>}
               disabled={submitting}
               onClick={handleConfirm}
             >

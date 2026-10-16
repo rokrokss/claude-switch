@@ -9,4 +9,4 @@ export const desktopVersion: string = `v${desktopVersionRaw}`
 // Computed default .dmg filename. The actual filename comes from
 // the GitHub release at runtime; this is the fallback shown
 // before the JS swap completes.
-export const defaultDmgFilename: string = `ai-profiles-${desktopVersionRaw}.dmg`
+export const defaultDmgFilename: string = `claude-switch_${desktopVersionRaw}_universal.dmg`

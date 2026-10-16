@@ -110,7 +110,7 @@ export function Sidebar({ entries, selectedId, searchInputRef, onSelect, onCreat
           size="sm"
           className="flex-1 rounded-full"
           leadingIcon={<Plus className="h-3.5 w-3.5" strokeWidth={2.25} />}
-          trailingKbd={<Kbd variant="onOrange" shortcutId="open-create-profile" />}
+          trailingKbd={<Kbd variant="onAccent" shortcutId="open-create-profile" />}
           aria-keyshortcuts={ariaKeyshortcutsFor('open-create-profile')}
           onClick={onCreate}
         >

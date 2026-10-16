@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "@claude-switch/design-tokens/tokens.css";
 
+@import "@fontsource-variable/bricolage-grotesque/index.css";
 @import "@fontsource-variable/geist/index.css";
 @import "@fontsource-variable/geist-mono/index.css";
 
@@ -16,15 +17,36 @@ html, body {
   margin: 0;
   padding: 0;
   min-height: 100%;
-  background: var(--color-cream);
+  background-color: var(--color-base);
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
+/* shizue's faint dot grid on the cream canvas (../shizue site/index.html). */
 body {
   font-size: 15px;
   line-height: 1.6;
+  background-image: radial-gradient(rgba(16, 48, 43, 0.08) 1.2px, transparent 1.3px);
+  background-size: 22px 22px;
+}
+:root[data-theme="dark"] body {
+  background-image: radial-gradient(rgba(144, 247, 236, 0.07) 1.2px, transparent 1.3px);
+}
+
+::selection {
+  background-color: var(--color-mint-soft);
+  color: var(--color-ink);
+}
+
+/* A mint-2 band under a phrase, as in shizue's headlines. */
+.mark-highlight {
+  background: linear-gradient(transparent 58%, var(--color-mint-2) 58%);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+:root[data-theme="dark"] .mark-highlight {
+  background: linear-gradient(transparent 58%, color-mix(in oklab, var(--color-mint) 45%, transparent) 58%);
 }
 
 @import "./cookie-banner.css";
@@ -44,6 +66,10 @@ body {
     block-size: auto;
   }
 }
+
+/* The brand mark has a dark variant of its own. */
+:root[data-theme="dark"] .theme-light-only { display: none; }
+:root:not([data-theme="dark"]) .theme-dark-only { display: none; }
 
 /* Theme toggle icon visibility */
 #theme-icon-sun { display: none; }

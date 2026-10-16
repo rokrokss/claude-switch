@@ -34,7 +34,7 @@ export function AboutDialog({ open, onClose, onOpenWhatsNew }: Props) {
       title="About claude-switch"
       onClose={onClose}
       foot={
-        <Button variant="primary" size="sm" trailingKbd={<Kbd variant="onOrange">⎋</Kbd>} onClick={onClose}>
+        <Button variant="primary" size="sm" trailingKbd={<Kbd variant="onAccent">⎋</Kbd>} onClick={onClose}>
           Close
         </Button>
       }

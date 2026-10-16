@@ -45,7 +45,7 @@ const DEFAULT_DURATION_MS = 5000
 const toneIcons: Record<ToastTone, ReactNode> = {
   success: <CheckCircle2 className="h-4 w-4 text-green" strokeWidth={2} />,
   error: <AlertCircle className="h-4 w-4 text-red" strokeWidth={2} />,
-  info: <Info className="h-4 w-4 text-orange" strokeWidth={2} />,
+  info: <Info className="h-4 w-4 text-link" strokeWidth={2} />,
 }
 
 /**

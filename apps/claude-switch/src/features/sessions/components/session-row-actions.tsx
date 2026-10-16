@@ -86,7 +86,7 @@ type HeldBackReasonProps = {
  * dimmed while the action is unavailable.
  */
 const controlClasses =
-  'inline-flex h-7 shrink-0 cursor-pointer items-center rounded-[7px] text-[12px] text-muted outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) hover:bg-ink/[0.06] hover:text-ink focus-visible:ring-2 focus-visible:ring-orange/40 aria-disabled:cursor-default aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-muted'
+  'inline-flex h-7 shrink-0 cursor-pointer items-center rounded-[7px] text-[12px] text-muted outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) hover:bg-ink/[0.06] hover:text-ink focus-visible:ring-2 focus-visible:ring-focus/40 aria-disabled:cursor-default aria-disabled:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-muted'
 
 /**
  * A row's actions, laid out for the room the panel has: side by side as

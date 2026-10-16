@@ -38,7 +38,7 @@ export function ColorSwatchPicker({ value, onChange }: Props) {
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        className="ml-1 h-8 w-[110px] appearance-none rounded-md border border-border bg-white px-2 font-mono text-[12px] text-ink outline-none transition-colors focus:border-orange aria-[invalid=true]:border-red dark:bg-cream-2"
+        className="ml-1 h-8 w-[110px] appearance-none rounded-md border border-border bg-white px-2 font-mono text-[12px] text-ink outline-none transition-colors focus:border-focus aria-[invalid=true]:border-red dark:bg-cream-2"
       />
     </div>
   )

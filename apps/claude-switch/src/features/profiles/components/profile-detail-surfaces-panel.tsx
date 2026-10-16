@@ -49,15 +49,15 @@ const rowClasses =
   'flex min-h-[42px] items-center justify-between gap-3.5 border-t border-border-soft px-[13px] py-[9px] first:border-t-0'
 
 const controlClasses =
-  'inline-flex h-7 shrink-0 cursor-pointer items-center rounded-[7px] leading-none outline-none transition-[background-color,border-color,color,filter,transform] duration-(--duration-snap) ease-(--ease-natural) focus-visible:ring-2 focus-visible:ring-orange/40'
+  'inline-flex h-7 shrink-0 cursor-pointer items-center rounded-[7px] leading-none outline-none transition-[background-color,border-color,color,filter,transform] duration-(--duration-snap) ease-(--ease-natural) focus-visible:ring-2 focus-visible:ring-focus/40'
 
 /**
- * Filled orange treatment. Worn by the Open button, and by the command
+ * Filled mint treatment. Worn by the Open button, and by the command
  * token when the terminal is the only surface a profile has — so every
  * reachable state of the pane keeps exactly one obvious action.
  */
 const filledClasses =
-  'border-0 bg-[linear-gradient(180deg,var(--color-orange),var(--color-orange-deep))] text-white shadow-[0_1px_2px_rgba(191,98,64,0.35),inset_0_1px_0_rgba(255,255,255,0.2)] hover:brightness-[0.96] active:translate-y-px'
+  'border-[1.5px] border-ink bg-mint text-accent-ink shadow-button-primary hover:bg-mint-hover active:translate-x-px active:translate-y-px active:shadow-none'
 
 const outlinedClasses =
   'border border-border bg-white/60 text-ink-soft hover:border-border-strong hover:bg-white dark:bg-white/[0.05] dark:hover:bg-white/[0.09]'
@@ -134,7 +134,7 @@ export function ProfileDetailSurfacesPanel({
 
   // With no Open button on screen, the token is the only action left, so it
   // takes the primary fill. Checked against the outlined alternative: mono
-  // white-on-orange still reads as a shell command, and the alternative
+  // ink-on-mint still reads as a shell command, and the alternative
   // leaves a pane with nothing coloured to aim at.
   const tokenPromoted = cliEnabled && !guiEnabled
 
@@ -254,7 +254,7 @@ function OpenDesktopButton({ opening, onOpen }: OpenDesktopButtonProps) {
       onClick={onOpen}
     >
       {opening ? 'Opening' : 'Open'}
-      <Kbd variant="onOrange" shortcutId="open-selected-desktop" />
+      <Kbd variant="onAccent" shortcutId="open-selected-desktop" />
     </button>
   )
 }
@@ -296,7 +296,7 @@ function CopyCommandButton({ copied, promoted, command, onCopy }: CopyCommandBut
       onClick={onCopy}
     >
       {copied ? 'Copied' : command}
-      <Kbd variant={promoted ? 'onOrange' : 'default'} shortcutId="copy-selected-cli" />
+      <Kbd variant={promoted ? 'onAccent' : 'default'} shortcutId="copy-selected-cli" />
     </button>
   )
 }

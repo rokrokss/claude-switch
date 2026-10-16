@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'astro/config'
 
 export default defineConfig({
-  site: 'https://ai-profiles.vercel.app',
+  site: 'https://claude-switch.vercel.app',
   output: 'static',
   trailingSlash: 'never',
   integrations: [sitemap(), react()],

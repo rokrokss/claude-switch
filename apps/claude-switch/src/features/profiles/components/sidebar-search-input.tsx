@@ -39,7 +39,7 @@ export function SidebarSearchInput({ value = '', placeholder = 'Search profilesâ
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
-        className="w-full appearance-none rounded-md border border-border bg-white/55 py-[5px] pr-8 pl-6.5 text-[12px] text-ink placeholder:text-muted-strong outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) focus:border-orange/55 focus:bg-white focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-orange)_12%,transparent)] dark:bg-white/4 dark:focus:bg-white/6"
+        className="w-full appearance-none rounded-md border border-border bg-white/55 py-[5px] pr-8 pl-6.5 text-[12px] text-ink placeholder:text-muted-strong outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) focus:border-focus/55 focus:bg-white focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-focus)_12%,transparent)] dark:bg-white/4 dark:focus:bg-white/6"
       />
       {/* Positioned directly, with no wrapper span. A span around it forms an
           inline line box ~3px taller than the 18px chip, so centring the

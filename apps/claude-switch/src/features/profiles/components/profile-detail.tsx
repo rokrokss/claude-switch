@@ -47,7 +47,7 @@ export function ProfileDetail({ profile, shortcutsEnabled, onEdit, onDelete }: P
       header={
         <ProfileDetailHeader
           name={profile.name}
-          swatch={<ProfileSwatch color={profile.color} />}
+          swatch={<ProfileSwatch app={profile.app} color={profile.color} />}
           info={<ProfileDetailInfo app={profile.app} command={command} />}
           subline={
             <>

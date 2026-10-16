@@ -76,7 +76,7 @@ export function RenameDefaultProfileDialog({ open, entry, onClose, onSave }: Pro
           <Button
             variant="primary"
             size="sm"
-            trailingKbd={<Kbd variant="onOrange">⏎</Kbd>}
+            trailingKbd={<Kbd variant="onAccent">⏎</Kbd>}
             disabled={!canSubmit}
             onClick={handleSubmit}
           >

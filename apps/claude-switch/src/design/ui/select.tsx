@@ -22,9 +22,9 @@ function SelectTrigger({ className, children, ...props }: React.ComponentProps<t
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       // Mirrors the `Input` field look exactly (radius, border, bg, padding,
-      // type scale, orange focus ring) so a Select sits flush beside inputs.
+      // type scale, focus ring) so a Select sits flush beside inputs.
       className={cn(
-        "flex w-full items-center justify-between gap-1.5 rounded-md border border-border bg-white px-3 py-2.5 font-sans text-[13.5px] whitespace-nowrap text-ink outline-none transition-[border-color,box-shadow] duration-(--duration-snap) ease-(--ease-natural) select-none focus:border-orange focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-orange)_15%,transparent)] disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-muted-strong *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-cream-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "flex w-full items-center justify-between gap-1.5 rounded-md border border-border bg-white px-3 py-2.5 font-sans text-[13.5px] whitespace-nowrap text-ink outline-none transition-[border-color,box-shadow] duration-(--duration-snap) ease-(--ease-natural) select-none focus:border-focus focus:shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-focus)_15%,transparent)] disabled:cursor-not-allowed disabled:opacity-50 data-placeholder:text-muted-strong *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 dark:bg-cream-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}

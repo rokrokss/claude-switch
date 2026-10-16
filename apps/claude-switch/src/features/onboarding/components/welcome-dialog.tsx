@@ -14,7 +14,7 @@ export function WelcomeDialog({ open, onContinue }: Props) {
       onClose={onContinue}
       onSubmit={onContinue}
       foot={
-        <Button variant="primary" size="sm" trailingKbd={<Kbd variant="onOrange">⏎</Kbd>} onClick={onContinue}>
+        <Button variant="primary" size="sm" trailingKbd={<Kbd variant="onAccent">⏎</Kbd>} onClick={onContinue}>
           Continue
         </Button>
       }

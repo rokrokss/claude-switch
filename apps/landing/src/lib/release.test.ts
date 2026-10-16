@@ -17,27 +17,27 @@ describe('pickDmg', () => {
   })
 
   it('prefers aarch64 over x64 when both are present', () => {
-    const result = pickDmg([asset('ai-profiles-1.0.0-x86_64.dmg'), asset('ai-profiles-1.0.0-aarch64.dmg')])
-    expect(result?.name).toBe('ai-profiles-1.0.0-aarch64.dmg')
+    const result = pickDmg([asset('claude-switch_1.0.0_x86_64.dmg'), asset('claude-switch_1.0.0_aarch64.dmg')])
+    expect(result?.name).toBe('claude-switch_1.0.0_aarch64.dmg')
   })
 
   it('also recognises arm64 in the name', () => {
-    const result = pickDmg([asset('ai-profiles-1.0.0-x64.dmg'), asset('ai-profiles-1.0.0-arm64.dmg')])
-    expect(result?.name).toBe('ai-profiles-1.0.0-arm64.dmg')
+    const result = pickDmg([asset('claude-switch_1.0.0_x64.dmg'), asset('claude-switch_1.0.0_arm64.dmg')])
+    expect(result?.name).toBe('claude-switch_1.0.0_arm64.dmg')
   })
 
   it('falls back to x64 when no arm build exists', () => {
-    const result = pickDmg([asset('ai-profiles-1.0.0-x64.dmg')])
-    expect(result?.name).toBe('ai-profiles-1.0.0-x64.dmg')
+    const result = pickDmg([asset('claude-switch_1.0.0_x64.dmg')])
+    expect(result?.name).toBe('claude-switch_1.0.0_x64.dmg')
   })
 
   it('falls back to any dmg when arch is unknown', () => {
-    const result = pickDmg([asset('ai-profiles-1.0.0-universal.dmg')])
-    expect(result?.name).toBe('ai-profiles-1.0.0-universal.dmg')
+    const result = pickDmg([asset('claude-switch_1.0.0_universal.dmg')])
+    expect(result?.name).toBe('claude-switch_1.0.0_universal.dmg')
   })
 
   it('ignores non-dmg assets when picking', () => {
-    const result = pickDmg([asset('source.tar.gz'), asset('ai-profiles-1.0.0-aarch64.dmg')])
-    expect(result?.name).toBe('ai-profiles-1.0.0-aarch64.dmg')
+    const result = pickDmg([asset('source.tar.gz'), asset('claude-switch_1.0.0_aarch64.dmg')])
+    expect(result?.name).toBe('claude-switch_1.0.0_aarch64.dmg')
   })
 })

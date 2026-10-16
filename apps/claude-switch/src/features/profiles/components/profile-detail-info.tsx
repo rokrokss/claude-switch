@@ -32,7 +32,7 @@ export function ProfileDetailInfo({ app, command }: Props) {
         <button
           type="button"
           aria-label="About this profile"
-          className="inline-flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-muted-strong outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) hover:bg-cream-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-orange/40"
+          className="inline-flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-muted-strong outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) hover:bg-cream-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-focus/40"
         >
           <Info className="h-3.5 w-3.5" strokeWidth={1.9} />
         </button>

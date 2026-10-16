@@ -32,7 +32,7 @@ type Props = {
  * first and last child, so a lone control still reads as a normal button.
  */
 export const headerControlClasses =
-  'inline-flex h-[26px] shrink-0 cursor-pointer items-center justify-center gap-1.5 border border-border bg-cream px-2.5 text-[11.5px] font-medium leading-none text-ink-soft outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) hover:not-disabled:border-border-strong hover:not-disabled:bg-white hover:not-disabled:text-ink focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-orange/40 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[0.04] dark:hover:not-disabled:bg-white/[0.07]'
+  'inline-flex h-[26px] shrink-0 cursor-pointer items-center justify-center gap-1.5 border border-border bg-cream px-2.5 text-[11.5px] font-medium leading-none text-ink-soft outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) hover:not-disabled:border-border-strong hover:not-disabled:bg-white hover:not-disabled:text-ink focus-visible:relative focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-focus/40 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[0.04] dark:hover:not-disabled:bg-white/[0.07]'
 
 /**
  * Detail-page header chrome. The caller supplies the swatch (colour-filled
@@ -86,13 +86,20 @@ export function ProfileDetailHeader({ name, swatch, action, info, subline, menu,
   )
 }
 
-export function ProfileSwatch({ color }: { color: string }) {
+/**
+ * Swatch for a managed profile: what its Dock tile shows — the app's brand
+ * logo on the neutral tile `BrandSwatch` draws, with a badge in the
+ * profile's color at the bottom right.
+ */
+export function ProfileSwatch({ app, color }: { app: AppId; color: string }) {
   return (
-    <div
-      aria-hidden
-      className="relative h-11 w-11 shrink-0 rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.3),inset_0_0_0_1px_rgba(0,0,0,0.06),0_2px_6px_-3px_rgba(0,0,0,0.18)] after:absolute after:inset-1 after:rounded-[10px] after:bg-[linear-gradient(160deg,rgba(255,255,255,0.18),transparent_60%)] after:content-['']"
-      style={{ background: color }}
-    />
+    <div aria-hidden className="relative h-11 w-11 shrink-0">
+      <BrandSwatch app={app} />
+      <span
+        className="absolute -right-1 -bottom-1 h-4 w-4 rounded-full border-[2.5px] border-cream shadow-[0_1px_2px_rgba(16,48,43,0.25)]"
+        style={{ background: color }}
+      />
+    </div>
   )
 }
 

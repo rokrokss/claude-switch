@@ -139,7 +139,7 @@ function MigrationDialogFoot({ valid, submitting, onCancel, onImport }: Migratio
         variant="primary"
         size="sm"
         leadingIcon={submitting ? <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" /> : null}
-        trailingKbd={submitting ? null : <Kbd variant="onOrange">⏎</Kbd>}
+        trailingKbd={submitting ? null : <Kbd variant="onAccent">⏎</Kbd>}
         onClick={onImport}
       >
         {submitting ? 'Importing…' : 'Import'}
@@ -289,7 +289,7 @@ function ImportChoices({
               type="checkbox"
               checked={includeGui}
               onChange={(event) => onIncludeGuiChange(event.target.checked)}
-              className="h-3.5 w-3.5 cursor-pointer accent-orange"
+              className="h-3.5 w-3.5 cursor-pointer accent-mint"
             />
             Desktop app data (history, login)
           </label>
@@ -300,7 +300,7 @@ function ImportChoices({
               type="checkbox"
               checked={includeCli}
               onChange={(event) => onIncludeCliChange(event.target.checked)}
-              className="h-3.5 w-3.5 cursor-pointer accent-orange"
+              className="h-3.5 w-3.5 cursor-pointer accent-mint"
             />
             {appSpecs[app].cliDisplayName} CLI config
           </label>

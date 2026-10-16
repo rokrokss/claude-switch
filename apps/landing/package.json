@@ -17,6 +17,7 @@
     "@astrojs/sitemap": "3.7.2",
     "@c15t/react": "2.1.0",
     "@claude-switch/design-tokens": "workspace:*",
+    "@fontsource-variable/bricolage-grotesque": "5.3.0",
     "@fontsource-variable/geist": "5.2.9",
     "@fontsource-variable/geist-mono": "5.2.8",
     "astro": "6.3.7",

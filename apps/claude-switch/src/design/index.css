@@ -1,10 +1,12 @@
 /**
  * Design module CSS entry — wires the Tailwind `dark` variant to the
- * data-theme attribute and applies the body background gradient + grain.
+ * data-theme attribute and applies the body background: shizue's dot grid
+ * on the canvas, under soft color fields.
  *
  * Imported once from src/index.css; downstream code never touches this file.
  */
 
+@import "@fontsource-variable/bricolage-grotesque";
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 @import "@claude-switch/design-tokens/tokens.css";
@@ -36,28 +38,27 @@
   --app-accent: var(--color-chatgpt);
 }
 
-/* Body background — warm cream wash with overlapping accent + steel
-   radial gradients. The first radial tracks --app-accent so selecting a
-   ChatGPT entry shifts the window to blue/violet. Switches palette via the
-   cream token, so dark mode adopts a much darker base automatically. */
+/* Body background — shizue's faint dot grid on the cream canvas, under two
+   soft color fields: mint at the top right, and a tint that tracks
+   --app-accent at the bottom left, so selecting a ChatGPT entry shifts the
+   window toward violet. Switches palette via the base token, so dark mode
+   adopts the deep green canvas automatically. */
 body {
+  --dots: rgba(16, 48, 43, 0.09);
   background-color: var(--color-base);
   background-image:
+    radial-gradient(var(--dots) 1px, transparent 1.2px),
     radial-gradient(
-      1200px 800px at 18% 12%,
-      color-mix(in oklab, var(--app-accent) 15%, transparent),
+      1000px 700px at 88% 6%,
+      color-mix(in oklab, var(--color-mint-2) 32%, transparent),
       transparent 60%
     ),
     radial-gradient(
-      900px 700px at 82% 88%,
-      color-mix(in oklab, var(--color-profile-steel) 10%, transparent),
+      1000px 700px at 8% 96%,
+      color-mix(in oklab, var(--app-accent) 10%, transparent),
       transparent 60%
-    ),
-    radial-gradient(
-      600px 500px at 50% 50%,
-      rgba(255, 255, 255, 0.25),
-      transparent 70%
     );
+  background-size: 22px 22px, auto, auto;
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-feature-settings: "ss01", "cv11";
@@ -66,33 +67,24 @@ body {
 }
 
 [data-theme="dark"] body {
+  --dots: rgba(144, 247, 236, 0.07);
   background-image:
+    radial-gradient(var(--dots) 1px, transparent 1.2px),
     radial-gradient(
-      1200px 800px at 18% 12%,
-      color-mix(in oklab, var(--app-accent) 10%, transparent),
+      1000px 700px at 88% 6%,
+      color-mix(in oklab, var(--color-mint) 10%, transparent),
       transparent 60%
     ),
     radial-gradient(
-      900px 700px at 82% 88%,
-      rgba(107, 141, 181, 0.05),
+      1000px 700px at 8% 96%,
+      color-mix(in oklab, var(--app-accent) 7%, transparent),
       transparent 60%
-    ),
-    radial-gradient(
-      600px 500px at 50% 50%,
-      rgba(255, 255, 255, 0.02),
-      transparent 70%
     );
 }
 
-/* Subtle grain overlay — opacity flips per theme via --noise-opacity. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  opacity: var(--noise-opacity);
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.045 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+::selection {
+  background-color: var(--color-mint-soft);
+  color: var(--color-ink);
 }
 
 @keyframes design-pulse {

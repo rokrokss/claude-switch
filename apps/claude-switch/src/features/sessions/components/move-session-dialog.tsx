@@ -229,7 +229,7 @@ function PlanDetails({ replaceNewer, plan, destinationLabel, onReplaceNewerChang
             checked={replaceNewer}
             type="checkbox"
             onChange={(event) => onReplaceNewerChange(event.target.checked)}
-            className="mt-[3px] h-4 w-4 cursor-pointer accent-orange"
+            className="mt-[3px] h-4 w-4 cursor-pointer accent-mint"
           />
           <span>
             Replace newer copy

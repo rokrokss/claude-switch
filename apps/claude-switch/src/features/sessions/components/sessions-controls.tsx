@@ -122,7 +122,7 @@ export function SessionsControls({
             <button
               type="button"
               aria-label={`Last used, ${directionLabels[direction].toLowerCase()}`}
-              className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[7px] border border-border bg-white text-muted outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) hover:border-border-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-orange/40 dark:bg-cream-2"
+              className="inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-[7px] border border-border bg-white text-muted outline-none transition-colors duration-(--duration-snap) ease-(--ease-natural) hover:border-border-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-focus/40 dark:bg-cream-2"
               onClick={() => onDirectionChange(direction === 'desc' ? 'asc' : 'desc')}
             >
               <SortIcon aria-hidden className="h-3.5 w-3.5" />

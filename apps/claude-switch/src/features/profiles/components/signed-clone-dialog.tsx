@@ -43,7 +43,7 @@ export function SignedCloneDialog({ open, app, onClose }: Props) {
       onClose={onClose}
       onSubmit={onClose}
       foot={
-        <Button variant="primary" size="sm" trailingKbd={<Kbd variant="onOrange">⏎</Kbd>} onClick={onClose}>
+        <Button variant="primary" size="sm" trailingKbd={<Kbd variant="onAccent">⏎</Kbd>} onClick={onClose}>
           Close
         </Button>
       }

@@ -45,9 +45,10 @@
 }
 
 .cookie-banner-actions .btn-accept {
-  background: var(--color-orange);
-  color: white;
-  box-shadow: 0 1px 2px rgba(191, 98, 64, 0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+  background: var(--color-mint);
+  color: var(--color-accent-ink);
+  border: 1.5px solid var(--color-ink);
+  box-shadow: var(--shadow-button-primary);
 }
 
 .cookie-banner-actions .btn-decline {

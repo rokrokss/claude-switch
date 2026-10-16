@@ -46,7 +46,7 @@ export function ProfileDialogFoot({
       <Button
         variant="primary"
         size="sm"
-        trailingKbd={<Kbd variant="onOrange">⏎</Kbd>}
+        trailingKbd={<Kbd variant="onAccent">⏎</Kbd>}
         disabled={!canSubmit || submitting}
         onClick={onSubmit}
       >

@@ -37,7 +37,12 @@ export function EmptyStateScreen({ dependencies, onCreate, onRefresh }: Props) {
 }
 
 function BrandMark() {
-  return <img src="/icon.svg" alt="" aria-hidden className="mb-7 size-[72px]" />
+  return (
+    <>
+      <img src="/icon.svg" alt="" aria-hidden className="mb-7 size-16 dark:hidden" />
+      <img src="/icon-dark.svg" alt="" aria-hidden className="mb-7 hidden size-16 dark:block" />
+    </>
+  )
 }
 
 type NoProfilesYetProps = {
@@ -62,7 +67,7 @@ function NoProfilesYet({ onCreate }: NoProfilesYetProps) {
         variant="primary"
         size="md"
         leadingIcon={<Plus className="h-3.5 w-3.5" strokeWidth={2.25} />}
-        trailingKbd={<Kbd variant="onOrange" shortcutId="open-create-profile" />}
+        trailingKbd={<Kbd variant="onAccent" shortcutId="open-create-profile" />}
         aria-keyshortcuts={ariaKeyshortcutsFor('open-create-profile')}
         onClick={onCreate}
       >
