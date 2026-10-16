@@ -615,7 +615,7 @@ pub(crate) async fn profile_usage(
             fetched_at: chrono::Utc::now().to_rfc3339(),
         });
     }
-    let user_agent = format!("claude-switch/{}", env!("CARGO_PKG_VERSION"));
+    let user_agent = usage::CLAUDE_USER_AGENT.to_owned();
     match app {
         AppKind::Claude => {
             let cache = CLAUDE_QUOTA_CACHE.get_or_init(ClaudeQuotaCache::new);
@@ -683,7 +683,7 @@ pub(crate) async fn stored_profile_usage(profile_id: &str) -> AppResult<ProfileU
             fetched_at: chrono::Utc::now().to_rfc3339(),
         });
     }
-    let user_agent = format!("claude-switch/{}", env!("CARGO_PKG_VERSION"));
+    let user_agent = usage::CLAUDE_USER_AGENT.to_owned();
     match app {
         AppKind::Claude => {
             let cache = CLAUDE_QUOTA_CACHE.get_or_init(ClaudeQuotaCache::new);

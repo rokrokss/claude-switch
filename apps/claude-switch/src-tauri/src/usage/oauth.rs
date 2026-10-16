@@ -234,8 +234,7 @@ fn lock_for(cli_config_dir: &Path) -> Arc<TokioMutex<()>> {
 /// Renews the sign-in at `cli_config_dir` with Anthropic's endpoint. See
 /// [`renew_with`].
 pub async fn renew(cli_config_dir: &Path, rejected_token: Option<&str>) -> Renewal {
-    let user_agent = format!("claude-switch/{}", env!("CARGO_PKG_VERSION"));
-    let Some(endpoint) = AnthropicEndpoint::new(&user_agent) else {
+    let Some(endpoint) = AnthropicEndpoint::new(super::CLAUDE_USER_AGENT) else {
         return Renewal::Failed;
     };
     renew_with(&endpoint, &SystemStore, cli_config_dir, rejected_token).await

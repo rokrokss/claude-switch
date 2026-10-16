@@ -12,6 +12,10 @@ pub(crate) mod spend;
 
 use serde::{Deserialize, Serialize};
 
+/// The User-Agent sent to Anthropic with a profile's own sign-in (its usage,
+/// renewing it): Claude Code's, as that profile's `claude` sends it.
+pub(crate) const CLAUDE_USER_AGENT: &str = "claude-cli/2.1.301 (external, cli)";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProfileUsage {
