@@ -15,7 +15,10 @@ export type AppSurfaceSpec = {
 }
 
 export type AppUsageSpec = {
-  /** Copy shown when the profile is not signed in / has no credentials. */
+  /**
+   * Copy shown when the profile is not signed in / has no credentials.
+   * `{command}` is replaced with the profile's CLI command.
+   */
   noCredentials: string
   /** Copy when the access token needs refreshing (re-run the CLI once). */
   unauthorized: string
@@ -117,7 +120,10 @@ const claude: AppSpec = {
   dockIcon: { defaultOn: false, cost: "Cowork can't use folders you attach in this profile." },
   signedClone: true,
   usage: {
-    noCredentials: 'Sign in to Claude Code once with this profile to see usage.',
+    // Claude Code keeps its own sign-in: the desktop app's doesn't reach the
+    // CLI's Keychain item, which is what the usage lookup reads.
+    noCredentials:
+      "Run `{command}` once and sign in with /login to see usage. Signing in to the desktop app doesn't sign in the CLI.",
     unauthorized: 'Token refresh needed — run `claude` in a terminal once, then retry.',
     rateLimited: 'Rate limited by Anthropic. Try again in a few minutes.',
     networkError: "Couldn't reach Anthropic — check your connection and retry.",

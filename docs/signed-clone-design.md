@@ -43,7 +43,8 @@ The two existing modes stay as they are.
 |---------|---------------|---------------------|
 | Profile storage | `profiles.json`, `profiles/<id>/gui-data`, `profiles/<id>/cli-config` | Same. Only the `signedClone` field is added. |
 | Desktop sign-in | `--user-data-dir=<gui-data>` and the Keychain item "Claude Safe Storage" | Same `gui-data`. The designated requirement is the same, so the Keychain ACL is expected to let it through (check C1). |
-| CLI and Code tab sign-in | The Keychain item `Claude Code-credentials-<sha256(cli-config)[:8]>`, chosen by `CLAUDE_CONFIG_DIR=<cli-config>` | The path string comes from **the same function** as the CLI wrapper's, `paths::cli_config_dir(id)`, so the Keychain item is the same (check C2). |
+| CLI sign-in | The Keychain item `Claude Code-credentials-<sha256(cli-config)[:8]>`, chosen by `CLAUDE_CONFIG_DIR=<cli-config>`. The CLI's `/login` writes it; signing in to the desktop app doesn't. | The path string comes from **the same function** as the CLI wrapper's, `paths::cli_config_dir(id)`, so `claude-<slug>` and a `claude` started inside the clone (the Bash tool, the terminal panel) use the same item (check C2). |
+| Code tab sign-in | None of its own: the desktop app hands its sign-in to the Code tab, which takes only its config and history from `CLAUDE_CONFIG_DIR`. It runs signed in while the CLI item is absent. | Same (check C2). |
 | Usage stats | `usage/credentials.rs` reads `cli-config` | Unchanged |
 | Session list, move, archive | `sessions/home.rs` uses `profiles::paths()` | Paths unchanged. The running-instance check now counts strays (§5.6). |
 | Account display | `accounts.rs` | Unchanged |

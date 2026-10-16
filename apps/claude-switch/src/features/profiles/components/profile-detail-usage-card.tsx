@@ -330,7 +330,7 @@ function quotaErrorShort(quotaError: QuotaError): string {
 export function quotaErrorMessage(app: AppId, quotaError: QuotaError, cliCommand: string): string {
   const usage = appSpecs[app].usage
   if (quotaError === 'no_credentials') {
-    return usage?.noCredentials ?? 'Sign in once with this profile to see usage.'
+    return (usage?.noCredentials ?? 'Sign in once with this profile to see usage.').replace('{command}', cliCommand)
   }
   if (quotaError === 'needs_login') {
     return `Session expired — run \`${cliCommand}\` and sign in to this profile again.`

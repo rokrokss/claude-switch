@@ -527,7 +527,7 @@ describe('ProfileDetailUsageCard', () => {
   })
 
   it.each([
-    ['no_credentials', /sign in to claude code once/i],
+    ['no_credentials', /run `claude` once and sign in with \/login/i],
     ['needs_login', /session expired — run `claude`/i],
     ['unauthorized', /token refresh needed — run `claude`/i],
     ['forbidden', /blocked upstream/i],
@@ -538,7 +538,8 @@ describe('ProfileDetailUsageCard', () => {
     expect(quotaErrorMessage('claude', code, 'claude')).toMatch(expected)
   })
 
-  it('quotaErrorMessage names the given CLI command for needs_login and unauthorized', () => {
+  it('quotaErrorMessage names the given CLI command for no_credentials, needs_login and unauthorized', () => {
+    expect(quotaErrorMessage('claude', 'no_credentials', 'claude-work')).toContain('`claude-work`')
     expect(quotaErrorMessage('claude', 'needs_login', 'claude-work')).toContain('claude-work')
     expect(quotaErrorMessage('claude', 'unauthorized', 'claude-work')).toContain('claude-work')
   })

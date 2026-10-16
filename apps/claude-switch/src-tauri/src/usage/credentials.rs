@@ -40,7 +40,7 @@ struct ClaudeOauth {
 ///
 /// On non-macOS platforms the keychain step is skipped — if the file
 /// isn't present we return `NoCredentials` so the UI shows the standard
-/// "sign in to Claude Code once with this profile" message rather than
+/// "run `claude-<slug>` and sign in with /login" message rather than
 /// failing as `Unknown` from a missing `/usr/bin/security`.
 ///
 /// On any failure returns a categorised `QuotaError`. Never panics.

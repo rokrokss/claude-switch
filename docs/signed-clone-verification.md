@@ -169,18 +169,25 @@ These five decide whether the mode is worth having. About 30 minutes.
 - Expected: still signed in, and no Keychain prompt for "Claude Safe Storage".
 - If it fails: the strict validation failure matters at runtime. Put the mode on hold (design Q3).
 
-**C2 — The CLI and the Code tab use the same Keychain item**
-- Steps: run these two commands (no secret is printed):
+**C2 — The CLI signs in on its own, and the clone's `claude` is the profile's**
+- Background: the Code tab takes its sign-in from the desktop app (design §2). `claude-<slug>` and any `claude` started inside the clone (the Bash tool, the terminal panel) share `CLAUDE_CONFIG_DIR=<cli-config>`, and with it the CLI's Keychain item, which the desktop sign-in doesn't create.
+- Steps:
+  1. With the clone signed in and the CLI not yet, start a Code tab session, then run these two commands (no secret is printed):
 
-  ```bash
-  H=$(printf %s "$P/cli-config" | shasum -a 256 | cut -c1-8); echo "$H"
-  ```
+     ```bash
+     H=$(printf %s "$P/cli-config" | shasum -a 256 | cut -c1-8); echo "$H"
+     ```
 
-  ```bash
-  security find-generic-password -s "Claude Code-credentials-$H" >/dev/null && echo present
-  ```
+     ```bash
+     security find-generic-password -s "Claude Code-credentials-$H" >/dev/null && echo present || echo absent
+     ```
 
-- Expected: after signing in with `claude-<slug>`, it prints `present`, and the clone's Code tab is signed in too.
+  2. In the clone's terminal panel, run `claude auth status`.
+  3. Run `claude-<slug>` in any terminal, sign in with `/login`, then repeat steps 1 and 2.
+- Expected:
+  - Before step 3: the Code tab works, the item is `absent`, and `claude auth status` shows the profile's `cli-config` as `configDirectory` and reports it isn't logged in.
+  - After step 3: the item is `present`, and `claude auth status` in the terminal panel reports `"loggedIn": true` with the profile's `cli-config` and the profile's account.
+- If it fails: a `configDirectory` of `~/.claude` means the clone didn't pass `CLAUDE_CONFIG_DIR` on. A `claude` inside it then runs as the default account, without any error.
 
 **C3 — Existing features**
 - Steps: look at the profile's detail page.
@@ -348,7 +355,7 @@ sudo fs_usage -w -f filesys | grep -E 'claude-switch|launcher' | grep -E 'Applic
 | B4 ★ | | | | |
 | B5 | | | | |
 | C1 ★ | | | | |
-| C2 | | | | |
+| C2 | Pending | 2026-10-16 | 26.6.2 / 2.42304.0 | Before sign-in as expected: Code tab worked, item absent, `claude` in the terminal panel "Not logged in". After `/login` the item is present and `claude auth status` with the clone's `CLAUDE_CONFIG_DIR` reports the profile's account; not yet rerun inside the terminal panel |
 | C3 | | | | |
 | C4 ★ | | | | |
 | C5 | | | | |
