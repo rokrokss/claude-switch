@@ -12,6 +12,7 @@ mod inherited_env;
 mod launch;
 mod launchers;
 mod migration;
+mod notifications;
 mod path_setup;
 mod paths;
 mod profiles;
@@ -128,6 +129,7 @@ pub fn run() {
             app.set_menu(menu)?;
 
             tray::setup(app)?;
+            notifications::setup(app);
             Ok(())
         })
         // Closing the main window leaves claude-switch running in the menu
@@ -184,6 +186,9 @@ pub fn run() {
             tray::tray_usage,
             tray::open_main_window,
             tray::quit_app,
+            notifications::notification_permission,
+            notifications::request_notification_permission,
+            notifications::open_notification_settings,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

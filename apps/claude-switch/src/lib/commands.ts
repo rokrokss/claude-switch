@@ -13,6 +13,7 @@ import type {
   MigrationBackupInfo,
   MovePlan,
   MoveReport,
+  NotificationPermission,
   PathHookOutcome,
   Profile,
   ProfilePatch,
@@ -146,6 +147,28 @@ export function getAppMetadata(): Promise<AppMetadata> {
 
 export function openExternalUrl(url: string): Promise<void> {
   return invoke('open_external_url', { url })
+}
+
+/**
+ * Whether macOS lets claude-switch post notifications.
+ */
+export function notificationPermission(): Promise<NotificationPermission> {
+  return invoke<NotificationPermission>('notification_permission')
+}
+
+/**
+ * Asks the user to let claude-switch post notifications, if they haven't answered yet, and resolves
+ * with what they allow now.
+ */
+export function requestNotificationPermission(): Promise<NotificationPermission> {
+  return invoke<NotificationPermission>('request_notification_permission')
+}
+
+/**
+ * Opens claude-switch's page of System Settings → Notifications.
+ */
+export function openNotificationSettings(): Promise<void> {
+  return invoke('open_notification_settings')
 }
 
 export function openCliLogin(id: string): Promise<void> {

@@ -37,7 +37,7 @@ use crate::app_state::AppState;
 use crate::error::AppResult;
 use crate::usage::metrics::{self, Metric};
 use crate::usage::{ProfileUsage, QuotaError};
-use crate::{app_state, commands, migration, profiles};
+use crate::{app_state, commands, migration, notifications, profiles};
 
 /// Label of the main window.
 pub const MAIN_WINDOW: &str = "main";
@@ -210,7 +210,42 @@ fn toggle_panel(app: &AppHandle, icon: Rect) {
     if just_hidden {
         return;
     }
-    place_panel(&panel, icon);
+    open_panel(app, &panel, icon);
+}
+
+/// Opens the panel under the item, as a click on it does: for a click on a
+/// notification. With the item out of sight, as when a full menu bar hides
+/// it, the main window opens instead.
+pub fn show_panel(app: &AppHandle) {
+    let Some(panel) = app.get_webview_window(PANEL_WINDOW) else {
+        return;
+    };
+    if panel.is_visible().unwrap_or(false) {
+        let _ = panel.set_focus();
+        return;
+    }
+    let icon = app
+        .tray_by_id(TRAY_ID)
+        .and_then(|tray| tray.rect().ok().flatten())
+        .filter(|icon| on_screen(&panel, icon));
+    match icon {
+        Some(icon) => open_panel(app, &panel, icon),
+        None => show_main_window(app),
+    }
+}
+
+fn on_screen(panel: &WebviewWindow, icon: &Rect) -> bool {
+    let scale = panel.scale_factor().unwrap_or(1.0);
+    let position = icon.position.to_physical::<f64>(scale);
+    matches!(
+        panel.monitor_from_point(position.x, position.y),
+        Ok(Some(_))
+    )
+}
+
+fn open_panel(app: &AppHandle, panel: &WebviewWindow, icon: Rect) {
+    let state = app.state::<TrayState>();
+    place_panel(panel, icon);
     let _ = panel.show();
     let _ = panel.set_focus();
     // Redraws its "updated … ago" lines at once; a fetch may follow.
@@ -413,7 +448,9 @@ async fn refresh(app: &AppHandle) -> bool {
 
 /// Runs after every fetch with the entries before and after it: where what
 /// reacts to a change in usage (notifications) hooks in.
-fn after_refresh(_app: &AppHandle, _previous: &[TrayEntry], _next: &[TrayEntry]) {}
+fn after_refresh(app: &AppHandle, _previous: &[TrayEntry], next: &[TrayEntry]) {
+    notifications::after_refresh(app, next);
+}
 
 /// `entries` as sent to the panel: each meter with its state as of now.
 fn for_panel(entries: &[TrayEntry]) -> Vec<TrayEntry> {

@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ThemeProvider, ToastProvider } from '@/design'
+import { defaultSettings } from '@/lib/settings'
 import { renderWithQuery } from '@/test/render-with-query'
 
 import { SettingsView } from './settings-view'
@@ -36,6 +37,7 @@ const DEFAULT_STATE = {
   migrationDismissedAt: null,
   pathBannerDismissedAt: null,
   themeMode: 'system' as const,
+  settings: defaultSettings,
 }
 
 const DEFAULT_EXISTING = {
