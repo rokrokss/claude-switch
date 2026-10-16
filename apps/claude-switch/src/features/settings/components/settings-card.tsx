@@ -21,7 +21,7 @@ export function SettingsSection({
         <span className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-strong">{title}</span>
         {action}
       </div>
-      <div className="rounded-xl border border-border bg-white dark:bg-cream-2">{children}</div>
+      <div className="glass rounded-xl border">{children}</div>
     </section>
   )
 }

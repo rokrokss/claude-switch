@@ -74,8 +74,8 @@ export function CommandPalette({
         }
       }}
       label="Command palette"
-      overlayClassName="fixed inset-0 z-40 bg-[rgba(26,24,21,0.18)] backdrop-blur-sm backdrop-saturate-150 dark:bg-[rgba(0,0,0,0.55)]"
-      contentClassName="fixed left-1/2 top-[12vh] z-50 flex max-h-[calc(100%-128px)] w-[min(640px,calc(100%-64px))] -translate-x-1/2 flex-col overflow-hidden rounded-xl border border-[color:rgba(40,30,20,0.1)] bg-cream shadow-modal outline-none animate-[design-modal-in_0.22s_cubic-bezier(0.16,1,0.3,1)] dark:border-white/[0.06]"
+      overlayClassName="fixed inset-0 z-40 bg-[rgba(23,35,45,0.14)] backdrop-blur-sm backdrop-saturate-150 dark:bg-[rgba(0,0,0,0.55)]"
+      contentClassName="glass-thick fixed left-1/2 top-[12vh] z-50 flex max-h-[calc(100%-128px)] w-[min(640px,calc(100%-64px))] -translate-x-1/2 flex-col overflow-hidden rounded-xl border outline-none animate-[design-modal-in_0.22s_cubic-bezier(0.16,1,0.3,1)]"
     >
       <div className="relative border-b border-border-soft">
         <Search
@@ -251,7 +251,7 @@ function PaletteItem({ value, keywords, kbd, disabled, leading, onSelect, childr
       disabled={disabled}
       className={cn(
         'grid grid-cols-[14px_1fr_auto] items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] tracking-[-0.003em] text-ink-soft cursor-pointer outline-none',
-        'data-[selected=true]:bg-white/55 data-[selected=true]:text-ink data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(229,224,210,0.55)]',
+        'data-[selected=true]:bg-white/55 data-[selected=true]:text-ink data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(214,221,230,0.6)]',
         'data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-50',
         'dark:data-[selected=true]:bg-white/[0.06] dark:data-[selected=true]:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]',
       )}

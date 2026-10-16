@@ -6,7 +6,7 @@ import { Skeleton } from '@/design'
  * that fills the height the pane gives it, beside the details or under them.
  */
 export const sessionsPanelClasses =
-  '@container/sessions mb-6 flex min-h-0 flex-1 flex-col gap-0 overflow-clip rounded-[10px] border border-border-soft bg-white/30 dark:bg-white/[0.02]'
+  'glass @container/sessions mb-6 flex min-h-0 flex-1 flex-col gap-0 overflow-clip rounded-[10px] border'
 
 /**
  * The card's eyebrow row: the SESSIONS label, with the tabs across from it.

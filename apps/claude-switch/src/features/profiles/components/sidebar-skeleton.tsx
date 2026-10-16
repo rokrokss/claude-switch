@@ -6,7 +6,7 @@ import { Skeleton } from '@/design'
  */
 export function SidebarSkeleton() {
   return (
-    <aside className="flex w-64 flex-col gap-2 border-r border-border bg-cream-2 p-3">
+    <aside className="glass flex w-64 flex-col gap-2 border-r p-3">
       <Skeleton className="h-6 w-32" />
       <Skeleton className="h-8 w-full" />
       <div className="mt-3 flex flex-col gap-1">

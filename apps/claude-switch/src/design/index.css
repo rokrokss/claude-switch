@@ -1,7 +1,8 @@
 /**
  * Design module CSS entry — wires the Tailwind `dark` variant to the
- * data-theme attribute and applies the body background: shizue's dot grid
- * on the canvas, under soft color fields.
+ * data-theme attribute, applies the body background (shizue's dot grid on
+ * the canvas, under soft color fields), and defines the light theme's glass
+ * surfaces.
  *
  * Imported once from src/index.css; downstream code never touches this file.
  */
@@ -38,24 +39,26 @@
   --app-accent: var(--color-chatgpt);
 }
 
-/* Body background — shizue's faint dot grid on the cream canvas, under two
-   soft color fields: mint at the top right, and a tint that tracks
-   --app-accent at the bottom left, so selecting a ChatGPT entry shifts the
-   window toward violet. Switches palette via the base token, so dark mode
-   adopts the deep green canvas automatically. */
+/* Body background — shizue's faint dot grid on the canvas, under two soft
+   color fields: mint at the top right, and a tint that tracks --app-accent at
+   the bottom left, so selecting a ChatGPT entry shifts the window toward
+   violet. Switches palette via the base token, so dark mode adopts the deep
+   green canvas automatically. In light, the fields are what the glass
+   surfaces pick their tint up from, and the dots are what their blur
+   visibly frosts away. */
 body {
-  --dots: rgba(16, 48, 43, 0.09);
+  --dots: rgba(23, 35, 45, 0.07);
   background-color: var(--color-base);
   background-image:
     radial-gradient(var(--dots) 1px, transparent 1.2px),
     radial-gradient(
       1000px 700px at 88% 6%,
-      color-mix(in oklab, var(--color-mint-2) 32%, transparent),
+      color-mix(in oklab, var(--color-mint-2) 55%, transparent),
       transparent 60%
     ),
     radial-gradient(
       1000px 700px at 8% 96%,
-      color-mix(in oklab, var(--app-accent) 10%, transparent),
+      color-mix(in oklab, var(--app-accent) 14%, transparent),
       transparent 60%
     );
   background-size: 22px 22px, auto, auto;
@@ -72,14 +75,40 @@ body {
     radial-gradient(var(--dots) 1px, transparent 1.2px),
     radial-gradient(
       1000px 700px at 88% 6%,
-      color-mix(in oklab, var(--color-mint) 10%, transparent),
+      color-mix(in oklab, var(--color-mint) 14%, transparent),
       transparent 60%
     ),
     radial-gradient(
       1000px 700px at 8% 96%,
-      color-mix(in oklab, var(--app-accent) 7%, transparent),
+      color-mix(in oklab, var(--app-accent) 10%, transparent),
       transparent 60%
     );
+}
+
+/* Glass — the surfaces of both themes: a frosted, translucent fill with a lit
+   rim and top edge, lifted by a soft shadow (the tokens under "Glass" in
+   tokens.css, with their dark values in its dark block). `.glass` is for
+   cards and panes on the canvas, `.glass-thick` for what floats over
+   content: dialogs, menus, toasts.
+
+   The class brings the fill, the rim colour and the shadow; the element
+   keeps its border width and radius. The rules are unlayered on purpose, so
+   they win over any fill a component's own classes still carry (the shadcn
+   menus keep theirs, as shipped) whatever Tailwind's utility order. */
+.glass,
+.glass-thick {
+  border-color: var(--color-glass-rim);
+  background-color: var(--color-glass);
+  box-shadow: var(--shadow-glass);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+}
+
+.glass-thick {
+  background-color: var(--color-glass-thick);
+  box-shadow: var(--shadow-glass-thick);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(180%);
 }
 
 ::selection {

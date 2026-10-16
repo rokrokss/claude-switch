@@ -28,8 +28,7 @@ import { refetchIntervalMs, UsageUnavailableError, useProfileUsage } from '../ap
  * card owns it because it renders nothing at all for a profile without a
  * CLI surface, and a caller-supplied gap would then hang in empty space.
  */
-const usagePanelClasses =
-  'mb-3.5 rounded-[10px] border border-border-soft bg-white/30 px-[13px] py-[9px] dark:bg-white/[0.02]'
+const usagePanelClasses = 'glass mb-3.5 rounded-[10px] border px-[13px] py-[9px]'
 
 type Props = {
   app: AppId
