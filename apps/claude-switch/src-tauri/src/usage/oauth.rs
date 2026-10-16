@@ -602,7 +602,9 @@ mod tests {
     }
 
     /// Renews the real sign-in at `$CLAUDE_SWITCH_RENEW_SMOKE` (a Claude config
-    /// dir, e.g. `~/.claude`) if it is due, and prints only the outcome.
+    /// dir, e.g. `~/.claude`) if it is due — or now, with
+    /// `CLAUDE_SWITCH_RENEW_FORCE` set, as if its token had just been refused —
+    /// and prints only the outcome.
     #[tokio::test]
     #[ignore = "renews a real sign-in; opt in via CLAUDE_SWITCH_RENEW_SMOKE"]
     async fn renew_smoke() {
@@ -610,6 +612,9 @@ mod tests {
             eprintln!("set CLAUDE_SWITCH_RENEW_SMOKE=<claude config dir> to run");
             return;
         };
-        println!("renewal: {:?}", renew(Path::new(&dir), None).await);
+        let dir = Path::new(&dir);
+        let refused = std::env::var_os("CLAUDE_SWITCH_RENEW_FORCE")
+            .and_then(|_| credentials::read_access_token(dir).ok());
+        println!("renewal: {:?}", renew(dir, refused.as_deref()).await);
     }
 }
