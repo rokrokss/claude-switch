@@ -133,7 +133,7 @@ const scale = 2
 const lineHeight: Record<ShareLine['kind'], number> = {
   meter: 46,
   text: 22,
-  bars: 48,
+  bars: 42,
   hero: 34,
   stack: 16,
   legend: 19,
@@ -276,7 +276,7 @@ function drawLine(
     case 'bars':
       return drawBars(ctx, line, colors, left, right, top)
     case 'hero':
-      ctx.font = `600 22px ${sans}`
+      ctx.font = `600 16px ${sans}`
       ctx.fillStyle = colors.ink
       ctx.fillText(line.value, left, top + 26)
       return
@@ -296,11 +296,11 @@ function drawMeter(
   top: number,
 ) {
   labelAndValue(ctx, colors, line.label, line.headline, left, right, top + 15)
-  roundedRect(ctx, left, top + 21, right - left, 6, 3)
+  roundedRect(ctx, left, top + 21, right - left, 5, 2.5)
   ctx.fillStyle = colors.track
   ctx.fill()
   if (line.fraction > 0) {
-    roundedRect(ctx, left, top + 21, Math.max((right - left) * line.fraction, 6), 6, 3)
+    roundedRect(ctx, left, top + 21, Math.max((right - left) * line.fraction, 5), 5, 2.5)
     ctx.fillStyle = line.tone
       ? { normal: colors.green, warning: colors.amber, critical: colors.red }[line.tone]
       : colors.muted
@@ -327,9 +327,9 @@ function drawBars(
   const peak = Math.max(0, ...line.values)
   const step = (right - left) / Math.max(line.values.length, 1)
   line.values.forEach((value, index) => {
-    const barHeight = peak > 0 && value > 0 ? Math.max((value / peak) * 24, 1.5) : 0
+    const barHeight = peak > 0 && value > 0 ? Math.max((value / peak) * 18, 1.5) : 0
     ctx.fillStyle = index === line.values.length - 1 ? colors.inkSoft : colors.muted
-    ctx.fillRect(left + index * step + 1, top + 44 - barHeight, step - 2, barHeight)
+    ctx.fillRect(left + index * step + 1, top + 38 - barHeight, step - 2, barHeight)
   })
 }
 
@@ -346,12 +346,12 @@ function drawStack(
   const room = right - left - gap * Math.max(segments.length - 1, 0)
   let x = left
   ctx.save()
-  roundedRect(ctx, left, top + 2, right - left, 8, 4)
+  roundedRect(ctx, left, top + 3, right - left, 5, 2.5)
   ctx.clip()
   for (const segment of segments) {
     const segmentWidth = Math.max(room * segment.share, 3)
     ctx.fillStyle = seriesColor(colors, segment.slot)
-    ctx.fillRect(x, top + 2, segmentWidth, 8)
+    ctx.fillRect(x, top + 3, segmentWidth, 5)
     x += segmentWidth + gap
   }
   ctx.restore()

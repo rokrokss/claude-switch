@@ -99,7 +99,7 @@ const height = 28
  * A reading a day, oldest first, as bars; pointing at one reads its day,
  * otherwise the row reads today.
  */
-export function TrendRow({ metric, spacing }: { metric: Chart; spacing: string }) {
+export function TrendRow({ metric, spacing, compact }: { metric: Chart; spacing: string; compact: boolean }) {
   const [pointed, setPointed] = useState<number | null>(null)
   const { points, unit } = metric
   const last = points.length - 1
@@ -126,7 +126,7 @@ export function TrendRow({ metric, spacing }: { metric: Chart; spacing: string }
         }
         viewBox={`0 0 ${points.length * step} ${height}`}
         preserveAspectRatio="none"
-        className="mt-1 h-7 w-full"
+        className={cn('mt-1 w-full', compact ? 'h-3.5' : 'h-[18px]')}
         onMouseLeave={() => setPointed(null)}
       >
         {points.map((point, index) => {

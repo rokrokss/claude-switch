@@ -57,7 +57,7 @@ export function TotalSpendCard({ entries, settings, onChange, onNotice }: Props)
           className="rounded-[10px] border border-border-soft bg-white/40 px-3 py-2 dark:bg-white/[0.03]"
         >
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-[12.5px] font-medium text-ink">Total spend</h2>
+            <h2 className="text-[13px] font-semibold text-ink">Total spend</h2>
             <Segmented<Period>
               ariaLabel="Period"
               size="small"
@@ -71,7 +71,7 @@ export function TotalSpendCard({ entries, settings, onChange, onNotice }: Props)
           ) : (
             <>
               <div className="mt-1.5 flex items-center justify-between gap-2">
-                <span className="text-[19px] font-semibold tabular-nums text-ink">
+                <span className="text-[14px] font-semibold tabular-nums text-ink">
                   {headline(total.cost, total.tokens, settings.metric)}
                 </span>
                 <Segmented<Shown>
@@ -143,7 +143,7 @@ function ShareBar({ total, shown }: { total: TotalSpend; shown: Shown }) {
     <div
       role="img"
       aria-label={`Share of ${of}: ${shares.map(({ slice, share }) => `${slice.name} ${percent(share)}`).join(', ')}`}
-      className="mt-1.5 flex h-2 gap-[2px] overflow-hidden rounded-full bg-cream-3"
+      className="mt-1.5 flex h-[5px] gap-[2px] overflow-hidden rounded-full bg-cream-3"
     >
       {shares.map(({ slice, share }) => (
         <div

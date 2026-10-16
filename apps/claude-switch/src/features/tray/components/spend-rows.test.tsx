@@ -63,7 +63,7 @@ describe('SpendRow', () => {
 
 describe('TrendRow', () => {
   it('reads today, and the day pointed at', () => {
-    const { container } = render(<TrendRow metric={trend([0, 3_400_000, 1_200_000])} spacing="" />)
+    const { container } = render(<TrendRow metric={trend([0, 3_400_000, 1_200_000])} spacing="" compact={false} />)
     expect(screen.getByText(/Today · 1\.2M tokens/)).toBeInTheDocument()
     expect(screen.getByRole('img')).toHaveAccessibleName(/the most on Oct 16: 3\.4M tokens/)
 
@@ -78,7 +78,7 @@ describe('TrendRow', () => {
   })
 
   it('draws no bar for an idle day', () => {
-    const { container } = render(<TrendRow metric={trend([0, 5])} spacing="" />)
+    const { container } = render(<TrendRow metric={trend([0, 5])} spacing="" compact={false} />)
     const idle = container.querySelectorAll('[data-day="2026-10-15"] rect')[1]
     expect(idle).toHaveAttribute('height', '0')
   })

@@ -121,10 +121,17 @@ function MetricBody({
     return <ValuesRow metric={placed.metric} now={now} spacing={spacing} />
   }
   if (placed.metric.kind === 'chart') {
-    return <TrendRow metric={placed.metric} spacing={spacing} />
+    return <TrendRow metric={placed.metric} spacing={spacing} compact={compact} />
   }
   return (
-    <MeterRow meter={placed.metric} display={display} now={now} spacing={spacing} onDisplayChange={onDisplayChange} />
+    <MeterRow
+      meter={placed.metric}
+      display={display}
+      now={now}
+      compact={compact}
+      spacing={spacing}
+      onDisplayChange={onDisplayChange}
+    />
   )
 }
 
@@ -132,6 +139,7 @@ type MeterProps = {
   meter: Meter
   display: Display
   now: number
+  compact: boolean
   onDisplayChange: (display: Display) => void
 }
 
@@ -168,7 +176,7 @@ function MeterTitle({ meter, display, now }: MeterProps) {
  * The bar, coloured by the meter's state, with the even-pace tick and the
  * projection on hover.
  */
-function MeterBar({ meter, display, now }: MeterProps) {
+function MeterBar({ meter, display, now, compact }: MeterProps) {
   const party = useParty()
   const severity = severityOf(meter.state)
   const fill = shownFraction(meter, display.meterStyle) * 100
@@ -183,14 +191,14 @@ function MeterBar({ meter, display, now }: MeterProps) {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(fill)}
-        className="h-1.5 overflow-hidden rounded-full bg-cream-3"
+        className={cn('overflow-hidden rounded-full bg-cream-3', compact ? 'h-1' : 'h-[5px]')}
       >
         <div
           className={fillClasses(severity, party, !display.reduceAnimations)}
           style={{ width: `${fill}%`, minWidth: fill > 0 ? 6 : 0 }}
         />
       </div>
-      <PaceTick at={tick} />
+      <PaceTick at={tick} compact={compact} />
       {note ? <TooltipBubble>{note}</TooltipBubble> : null}
     </div>
   )
@@ -209,14 +217,14 @@ function fillClasses(severity: Severity | null, party: boolean, moving: boolean)
 /**
  * Where an even pace would be by now, as a mark across the bar.
  */
-function PaceTick({ at }: { at: number | null }) {
+function PaceTick({ at, compact }: { at: number | null; compact: boolean }) {
   if (at === null) {
     return null
   }
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute -top-0.5 h-2.5 w-0.5 rounded-sm bg-ink/55"
+      className={cn('pointer-events-none absolute -top-0.5 w-0.5 rounded-sm bg-ink/55', compact ? 'h-2' : 'h-[9px]')}
       style={{ left: `calc(${at * 100}% - 1px)` }}
     />
   )
@@ -243,7 +251,7 @@ function MeterDetails({ meter, display, now, onDisplayChange }: MeterProps) {
   )
 }
 
-function ResetLabel({ meter, display, now, onDisplayChange }: MeterProps) {
+function ResetLabel({ meter, display, now, onDisplayChange }: Omit<MeterProps, 'compact'>) {
   if (meter.notStarted) {
     return <span title="It starts with your first message.">Not started</span>
   }
