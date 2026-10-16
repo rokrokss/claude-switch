@@ -77,6 +77,18 @@
   --color-profile-mauve: #b97ab8;
   --color-profile-brown: #8b7355;
 
+  /* ---------- Chart series ----------
+     Categorical, in this fixed order: one per entity, never by rank. Checked
+     for colour-blind separation on the card surface in each theme; the light
+     aqua, yellow and magenta sit under 3:1, so a chart using them labels its
+     values in text beside the marks. */
+  --color-series-1: #2a78d6;
+  --color-series-2: #eb6834;
+  --color-series-3: #1baf7a;
+  --color-series-4: #eda100;
+  --color-series-5: #e87ba4;
+  --color-series-6: #008300;
+
   /* ---------- Radius ---------- */
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -191,6 +203,13 @@
   --color-profile-teal: #82a8a8;
   --color-profile-mauve: #c897c7;
   --color-profile-brown: #a48b6b;
+
+  --color-series-1: #3987e5;
+  --color-series-2: #d95926;
+  --color-series-3: #199e70;
+  --color-series-4: #c98500;
+  --color-series-5: #d55181;
+  --color-series-6: #008300;
 
   --shadow-card-hover: 0 4px 14px -10px rgba(0, 0, 0, 0.6);
   --shadow-window: 0 30px 60px -25px rgba(0, 0, 0, 0.55), 0 8px 22px -10px rgba(0, 0, 0, 0.4);

@@ -1,6 +1,6 @@
 import type { Metric, Settings, TrayEntry } from '@/lib/types'
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { claimCodexReset, closePanel, openSettings, quitApp, refreshUsage } from '@/lib/commands'
@@ -112,6 +112,39 @@ describe('TrayPanel', () => {
     expect(screen.getAllByText('Max 20x')).toHaveLength(2)
     expect(screen.getAllByText('18% used')).toHaveLength(2)
     expect(screen.getAllByText('Resets in 3h 25m')).toHaveLength(4)
+  })
+
+  it('totals what every profile spent, and keeps the period chosen', () => {
+    const today = (cost: number, tokens: number): Metric => ({
+      id: 'today',
+      label: 'Today',
+      kind: 'values',
+      values: [
+        { amount: cost, unit: { type: 'money', currency: 'USD' } },
+        { amount: tokens, unit: { type: 'tokens' } },
+      ],
+    })
+    vi.mocked(useTrayEntries).mockReturnValue([
+      makeEntry({ metrics: [today(6, 2_000_000)] }),
+      makeEntry({ id: 'personal', name: 'Personal', metrics: [today(2, 6_000_000)] }),
+    ])
+    render(<TrayPanel />)
+    const card = screen.getByRole('region', { name: 'Total spend' })
+    expect(within(card).getByText(/8\.00$/)).toBeInTheDocument()
+    expect(within(card).getByRole('img')).toHaveAccessibleName('Share of cost: Work 75%, Personal 25%')
+    fireEvent.click(within(card).getByRole('radio', { name: 'Yesterday' }))
+    expect(update).toHaveBeenCalledWith({
+      display: {
+        ...defaultSettings.display,
+        totalSpend: { ...defaultSettings.display.totalSpend, period: 'yesterday' },
+      },
+    })
+  })
+
+  it('has no total spend card without spend', () => {
+    vi.mocked(useTrayEntries).mockReturnValue([makeEntry()])
+    render(<TrayPanel />)
+    expect(screen.queryByRole('region', { name: 'Total spend' })).not.toBeInTheDocument()
   })
 
   it('flips a meter between used and left', () => {

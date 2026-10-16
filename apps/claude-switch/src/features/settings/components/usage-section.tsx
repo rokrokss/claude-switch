@@ -68,6 +68,17 @@ export function UsageSection() {
           />
         }
       />
+      <SettingRow
+        title="Total spend"
+        description="A card atop the panel with what every profile spent, worked out from this Mac's session logs."
+        control={
+          <Switch
+            aria-label="Total spend"
+            checked={display.totalSpend.shown}
+            onChange={(shown) => save({ ...display, totalSpend: { ...display.totalSpend, shown } })}
+          />
+        }
+      />
     </SettingsSection>
   )
 }

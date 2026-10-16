@@ -10,9 +10,11 @@ import { usePanelSettings } from '../api/use-panel-settings'
 import { useTrayEntries } from '../api/use-tray-entries'
 import { useTrayStatus } from '../api/use-tray-status'
 import { useUpdateNotice } from '../api/use-update-notice'
+import { hasSpend } from '../lib/total-spend'
 import { PanelFooter } from './panel-footer'
 import { PartyContext, usePartyMode } from './party'
 import { ProfileCard } from './profile-card'
+import { TotalSpendCard } from './total-spend-card'
 
 /**
  * The panel is never taller than this share of the screen; past it, it scrolls.
@@ -57,6 +59,13 @@ export function TrayPanel() {
                   Open claude-switch
                 </Button>
               </div>
+            ) : null}
+            {entries && settings.display.totalSpend.shown && hasSpend(entries) ? (
+              <TotalSpendCard
+                entries={entries}
+                settings={settings.display.totalSpend}
+                onChange={(totalSpend) => update({ display: { ...settings.display, totalSpend } })}
+              />
             ) : null}
             {entries?.map((entry) => (
               <ProfileCard
