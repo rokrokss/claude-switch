@@ -4,9 +4,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   formatCompact,
+  formatCost,
+  formatDay,
   formatDeadline,
   formatDuration,
   formatMoment,
+  formatReading,
   meterHeadline,
   shownFraction,
   valuesText,
@@ -98,6 +101,25 @@ describe('valuesText', () => {
       expiresAt: [],
     }
     expect(valuesText(resets)).toBe('3 available')
+  })
+
+  it('names tokens, and leaves other counts bare', () => {
+    const spend: Extract<Metric, { kind: 'values' }> = {
+      id: 'last30',
+      label: 'Last 30 days',
+      kind: 'values',
+      values: [
+        { amount: 4.08, unit: { type: 'money', currency: 'USD' } },
+        { amount: 1_234_567, unit: { type: 'tokens' } },
+      ],
+    }
+    expect(valuesText(spend)).toMatch(/4\.08 · 1\.2M tokens$/)
+    expect(formatReading(12, { type: 'count' })).toBe('12')
+    expect(formatCost(1.5)).toMatch(/1\.50$/)
+  })
+
+  it('names a local day without moving it across time zones', () => {
+    expect(formatDay('2026-10-01')).toMatch(/Oct\s?1$|1\s?Oct/)
   })
 
   it('compacts large counts', () => {

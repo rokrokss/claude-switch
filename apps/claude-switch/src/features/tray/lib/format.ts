@@ -115,6 +115,29 @@ function formatAmount(amount: number, unit: MetricUnit): string {
 }
 
 /**
+ * US dollars as spend reads them: `$12.34`.
+ */
+export function formatCost(amount: number): string {
+  return formatMoney(amount, 'USD')
+}
+
+/**
+ * A reading with what it counts, where that isn't plain: `1.2M tokens`.
+ */
+export function formatReading(amount: number, unit: MetricUnit): string {
+  const text = formatAmount(amount, unit)
+  return unit.type === 'tokens' ? `${text} tokens` : text
+}
+
+/**
+ * A local day (`YYYY-MM-DD`) as `Oct 12`.
+ */
+export function formatDay(date: string): string {
+  const [year = 0, month = 1, day = 1] = date.split('-').map(Number)
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(year, month - 1, day))
+}
+
+/**
  * The share of a meter shown, used or left, 0 to 1.
  */
 export function shownFraction(meter: Meter, meterStyle: Settings['display']['meterStyle']): number {
@@ -148,11 +171,8 @@ export function valuesText(metric: Extract<Metric, { kind: 'values' }>): string 
   }
   return metric.values
     .map((reading) => {
-      const amount = formatAmount(reading.amount, reading.unit)
-      if (reading.unit.type !== 'count') {
-        return amount
-      }
-      return `${amount} ${metric.id === 'credits' ? 'credits' : 'tokens'}`
+      const text = formatReading(reading.amount, reading.unit)
+      return reading.unit.type === 'count' && metric.id === 'credits' ? `${text} credits` : text
     })
     .join(' · ')
 }

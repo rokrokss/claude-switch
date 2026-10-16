@@ -19,6 +19,7 @@ import { paceTick, projectionNote, severityOf } from '../lib/pace'
 import { canStar } from '../lib/stars'
 import { useParty } from './party'
 import { ResetsRow } from './resets-row'
+import { SpendRow, TrendRow } from './spend-rows'
 
 type Meter = Extract<Metric, { kind: 'meter' }>
 type Display = Settings['display']
@@ -89,8 +90,8 @@ export function MetricRow({ starred, onStarToggle, ...props }: Props) {
 }
 
 /**
- * The metric itself: a meter, a reading, or — for a metric the user placed
- * that the profile doesn't report — "No data".
+ * The metric itself: a meter, a reading, a day-by-day trend, or — for a
+ * metric the user placed that the profile doesn't report — "No data".
  */
 function MetricBody({
   placed,
@@ -114,10 +115,13 @@ function MetricBody({
     if (placed.metric.id === 'resets' && onUseReset) {
       return <ResetsRow metric={placed.metric} now={now} spacing={spacing} onUse={onUseReset} onNotice={onNotice} />
     }
+    if (placed.metric.breakdown) {
+      return <SpendRow metric={placed.metric} spacing={spacing} />
+    }
     return <ValuesRow metric={placed.metric} now={now} spacing={spacing} />
   }
   if (placed.metric.kind === 'chart') {
-    return null
+    return <TrendRow metric={placed.metric} spacing={spacing} />
   }
   return (
     <MeterRow meter={placed.metric} display={display} now={now} spacing={spacing} onDisplayChange={onDisplayChange} />
