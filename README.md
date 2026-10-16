@@ -1,9 +1,24 @@
-# claude-switch
+<div align="center">
+  <img src="docs/assets/banner.png" alt="claude-switch: every Claude account, its own Dock tile" width="100%" />
+  <h1>claude-switch</h1>
+  <p>Run several Claude accounts on one Mac, side by side.</p>
+  <p><b>Claude Desktop and Claude Code for each account, each with its own Dock tile. ChatGPT and Codex too.</b></p>
 
-<p align="center">
-  <img src="docs/assets/hero-dock.png" alt="Four Claude tiles in the Dock: the default Claude, and Work, Personal and Client, each with a badge in its profile color" width="900">
-</p>
-<p align="center"><sub>Illustration built from the icons claude-switch renders. Whether the macOS 26 Dock shows a clone's custom icon is still on the <a href="docs/signed-clone-verification.md">verification list</a> (D2).</sub></p>
+  <p>
+    <a style="font-size: 28px" href="https://github.com/rokrokss/claude-switch/releases/latest">
+      Download claude-switch for macOS
+    </a>
+  </p>
+
+  <p>
+    <a href="https://github.com/rokrokss/claude-switch/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/rokrokss/claude-switch?color=32ccbc&labelColor=10302b" /></a>
+    <a href="https://github.com/rokrokss/claude-switch/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/rokrokss/claude-switch/total?color=32ccbc&labelColor=10302b" /></a>
+    <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-32ccbc?labelColor=10302b" />
+    <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-32ccbc?labelColor=10302b" /></a>
+  </p>
+</div>
+
+<br/>
 
 Run several Claude accounts on one Mac, side by side: Claude Desktop and Claude Code, each account in its own profile, each profile with its own Dock tile. ChatGPT and Codex accounts work the same way. Coding sessions can move from one account to another.
 
@@ -11,7 +26,15 @@ Claude profiles can run from a **signed clone**: a copy of Claude.app that keeps
 
 > **Status**: the signed clone mode is implemented but not yet verified at runtime. Static checks (clone, signature, Gatekeeper) and the unit and E2E tests pass. Sign-in, permissions, the Dock and updates still need checking with the [verification guide](docs/signed-clone-verification.md).
 
-## What you get
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/app-dark.png">
+    <img src="docs/assets/app-light.png" alt="claude-switch with three Claude profiles and two ChatGPT profiles in the sidebar, and the Work profile open: its usage, its desktop app and terminal launchers, and its coding sessions" width="900">
+  </picture>
+</p>
+<p align="center"><sub>Light and dark follow macOS, or pick one in Settings → Appearance. Shown with demo profiles.</sub></p>
+
+## ✨ What you get
 
 - **A profile per account.** Each one gets a desktop launcher, `/Applications/Claude (<Name>).app`, and a CLI command, `claude-<slug>`. Both open with that account's login, history and settings, isolated from the others.
 - **Its own Dock tile.** A Claude profile can run from a signed clone wearing the profile's color, from a re-signed copy with its own icon and name, or simply from the stock app.
@@ -19,7 +42,12 @@ Claude profiles can run from a **signed clone**: a copy of Claude.app that keeps
 - **Sessions that move.** List a profile's Claude Code and Codex sessions, archive them, or move one to another account and carry on there.
 - **Your existing setup, imported.** Already using Claude Desktop or Claude Code? Bring it into your first profile.
 
-## The signed clone mode
+## 🧬 The signed clone mode
+
+<p align="center">
+  <img src="docs/assets/hero-dock.png" alt="Four Claude tiles in the Dock: the default Claude, and Work, Personal and Client, each with a badge in its profile color" width="900">
+</p>
+<p align="center"><sub>Illustration built from the icons claude-switch renders. Whether the macOS 26 Dock shows a clone's custom icon is still on the <a href="docs/signed-clone-verification.md">verification list</a> (D2).</sub></p>
 
 | | Stock app (default) | Distinct Dock icon | **Signed clone** |
 |---|---|---|---|
@@ -51,14 +79,14 @@ Claude profiles can run from a **signed clone**: a copy of Claude.app that keeps
 
 More: [design](docs/signed-clone-design.md) · [verification guide](docs/signed-clone-verification.md)
 
-## Supported apps
+## 🧩 Supported apps
 
 | App | Desktop launcher | CLI wrapper | Where the login lives |
 |-----|------------------|-------------|-----------------------|
 | **Claude** (Desktop + Claude Code) | `Claude (<Name>).app` | `claude-<slug>`, sets `CLAUDE_CONFIG_DIR` | A macOS Keychain entry derived from the profile's config dir |
 | **ChatGPT** (Desktop) + **Codex** (CLI) | `ChatGPT (<Name>).app` | `codex-<slug>`, sets `CODEX_HOME` | `auth.json` inside the profile's `CODEX_HOME` |
 
-## Install
+## 📦 Install
 
 Download the `.dmg` from the [latest release](https://github.com/rokrokss/claude-switch/releases/latest), open it and drag claude-switch to Applications. It is a universal build for Apple Silicon and Intel Macs, signed with a Developer ID and notarized by Apple. The app keeps its data in `~/Library/Application Support/claude-switch/`.
 
@@ -75,7 +103,7 @@ pnpm --filter claude-switch tauri build --bundles app --config '{"bundle":{"crea
 
 The `--config` override skips the signed update archive, which needs the release signing key. Then copy `apps/claude-switch/src-tauri/target/release/bundle/macos/claude-switch.app` to `/Applications`. A build from source isn't notarized, so open it the first time with right-click → Open.
 
-## Using it
+## 🕹️ Using it
 
 Create a profile from the sidebar: choose an app (Claude or ChatGPT), give it a name, pick a color, and choose the surfaces you want.
 
@@ -143,7 +171,7 @@ mv ~/Library/Application\ Support/claude-switch/migration-backup-<timestamp>/.cl
 mv ~/Library/Application\ Support/claude-switch/migration-backup-<timestamp>/Claude ~/Library/Application\ Support/Claude
 ```
 
-## Development
+## 🛠️ Development
 
 ```sh
 (cd apps/claude-switch/src-tauri && cargo test -- --test-threads=1)
@@ -154,7 +182,9 @@ NODE_OPTIONS=--no-webstorage pnpm --filter claude-switch test   # needed on Node
 
 Releases are built, notarized and published from a Mac with `scripts/release.sh`. See [Releasing](docs/releasing.md).
 
-## FAQ
+The README and social images are HTML in `docs/brand/`, in the app's shizue palette; `docs/brand/render.sh` renders them with Chrome.
+
+## ❓ FAQ
 
 **Why does a profile ask me to sign in to Claude Code again after importing?**
 Claude Code names its Keychain entry after the config directory, which changes when your install moves into a profile. Sign in once per profile.
@@ -171,7 +201,7 @@ No. There is no analytics, telemetry or remote logging. Its network requests are
 **Can I run it next to another build of this app?**
 Not on the same data directory. A build that doesn't know `signedClone` drops the field when it saves, and that profile falls back to the stock launcher (its data is safe).
 
-## License
+## 📄 License
 
 MIT — see [LICENSE](LICENSE).
 

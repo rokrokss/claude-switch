@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<style>
+  /* README: what the Dock shows with three Claude profiles (1200x540). */
+  .canvas { width: 1200px; height: 540px; text-align: center; }
+  .headline { font-size: 52px; margin-top: 64px; }
+  .sub { font-size: 20px; max-width: 660px; margin: 18px auto 0; }
+  .dock { position: absolute; left: 50%; top: 300px; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 30px; padding: 18px 34px 14px; }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .item .tile { --size: 100px; }
+  .item i { width: 6px; height: 6px; background: var(--ink); border-radius: 0; }
+  .sep { width: 2px; height: 96px; background: var(--line); align-self: center; margin: 0 2px; }
+  .label { position: absolute; top: 466px; transform: translateX(-50%); font: 600 15px var(--sys); color: var(--ink-2); }
+  .tip { position: absolute; top: 246px; font: 600 14px var(--sys); background: #fff; border: 2px solid var(--ink); border-radius: 10px; box-shadow: 3px 3px 0 var(--ink); padding: 6px 12px; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="glow" style="width: 520px; height: 360px; right: -120px; top: -140px; background: rgba(144, 247, 236, 0.75)"></div>
+  <div class="glow" style="width: 420px; height: 320px; left: -140px; bottom: -160px; background: rgba(232, 181, 172, 0.45)"></div>
+  <h1 class="headline" style="position: relative">Every Claude account, <span class="band">its own Dock tile.</span></h1>
+  <p class="sub" style="position: relative">Each profile runs from its own clone of Claude.app, with Anthropic's signature left intact and a badge in the profile's color.</p>
+  <div class="dock panel">
+    <div class="item"><div class="tile"><img src=".cache/claude.png" alt=""></div><i></i></div>
+    <div class="sep"></div>
+    <div class="item"><div class="tile" data-color="steel"><img src=".cache/claude.png" alt=""></div><i></i></div>
+    <div class="item"><div class="tile" data-color="sage"><img src=".cache/claude.png" alt=""></div><i></i></div>
+    <div class="item"><div class="tile" data-color="mauve"><img src=".cache/claude.png" alt=""></div><i></i></div>
+  </div>
+  <div class="tip" id="tip">Claude (Work)</div>
+</div>
+<script>
+  // Each label sits under its tile, and the tooltip over the Work tile.
+  const tiles = [...document.querySelectorAll('.dock .tile')]
+  const center = (tile) => { const r = tile.getBoundingClientRect(); return `${r.left + r.width / 2}px` }
+  ;['Default', 'Work', 'Personal', 'Client'].forEach((name, i) => {
+    const label = document.createElement('span')
+    label.className = 'label'
+    label.textContent = name
+    label.style.left = center(tiles[i])
+    document.querySelector('.canvas').append(label)
+  })
+  document.getElementById('tip').style.left = center(tiles[1])
+</script>
+</body>
+</html>

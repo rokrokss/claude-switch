@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="base.css">
+<style>
+  /* README: what happens when you open a profile (1200x556). */
+  .canvas { width: 1200px; height: 556px; padding: 44px 48px; }
+  .headline { font-size: 34px; }
+  .lede { font-size: 16.5px; color: var(--ink-2); margin-top: 10px; }
+  .steps { display: grid; grid-template-columns: 1fr 28px 1fr 28px 1fr 28px 1fr; align-items: center; margin-top: 28px; gap: 8px; }
+  .card { background: #fff; border: 2px solid var(--ink); border-radius: 16px; box-shadow: 4px 4px 0 var(--ink); padding: 18px 18px 20px; height: 262px; }
+  .arrow { font: 800 26px var(--head); text-align: center; }
+  .eyebrow { display: flex; align-items: center; gap: 8px; font: 400 12px/1 var(--pixel); letter-spacing: 0.06em; text-transform: uppercase; }
+  .num { display: inline-grid; place-items: center; width: 22px; height: 22px; background: var(--mint); border: 2px solid var(--ink); border-radius: 6px; font: 700 12px var(--pixel); }
+  h3 { font: 700 21px/1.15 var(--head); font-variation-settings: 'opsz' 24; letter-spacing: -0.02em; margin: 14px 0 10px; display: flex; align-items: center; gap: 10px; }
+  h3 .tile { --size: 34px; }
+  ul { list-style: none; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); }
+  li { position: relative; padding-left: 14px; margin-top: 7px; }
+  li::before { content: ''; position: absolute; left: 0; top: 7px; width: 5px; height: 5px; background: var(--mint); outline: 1.5px solid var(--ink); }
+  code { font: 12px var(--mono); background: var(--cream-2); border-radius: 4px; padding: 1px 5px; color: var(--ink); }
+  .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 26px; }
+  .note { border: 2px dashed rgba(16, 48, 43, 0.4); border-radius: 14px; padding: 14px 18px; font-size: 14px; line-height: 1.45; color: var(--ink-2); background: rgba(255, 255, 255, 0.55); }
+  .note b { color: var(--ink); }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="glow" style="width: 460px; height: 300px; right: -120px; top: -150px; background: rgba(144, 247, 236, 0.7)"></div>
+  <h1 class="headline" style="position: relative">What happens when you <span class="band">open a profile</span></h1>
+  <p class="lede">The Work profile, from Spotlight, the Finder or claude-switch. Every way in takes the same route.</p>
+  <div class="steps">
+    <div class="card">
+      <div class="eyebrow"><span class="num">1</span>Open</div>
+      <h3><span class="tile" data-color="steel"><img src=".cache/claude.png" alt=""></span>Claude (Work)</h3>
+      <ul>
+        <li>The launcher in <code>/Applications</code> hands off to claude-switch</li>
+        <li>Without claude-switch, it opens the stock app on Work's data</li>
+      </ul>
+    </div>
+    <div class="arrow">→</div>
+    <div class="card">
+      <div class="eyebrow"><span class="num">2</span>claude-switch</div>
+      <h3>Focus or prepare</h3>
+      <ul>
+        <li>Running already? Its window comes forward</li>
+        <li>Otherwise the clone is checked: moved forward if Claude.app is newer, never while in use</li>
+      </ul>
+    </div>
+    <div class="arrow">→</div>
+    <div class="card">
+      <div class="eyebrow"><span class="num">3</span>Signed clone</div>
+      <h3>Claude (Work).app</h3>
+      <ul>
+        <li>APFS clone of Claude.app, near-zero disk</li>
+        <li>Anthropic's signature intact: same CDHash, Gatekeeper accepts it</li>
+        <li>Finder icon with Work's badge</li>
+      </ul>
+    </div>
+    <div class="arrow">→</div>
+    <div class="card">
+      <div class="eyebrow"><span class="num">4</span>Running as Work</div>
+      <h3>Its own account</h3>
+      <ul>
+        <li><code>--user-data-dir</code> → Work's <code>gui-data</code></li>
+        <li><code>CLAUDE_CONFIG_DIR</code> → Work's <code>cli-config</code>, shared with <code>claude-work</code></li>
+        <li>Usage and sessions read the same paths as before</li>
+      </ul>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note"><b>Reopened by an update or the Dock?</b> macOS starts the clone without Work's arguments. The clone watch quits it within 20 seconds and opens Work again, or asks first if it has been running for a while.</div>
+    <div class="note"><b>Claude Desktop updated?</b> Nothing to update here. Claude's version, signature and icon are read from the installed app every time, and clones catch up on their next launch.</div>
+  </div>
+</div>
+</body>
+</html>

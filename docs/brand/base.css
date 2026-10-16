@@ -1,0 +1,80 @@
+/* Shared design for the README and social images, rendered by render.sh.
+   Colors and type follow shizue (../shizue store/src/base.css) and the app's
+   tokens in packages/design-tokens/src/tokens.css. */
+
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Silkscreen:wght@400;700&display=block');
+
+:root {
+  --cream: #f6f3dc;
+  --cream-2: #efeacb;
+  --ink: #10302b;
+  --ink-2: #3c5652;
+  --mint: #32ccbc;
+  --mint-2: #90f7ec;
+  --mint-3: #cbfbf6;
+  --line: #c9d1bf;
+  --blush: #e8b5ac;
+  --head: 'Bricolage Grotesque', system-ui, sans-serif;
+  --pixel: 'Silkscreen', monospace;
+  --sys: -apple-system, 'SF Pro Text', system-ui, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: transparent; }
+body { -webkit-font-smoothing: antialiased; overflow: hidden; color: var(--ink); font-family: var(--sys); }
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--cream);
+  background-image: radial-gradient(rgba(16, 48, 43, 0.09) 1.2px, transparent 1.3px);
+  background-size: 24px 24px;
+  background-position: 12px 12px;
+}
+.glow { position: absolute; border-radius: 50%; filter: blur(80px); pointer-events: none; }
+
+.headline {
+  font-family: var(--head);
+  font-weight: 800;
+  font-variation-settings: 'opsz' 96;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+/* A mint-2 band under a phrase. */
+.band { background: linear-gradient(transparent 60%, var(--mint-2) 60%); padding: 0 4px; margin: 0 -4px; }
+/* A white box with an ink border and a short solid shadow. */
+.boxed { display: inline-block; background: #fff; border: 2px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--ink); padding: 0 10px; line-height: 1.04; }
+.sub { font-family: var(--head); font-weight: 500; font-variation-settings: 'opsz' 24; color: var(--ink-2); letter-spacing: -0.01em; line-height: 1.35; }
+
+.tag {
+  display: inline-flex; align-items: center; gap: 10px;
+  font: 400 14px/1 var(--pixel); letter-spacing: 0.06em; text-transform: uppercase;
+  background: #fff; border: 2px solid var(--ink); border-radius: 999px; padding: 7px 14px 8px;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+.tag::before { content: ''; width: 9px; height: 9px; background: var(--mint); outline: 2px solid var(--ink); }
+
+.panel { background: #fff; border: 2px solid var(--ink); border-radius: 18px; box-shadow: 6px 6px 0 var(--ink); }
+
+/* The pixel mark (apps/claude-switch/public/icon.svg). */
+.mark { image-rendering: pixelated; }
+
+/* A Claude tile as the app badges it (src-tauri/src/launchers/icons.rs):
+   a disc in the profile color inside a white ring, 0.36 of the tile wide,
+   centered 0.26 of the tile in from its bottom-right corner. The icon's tile
+   fills 410/512 of the image. */
+.tile { position: relative; width: var(--size); height: var(--size); }
+.tile img { width: 100%; height: 100%; display: block; }
+.tile[data-color]::after {
+  content: ''; position: absolute;
+  --side: calc(var(--size) * 410 / 512);
+  --d: calc(var(--side) * 0.36);
+  --cx: calc(var(--size) * 461 / 512 - var(--side) * 0.26);
+  width: var(--d); height: var(--d); left: calc(var(--cx) - var(--d) / 2); top: calc(var(--cx) - var(--d) / 2);
+  border-radius: 50%; background: var(--badge); box-sizing: border-box;
+  border: calc(var(--d) * 0.13) solid #fff;
+}
+.tile[data-color='steel'] { --badge: #6b8db5; }
+.tile[data-color='sage'] { --badge: #7c9a6e; }
+.tile[data-color='mauve'] { --badge: #b97ab8; }
