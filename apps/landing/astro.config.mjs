@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'astro/config'
 
 export default defineConfig({
-  site: 'https://claude-switch.vercel.app',
+  site: 'https://claude-switch.shizue.net',
   output: 'static',
   trailingSlash: 'never',
   integrations: [sitemap(), react()],

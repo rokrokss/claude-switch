@@ -8,6 +8,8 @@
     <a style="font-size: 28px" href="https://github.com/rokrokss/claude-switch/releases/latest">
       Download claude-switch for macOS
     </a>
+    <br/>
+    <a href="https://claude-switch.shizue.net">claude-switch.shizue.net</a>
   </p>
 
   <p>

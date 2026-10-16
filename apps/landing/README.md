@@ -11,19 +11,12 @@ Marketing landing page for claude-switch. Static Astro + Tailwind v4.
 
 ## Deploying
 
-Hosted on Vercel.
+Served by GitHub Pages at https://claude-switch.shizue.net. `.github/workflows/pages.yml` builds the site and deploys it on every push to `main` that touches the landing page, the design tokens or the desktop app's version, and can be run by hand from the Actions tab.
 
-### Vercel project setup (one-time)
+### One-time setup
 
-1. New Project → Import from GitHub → select `rokrokss/claude-switch`.
-2. **Root Directory**: `apps/landing`.
-3. **Framework Preset**: leave on auto (Vercel detects Astro).
-4. **Build Command**: pre-set by `vercel.json` to `pnpm --filter landing build`.
-5. **Output Directory**: pre-set by `vercel.json` to `dist`.
-6. **Install Command**: pre-set by `vercel.json` to `pnpm install --frozen-lockfile`.
-7. **Environment Variables**:
-   - `PUBLIC_POSTHOG_KEY` — PostHog project API key
-   - `PUBLIC_POSTHOG_HOST` — defaults to `https://eu.i.posthog.com` if unset
-8. Click Deploy.
+1. Repository Settings → Pages → **Source**: GitHub Actions.
+2. **Custom domain**: `claude-switch.shizue.net` (also in `public/CNAME`), then **Enforce HTTPS** once the certificate is issued.
+3. DNS: a `CNAME` record for `claude-switch.shizue.net` pointing at `rokrokss.github.io`.
 
-PR previews are automatic for any PR that touches `apps/landing/**` or `packages/design-tokens/**`.
+Analytics stay off unless the workflow is given `PUBLIC_POSTHOG_KEY` (and optionally `PUBLIC_POSTHOG_HOST`, default `https://eu.i.posthog.com`) as repository variables.

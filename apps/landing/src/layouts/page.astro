@@ -11,7 +11,7 @@ interface Props {
 }
 
 const { title, description } = Astro.props
-const rawSiteUrl = (Astro.site ?? new URL('https://claude-switch.vercel.app')).toString()
+const rawSiteUrl = (Astro.site ?? new URL('https://claude-switch.shizue.net')).toString()
 const siteUrl = rawSiteUrl.endsWith('/') ? rawSiteUrl.slice(0, -1) : rawSiteUrl
 const ogImage = `${siteUrl}/og-image.png`
 // JSON-LD is SSR-rendered for crawlers; Phase 6's runtime release
