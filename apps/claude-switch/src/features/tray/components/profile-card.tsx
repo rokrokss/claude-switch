@@ -20,6 +20,7 @@ import {
 } from '@/features/profiles/components/profile-detail-usage-card'
 import { claimCodexReset, openExternalUrl, openSettings, refreshUsage } from '@/lib/commands'
 
+import { formatMoment } from '../lib/format'
 import { cardLayout } from '../lib/layout'
 import { copyAsImage, profileShareCard } from '../lib/share-image'
 import { starsFor, toggleStar } from '../lib/stars'
@@ -141,7 +142,8 @@ export function ProfileCard({
           <ContextMenuItem onSelect={() => void openSettings()}>Settings…</ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
-      {reportsNothing ? (
+      <RetryNote entry={entry} timeFormat={settings.display.timeFormat} now={now} />
+      {reportsNothing && !entry.retryAt ? (
         <p className="py-1 font-mono text-mono text-muted-strong">
           {quotaErrorMessage(entry.app, entry.error ?? 'unknown', entry.command)}
         </p>
@@ -218,6 +220,29 @@ function HeaderStatus({ entry, refreshing, now, showError, reduceAnimations }: O
         </span>
       ) : null}
     </>
+  )
+}
+
+/**
+ * While a rate limit holds the profile back: when it is asked again. Asking
+ * sooner wouldn't help, and could earn a longer hold.
+ */
+function RetryNote({
+  entry,
+  timeFormat,
+  now,
+}: {
+  entry: TrayEntry
+  timeFormat: Settings['display']['timeFormat']
+  now: number
+}) {
+  if (entry.error !== 'rate_limited' || !entry.retryAt) {
+    return null
+  }
+  return (
+    <p className="mb-0.5 text-[11.5px] text-amber">
+      Rate limited · trying again {formatMoment(new Date(entry.retryAt), timeFormat, new Date(now))}
+    </p>
   )
 }
 

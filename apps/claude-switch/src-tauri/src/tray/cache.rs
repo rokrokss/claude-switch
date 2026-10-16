@@ -83,6 +83,7 @@ mod tests {
                 state: None,
             }],
             error: None,
+            retry_at: None,
         }
     }
 

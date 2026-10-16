@@ -5,23 +5,21 @@
 //! Figures the menu bar (or an earlier run) fetched in the last five minutes
 //! are reused from its cache; the rest are fetched, one profile at a time, and
 //! saved back to it. A Claude profile the usage endpoint rate limited isn't
-//! asked again, even with `--force`, until its cooldown has run
-//! ([`backoff`]). The command follows OpenUsage's
+//! asked again, even with `--force`, until its hold has run
+//! ([`backoff`], shared with the app). The command follows OpenUsage's
 //! (MIT, <https://github.com/robinebers/openusage>).
 
 use std::collections::HashMap;
 use std::io::Write;
 
-use chrono::{DateTime, Local, TimeDelta, Utc};
+use chrono::{DateTime, Local, Utc};
 
 use crate::app_kind::AppKind;
 use crate::cli::{UsageArgs, HELP};
 use crate::local_api::limits;
 use crate::tray::{self, cache, Target, TrayEntry};
-use crate::usage::{metrics, quota, QuotaError};
+use crate::usage::{backoff, metrics, QuotaError};
 use crate::{commands, profiles};
-
-mod backoff;
 
 /// The exit status of a misuse, or of a profile that doesn't exist.
 const EXIT_MISUSE: i32 = 2;
@@ -90,7 +88,6 @@ pub fn run(args: &UsageArgs) -> i32 {
     let now = Utc::now();
     let mut entries = Vec::with_capacity(chosen.len());
     let mut fetched = Vec::new();
-    let mut fetched_holds = Vec::new();
     let mut held = Vec::new();
     // One at a time, as the menu bar does: fetched together, profiles have
     // tripped the usage endpoint's rate limit.
@@ -99,14 +96,12 @@ pub fn run(args: &UsageArgs) -> i32 {
         match step(args.force, last, backoff::until(&holds, &target.id, now)) {
             Step::Reuse(recent) => entries.push(recent.clone()),
             Step::Hold(until) => {
-                let entry = rate_limited(target, last);
+                let entry = rate_limited(target, last, until);
                 held.push((entry.clone(), until));
                 entries.push(entry);
             }
             Step::Fetch => {
                 let entry = runtime.block_on(fetch(target, last));
-                let until = is_tripped(&entry).then(|| hold_until(&target.id));
-                fetched_holds.push((entry.id.clone(), until));
                 fetched.push(entry.clone());
                 entries.push(entry);
             }
@@ -114,7 +109,6 @@ pub fn run(args: &UsageArgs) -> i32 {
     }
     if !fetched.is_empty() {
         save(&fetched);
-        save_holds(&fetched_holds);
     }
 
     let body = limits::limits(&entries, Utc::now());
@@ -201,9 +195,9 @@ fn step(force: bool, last: Option<&TrayEntry>, until: Option<DateTime<Utc>>) -> 
     }
 }
 
-/// `target`'s `last` entry, or a bare one, marked rate limited: what a
-/// profile held back reads as.
-fn rate_limited(target: &Target, last: Option<&TrayEntry>) -> TrayEntry {
+/// `target`'s `last` entry, or a bare one, marked rate limited `until` it
+/// may be asked again: what a profile held back reads as.
+fn rate_limited(target: &Target, last: Option<&TrayEntry>, until: DateTime<Utc>) -> TrayEntry {
     let mut entry = last.cloned().unwrap_or_else(|| TrayEntry {
         id: target.id.clone(),
         app: target.app,
@@ -213,24 +207,11 @@ fn rate_limited(target: &Target, last: Option<&TrayEntry>) -> TrayEntry {
         usage: None,
         metrics: Vec::new(),
         error: None,
+        retry_at: None,
     });
     entry.error = Some(QuotaError::RateLimited);
+    entry.retry_at = Some(until.to_rfc3339());
     entry
-}
-
-/// Pure: whether fetching `entry` tripped Claude's usage endpoint's rate
-/// limit. A Codex profile reads as rate limited when its quota is spent,
-/// which asking again doesn't make worse.
-fn is_tripped(entry: &TrayEntry) -> bool {
-    entry.app == AppKind::Claude && matches!(entry.error, Some(QuotaError::RateLimited))
-}
-
-/// When a Claude profile just rate limited may be asked again: once the
-/// cooldown its `Retry-After` set has run, or the default one.
-fn hold_until(profile_id: &str) -> DateTime<Utc> {
-    let cooldown =
-        commands::rate_limit_remaining(profile_id).unwrap_or(quota::DEFAULT_RATE_LIMIT_COOLDOWN);
-    Utc::now() + TimeDelta::from_std(cooldown).unwrap_or_default()
 }
 
 /// `target`'s entry, fetched now, with its stored sign-in as it is. A fetch
@@ -266,6 +247,7 @@ async fn fetch(target: &Target, last: Option<&TrayEntry>) -> TrayEntry {
         usage,
         metrics,
         error,
+        retry_at: None,
     }
 }
 
@@ -277,21 +259,6 @@ fn save(fetched: &[TrayEntry]) {
     if let Err(err) = cache::save(&entries) {
         eprintln!(
             "claude-switch: could not save the figures fetched: {}",
-            err.message()
-        );
-    }
-}
-
-/// Records this run's rate limits in the back-off file, read again first: an
-/// overlapping run may have saved since.
-fn save_holds(fetched: &[(String, Option<DateTime<Utc>>)]) {
-    let mut holds = backoff::load();
-    if !backoff::record(&mut holds, fetched, Utc::now()) {
-        return;
-    }
-    if let Err(err) = backoff::save(&holds) {
-        eprintln!(
-            "claude-switch: could not save when to ask again: {}",
             err.message()
         );
     }
@@ -440,35 +407,25 @@ mod tests {
             command: "claude-work".into(),
         };
         let last = entry("p1", AppKind::Claude, Some("2026-10-17T12:00:00Z"));
-        let held = rate_limited(&target, Some(&last));
+        let until = DateTime::parse_from_rfc3339("2026-10-17T13:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+        let held = rate_limited(&target, Some(&last), until);
         assert!(matches!(held.error, Some(QuotaError::RateLimited)));
+        assert_eq!(held.retry_at.as_deref(), Some("2026-10-17T13:00:00+00:00"));
         assert_eq!(held.metrics, last.metrics);
         assert_eq!(
             held.usage.unwrap().fetched_at,
             last.usage.unwrap().fetched_at
         );
 
-        let bare = rate_limited(&target, None);
+        let bare = rate_limited(&target, None, until);
         assert!(matches!(bare.error, Some(QuotaError::RateLimited)));
         assert_eq!(bare.name, "Work");
         assert!(bare.usage.is_none());
         let body: serde_json::Value =
             serde_json::from_str(&limits::limits(&[bare], Utc::now())).unwrap();
         assert_eq!(body["errors"][0]["code"], "rate_limited");
-    }
-
-    #[test]
-    fn only_claudes_rate_limit_holds_a_profile_back() {
-        let tripped = |app, error| {
-            let mut fetched = entry("p", app, None);
-            fetched.error = error;
-            is_tripped(&fetched)
-        };
-        assert!(tripped(AppKind::Claude, Some(QuotaError::RateLimited)));
-        // Codex reads as rate limited when its quota is spent.
-        assert!(!tripped(AppKind::Codex, Some(QuotaError::RateLimited)));
-        assert!(!tripped(AppKind::Claude, Some(QuotaError::Network)));
-        assert!(!tripped(AppKind::Claude, None));
     }
 
     #[test]

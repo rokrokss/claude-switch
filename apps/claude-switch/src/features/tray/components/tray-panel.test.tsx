@@ -157,6 +157,18 @@ describe('TrayPanel', () => {
     })
   })
 
+  it('says when a rate-limited profile is asked again', () => {
+    const retryAt = new Date(Date.now() + hour).toISOString()
+    vi.mocked(useTrayEntries).mockReturnValue([
+      makeEntry({ error: 'rate_limited', retryAt }),
+      makeEntry({ id: 'fresh', name: 'Fresh', metrics: [], usage: null, error: 'rate_limited', retryAt }),
+    ])
+    render(<TrayPanel />)
+    expect(screen.getAllByText(/^Rate limited · trying again (today|tomorrow) at /)).toHaveLength(2)
+    // The note stands in for the card's bare "rate limited" message.
+    expect(screen.queryByText(/Try again in a few minutes/)).not.toBeInTheDocument()
+  })
+
   it('has no total spend card without spend', () => {
     vi.mocked(useTrayEntries).mockReturnValue([makeEntry()])
     render(<TrayPanel />)

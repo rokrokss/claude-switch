@@ -310,6 +310,7 @@ pub(crate) mod tests {
                 Vec::new()
             },
             error: None,
+            retry_at: None,
         }
     }
 

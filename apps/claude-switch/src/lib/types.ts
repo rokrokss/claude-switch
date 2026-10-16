@@ -331,6 +331,10 @@ export type TrayEntry = {
    * Why the latest fetch brought no quota, if it didn't.
    */
   error: QuotaError | null
+  /**
+   * While a rate limit holds the profile back, when it is asked again.
+   */
+  retryAt?: string
 }
 
 /**

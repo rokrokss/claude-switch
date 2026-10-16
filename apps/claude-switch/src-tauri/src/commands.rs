@@ -623,18 +623,21 @@ pub(crate) async fn profile_usage(
                 CLAUDE_DEAD_CREDS.get_or_init(usage::dead_credentials::DeadCredentialRegistry::new);
             let provider = ClaudeQuotaProvider::new(user_agent, cache, dead_credentials)
                 .map_err(|_| AppError::Io(std::io::Error::other("could not build HTTP client")))?;
-            let renewed = usage::build_with_renewal(&config_dir, &provider, dead_credentials).await;
-            let unrenewed = matches!(renewed.quota_error, Some(QuotaError::Unauthorized));
-            if !refresh_sign_in || !unrenewed {
-                return Ok(renewed);
-            }
-            // Renewing directly failed (no refresh token, or a passing
-            // failure): with the user there, let `claude` renew it instead.
-            let refresher = CLAUDE_REFRESHER.get_or_init(usage::refresh::ClaudeCliRefresher::new);
-            Ok(
+            Ok(unless_held(profile_id, async {
+                let renewed =
+                    usage::build_with_renewal(&config_dir, &provider, dead_credentials).await;
+                let unrenewed = matches!(renewed.quota_error, Some(QuotaError::Unauthorized));
+                if !refresh_sign_in || !unrenewed {
+                    return renewed;
+                }
+                // Renewing directly failed (no refresh token, or a passing
+                // failure): with the user there, let `claude` renew it instead.
+                let refresher =
+                    CLAUDE_REFRESHER.get_or_init(usage::refresh::ClaudeCliRefresher::new);
                 usage::build_with_cli_refresh(&config_dir, &provider, refresher, dead_credentials)
-                    .await,
-            )
+                    .await
+            })
+            .await)
         }
         AppKind::Codex => {
             // app-server refreshes its own token per call, so no external
@@ -691,7 +694,7 @@ pub(crate) async fn stored_profile_usage(profile_id: &str) -> AppResult<ProfileU
                 CLAUDE_DEAD_CREDS.get_or_init(usage::dead_credentials::DeadCredentialRegistry::new);
             let provider = ClaudeQuotaProvider::new(user_agent, cache, dead_credentials)
                 .map_err(|_| AppError::Io(std::io::Error::other("could not build HTTP client")))?;
-            Ok(usage::build(&config_dir, &provider).await)
+            Ok(unless_held(profile_id, usage::build(&config_dir, &provider)).await)
         }
         AppKind::Codex => Ok(usage::build(&config_dir, &CodexQuotaProvider).await),
     }
@@ -699,9 +702,53 @@ pub(crate) async fn stored_profile_usage(profile_id: &str) -> AppResult<ProfileU
 
 /// What's left of the cooldown a rate limit of Claude profile `profile_id`'s
 /// usage set in this process, if one is running.
-pub(crate) fn rate_limit_remaining(profile_id: &str) -> Option<std::time::Duration> {
+fn rate_limit_remaining(profile_id: &str) -> Option<std::time::Duration> {
     let config_dir = resolve_cli_config_dir(profile_id).ok()?;
     CLAUDE_QUOTA_CACHE.get()?.rate_limit_remaining(&config_dir)
+}
+
+/// Claude profile `profile_id`'s usage from `ask`, unless a rate limit holds
+/// the profile back ([`usage::backoff`], shared with the command line): then
+/// it reads as rate limited, and nothing is asked. A rate limit the endpoint
+/// just gave sets the next hold; an answer with usage lifts it.
+async fn unless_held(
+    profile_id: &str,
+    ask: impl std::future::Future<Output = ProfileUsage>,
+) -> ProfileUsage {
+    let now = chrono::Utc::now();
+    if usage::backoff::until(&usage::backoff::load(), profile_id, now).is_some() {
+        return ProfileUsage {
+            quota: None,
+            quota_error: Some(QuotaError::RateLimited),
+            fetched_at: now.to_rfc3339(),
+        };
+    }
+    // A rate limit already cached in this process was counted when it came.
+    let cached = rate_limit_remaining(profile_id).is_some();
+    let answer = ask.await;
+    let recorded = match (&answer.quota, answer.quota_error) {
+        (None, Some(QuotaError::RateLimited)) if !cached => {
+            usage::backoff::hold(profile_id, rate_limit_remaining(profile_id)).map(|hold| {
+                crate::logging::warn(
+                    "usage",
+                    &format!(
+                        "{profile_id}: rate limited ({} in a row), not asked again before {}",
+                        hold.strikes,
+                        hold.until.with_timezone(&chrono::Local).format("%H:%M:%S")
+                    ),
+                );
+            })
+        }
+        (Some(_), _) => usage::backoff::release(profile_id),
+        _ => Ok(()),
+    };
+    if let Err(err) = recorded {
+        crate::logging::warn(
+            "usage",
+            &format!("could not save when to ask again: {}", err.message()),
+        );
+    }
+    answer
 }
 
 /// The plan profile `profile_id` is signed in under, as its app names it

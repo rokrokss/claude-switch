@@ -20,8 +20,9 @@ const REQUEST_TIMEOUT_SECS: u64 = 8;
 /// minutes collapses the frontend's per-mount + 5-min-poll refetches (one
 /// query per profile) into roughly one upstream call per token per window.
 const QUOTA_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
-/// Cooldown applied to a 429 that carries no usable `Retry-After`.
-pub(crate) const DEFAULT_RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(60);
+/// Cooldown applied to a 429 that carries no usable `Retry-After`: the
+/// shared back-off's.
+const DEFAULT_RATE_LIMIT_COOLDOWN: Duration = super::backoff::DEFAULT_WAIT;
 /// Upper bound on an honoured `Retry-After`. This endpoint hands out up to
 /// ~1h windows; cap there so a bogus header can't lock the card out longer.
 const MAX_RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(60 * 60);

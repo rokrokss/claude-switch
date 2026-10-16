@@ -41,7 +41,7 @@ use crate::app_state::AppState;
 use crate::error::AppResult;
 use crate::settings::MenuBarStyle;
 use crate::usage::metrics::{self, Metric};
-use crate::usage::spend;
+use crate::usage::{backoff, spend};
 use crate::usage::{ProfileUsage, QuotaError};
 use crate::{app_state, commands, logging, migration, notifications, profiles};
 
@@ -105,6 +105,10 @@ pub struct TrayEntry {
     pub metrics: Vec<Metric>,
     /// Why the latest fetch brought no quota, if it didn't.
     pub error: Option<QuotaError>,
+    /// While a rate limit holds the profile back, when it is asked again
+    /// ([`crate::usage::backoff`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_at: Option<String>,
 }
 
 #[derive(Default)]
@@ -597,6 +601,7 @@ async fn fetch_all(app: &AppHandle) -> bool {
             .and_then(|usage| usage.quota.as_ref()?.plan.clone())
             .or_else(|| commands::profile_plan(&target.id))
             .or_else(|| last.and_then(|entry| entry.plan.clone()));
+        let retry_at = retry_at(&target.id, error);
         entries.push(TrayEntry {
             id: target.id,
             app: target.app,
@@ -606,6 +611,7 @@ async fn fetch_all(app: &AppHandle) -> bool {
             usage,
             metrics,
             error,
+            retry_at,
         });
     }
     let histories = history.within(HISTORY_WAIT).await;
@@ -659,6 +665,16 @@ async fn fetch_all(app: &AppHandle) -> bool {
     *state.refreshed_at.lock().unwrap() = Some(Instant::now());
     show(app, entries);
     passing_failure
+}
+
+/// When a profile whose fetch was refused for a rate limit is asked again,
+/// while a hold keeps it back.
+fn retry_at(profile_id: &str, error: Option<QuotaError>) -> Option<String> {
+    if !matches!(error, Some(QuotaError::RateLimited)) {
+        return None;
+    }
+    let until = backoff::until(&backoff::load(), profile_id, Utc::now())?;
+    Some(until.to_rfc3339())
 }
 
 /// The metrics of `metrics` read from the local logs.

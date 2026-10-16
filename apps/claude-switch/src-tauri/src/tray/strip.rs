@@ -260,6 +260,7 @@ mod tests {
             usage: None,
             metrics,
             error: None,
+            retry_at: None,
         }
     }
 
