@@ -24,7 +24,7 @@ use crate::usage::{
     self,
     codex::CodexQuotaProvider,
     quota::{ClaudeQuotaCache, ClaudeQuotaProvider},
-    ProfileUsage,
+    ProfileUsage, QuotaError,
 };
 
 #[tauri::command]
@@ -596,10 +596,11 @@ pub async fn get_profile_usage(profile_id: String) -> AppResult<ProfileUsage> {
     profile_usage(&profile_id, true).await
 }
 
-/// The usage `get_profile_usage` reports. With `refresh_sign_in` off, a
-/// Claude profile whose access token has lapsed reports `Unauthorized`
-/// instead of having `claude` started to refresh it: the menu bar polls with
-/// nobody watching, and leaves that to a window the user has open.
+/// The usage `get_profile_usage` reports. A Claude profile's sign-in is
+/// renewed directly when it lapses ([`usage::build_with_renewal`]). Only with
+/// `refresh_sign_in` on — a window the user has open — does a renewal that
+/// fails fall back to starting `claude` to do it; the menu bar polls with
+/// nobody watching.
 pub(crate) async fn profile_usage(
     profile_id: &str,
     refresh_sign_in: bool,
@@ -622,9 +623,13 @@ pub(crate) async fn profile_usage(
                 CLAUDE_DEAD_CREDS.get_or_init(usage::dead_credentials::DeadCredentialRegistry::new);
             let provider = ClaudeQuotaProvider::new(user_agent, cache, dead_credentials)
                 .map_err(|_| AppError::Io(std::io::Error::other("could not build HTTP client")))?;
-            if !refresh_sign_in {
-                return Ok(usage::build(&config_dir, &provider).await);
+            let renewed = usage::build_with_renewal(&config_dir, &provider, dead_credentials).await;
+            let unrenewed = matches!(renewed.quota_error, Some(QuotaError::Unauthorized));
+            if !refresh_sign_in || !unrenewed {
+                return Ok(renewed);
             }
+            // Renewing directly failed (no refresh token, or a passing
+            // failure): with the user there, let `claude` renew it instead.
             let refresher = CLAUDE_REFRESHER.get_or_init(usage::refresh::ClaudeCliRefresher::new);
             Ok(
                 usage::build_with_cli_refresh(&config_dir, &provider, refresher, dead_credentials)
@@ -636,6 +641,17 @@ pub(crate) async fn profile_usage(
             // refresher dance is needed.
             Ok(usage::build(&config_dir, &CodexQuotaProvider).await)
         }
+    }
+}
+
+/// The plan profile `profile_id` is signed in under, as its app names it
+/// (`Max 20x`), when its stored sign-in says.
+pub(crate) fn profile_plan(profile_id: &str) -> Option<String> {
+    let app = resolve_app(profile_id).ok()?;
+    let config_dir = resolve_cli_config_dir(profile_id).ok()?;
+    match app {
+        AppKind::Claude => usage::oauth::stored_plan(&config_dir),
+        AppKind::Codex => None,
     }
 }
 

@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 #[cfg(target_os = "macos")]
 use std::process::Command;
 
@@ -45,11 +45,77 @@ struct ClaudeOauth {
 ///
 /// On any failure returns a categorised `QuotaError`. Never panics.
 pub fn read_access_token(cli_config_dir: &Path) -> Result<String, QuotaError> {
+    extract_token(&read_stored(cli_config_dir)?.document)
+}
+
+/// Where a Claude profile's sign-in is kept.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CredentialSource {
+    File(PathBuf),
+    Keychain { service: String, account: String },
+}
+
+/// A profile's stored sign-in: the whole document Claude Code keeps there
+/// (it holds more than the OAuth login, MCP logins among it), and where it
+/// came from, in the order [`read_access_token`] looks.
+#[derive(Debug, Clone)]
+pub struct StoredCredentials {
+    pub document: String,
+    pub source: CredentialSource,
+}
+
+pub fn read_stored(cli_config_dir: &Path) -> Result<StoredCredentials, QuotaError> {
     let file_path = cli_config_dir.join(".credentials.json");
     if file_path.exists() {
-        return read_from_file(&file_path);
+        return Ok(StoredCredentials {
+            document: read_from_file(&file_path)?,
+            source: CredentialSource::File(file_path),
+        });
     }
     read_from_keychain(cli_config_dir)
+}
+
+/// Replaces the stored document at `source`. A keychain item is written with
+/// `/usr/bin/security`, as Claude Code writes it: saving through another tool
+/// would take the item's access away from Claude Code.
+pub fn write_stored(source: &CredentialSource, document: &str) -> Result<(), String> {
+    match source {
+        CredentialSource::File(path) => {
+            crate::app_state::atomic_write(path, document.as_bytes()).map_err(|err| err.message())
+        }
+        CredentialSource::Keychain { service, account } => {
+            write_to_keychain(service, account, document)
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn write_to_keychain(service: &str, account: &str, document: &str) -> Result<(), String> {
+    let output = Command::new("/usr/bin/security")
+        .args([
+            "add-generic-password",
+            "-U",
+            "-a",
+            account,
+            "-s",
+            service,
+            "-w",
+            document,
+        ])
+        .output()
+        .map_err(|err| err.to_string())?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "security exited with {}",
+        output.status.code().unwrap_or(-1)
+    ))
+}
+
+#[cfg(not(target_os = "macos"))]
+fn write_to_keychain(_service: &str, _account: &str, _document: &str) -> Result<(), String> {
+    Err("there is no Keychain on this platform".into())
 }
 
 fn read_from_file(path: &Path) -> Result<String, QuotaError> {
@@ -63,15 +129,11 @@ fn read_from_file(path: &Path) -> Result<String, QuotaError> {
     if metadata.len() > MAX_CREDENTIALS_BYTES {
         return Err(QuotaError::Unknown);
     }
-    let raw = match std::fs::read_to_string(path) {
-        Ok(text) => text,
-        Err(_) => return Err(QuotaError::Unknown),
-    };
-    extract_token(&raw)
+    std::fs::read_to_string(path).map_err(|_| QuotaError::Unknown)
 }
 
 #[cfg(target_os = "macos")]
-fn read_from_keychain(cli_config_dir: &Path) -> Result<String, QuotaError> {
+fn read_from_keychain(cli_config_dir: &Path) -> Result<StoredCredentials, QuotaError> {
     let service = keychain_service_for(cli_config_dir);
     // Account name is the current macOS user. Fall back to the empty
     // string if USER isn't set — `security` will then return whatever
@@ -104,7 +166,10 @@ fn read_from_keychain(cli_config_dir: &Path) -> Result<String, QuotaError> {
         Ok(text) => text,
         Err(_) => return Err(QuotaError::Unknown),
     };
-    extract_token(raw.trim())
+    Ok(StoredCredentials {
+        document: raw.trim().to_owned(),
+        source: CredentialSource::Keychain { service, account },
+    })
 }
 
 /// Picks the macOS Keychain service name Claude Code actually wrote to for
@@ -126,7 +191,7 @@ fn keychain_service_for(cli_config_dir: &Path) -> String {
 /// to Claude Code on this profile yet. Surfacing `NoCredentials` keeps
 /// the UI consistent across platforms.
 #[cfg(not(target_os = "macos"))]
-fn read_from_keychain(_cli_config_dir: &Path) -> Result<String, QuotaError> {
+fn read_from_keychain(_cli_config_dir: &Path) -> Result<StoredCredentials, QuotaError> {
     Err(QuotaError::NoCredentials)
 }
 

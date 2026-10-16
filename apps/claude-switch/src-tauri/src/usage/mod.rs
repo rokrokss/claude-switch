@@ -2,6 +2,7 @@ pub(crate) mod codex;
 pub(crate) mod credentials;
 pub(crate) mod dead_credentials;
 pub(crate) mod metrics;
+pub(crate) mod oauth;
 pub(crate) mod pace;
 pub(crate) mod quota;
 pub(crate) mod refresh;
@@ -154,6 +155,39 @@ pub async fn build(config_dir: &Path, provider: &dyn QuotaProvider) -> ProfileUs
         quota,
         quota_error,
         fetched_at: Utc::now().to_rfc3339(),
+    }
+}
+
+/// Same as `build`, for a Claude profile whose sign-in is renewed here: ahead
+/// of time when it is about to lapse, and once more if the usage endpoint
+/// refuses it anyway. A refresh token the endpoint refuses marks the access
+/// token dead, which reads as `NeedsLogin` until the profile signs in again.
+pub async fn build_with_renewal(
+    cli_config_dir: &Path,
+    provider: &dyn QuotaProvider,
+    dead_credentials: &dead_credentials::DeadCredentialRegistry,
+) -> ProfileUsage {
+    // Not due, nothing to renew with, or a passing failure: the fetch says
+    // what that means.
+    let _ = oauth::renew(cli_config_dir, None).await;
+    let first = build(cli_config_dir, provider).await;
+    if !matches!(first.quota_error, Some(QuotaError::Unauthorized)) {
+        return first;
+    }
+    let refused = credentials::read_access_token(cli_config_dir).ok();
+    match oauth::renew(cli_config_dir, refused.as_deref()).await {
+        oauth::Renewal::Renewed => build(cli_config_dir, provider).await,
+        oauth::Renewal::Dead => {
+            if let Some(token) = refused {
+                dead_credentials.mark_dead(&token);
+            }
+            ProfileUsage {
+                quota: None,
+                quota_error: Some(QuotaError::NeedsLogin),
+                fetched_at: Utc::now().to_rfc3339(),
+            }
+        }
+        oauth::Renewal::Unchanged | oauth::Renewal::Failed => first,
     }
 }
 
