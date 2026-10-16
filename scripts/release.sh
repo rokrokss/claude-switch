@@ -13,6 +13,11 @@
 # Without --publish it stops there and prints the gh commands; with --publish
 # it uploads the DMG, the tarball and latest.json to the v<version> release.
 # The version comes from tauri.conf.json. See docs/releasing.md.
+#
+# With ICLOUD_PROVISIONING_PROFILE pointing at the Developer ID provisioning
+# profile, the app is signed for iCloud and can sync usage history between
+# Macs; without it, it is built as before and Settings says iCloud isn't
+# available in this build.
 
 set -euo pipefail
 
@@ -30,6 +35,7 @@ if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
     TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(security find-generic-password -s claude-switch-updater -w)"
 fi
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+ICLOUD_PROVISIONING_PROFILE="${ICLOUD_PROVISIONING_PROFILE:-}"
 
 VERSION="$(jq -r .version "$TAURI_DIR/tauri.conf.json")"
 TAG="v$VERSION"
@@ -44,8 +50,17 @@ green() { printf '\033[32m%s\033[0m\n' "$1"; }
 # 1. Build. The updater key is only needed because createUpdaterArtifacts is
 #    on; the tarball the bundler makes predates the notarization ticket, so
 #    step 3 replaces it.
+#    With an iCloud profile, the entitlements it allows are rendered first and
+#    merged into the config, which embeds the profile too.
+build_config=()
+if [ -n "$ICLOUD_PROVISIONING_PROFILE" ]; then
+    green "Signing for iCloud with $ICLOUD_PROVISIONING_PROFILE…"
+    build_config=(--config "$("$ROOT/scripts/icloud-config.sh" "$ICLOUD_PROVISIONING_PROFILE" "$TAURI_DIR/target/icloud")")
+fi
 green "Building claude-switch $VERSION…"
-TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY" pnpm --filter claude-switch tauri build --target universal-apple-darwin
+# The ${…+…} form keeps bash 3.2 from calling an empty array unbound.
+TAURI_SIGNING_PRIVATE_KEY="$SIGNING_KEY" pnpm --filter claude-switch tauri build --target universal-apple-darwin \
+    ${build_config[@]+"${build_config[@]}"}
 
 # 2. Notarize the DMG (Apple notarizes the app inside it with it), then staple
 #    the ticket to both so each passes Gatekeeper offline.

@@ -25,6 +25,7 @@ Each release therefore carries three files:
 
 - **Updater signing key**: the private key is `~/.tauri/claude-switch.key`. Its password is in the login keychain under the service `claude-switch-updater`. Its public half, `~/.tauri/claude-switch.key.pub`, is the `pubkey` in `tauri.conf.json`. **Back up the key and the password**, for example in a password manager. Without them no new release can update existing installs. A new key would mean every user downloads one release by hand, as with 1.4.0 below.
 - **GitHub CLI** signed in with write access to the repository (`gh auth status`), and `jq`.
+- **iCloud provisioning profile**: the Developer ID profile `Claude Switch Developer ID`, for the App ID `app.claude-switch` with the iCloud container `iCloud.app.claude-switch`, kept at `~/.tauri/claude-switch.provisionprofile`. Set `ICLOUD_PROVISIONING_PROFILE` to its path when running the script. [`scripts/icloud-config.sh`](../scripts/icloud-config.sh) checks it, signs the app with the entitlements it allows, and embeds it. Without the variable, the release builds without iCloud and its Settings say sync isn't available. Developer ID profiles don't expire for years, but changing the App ID's capabilities invalidates the profile; download it again after any change.
 
 The script's defaults can be overridden with `SIGNING_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`, `NOTARY_PROFILE` and `APPLE_SIGNING_IDENTITY`.
 
@@ -35,7 +36,7 @@ The script's defaults can be overridden with `SIGNING_KEY`, `TAURI_SIGNING_PRIVA
 3. Run the script without `--publish`:
 
    ```sh
-   scripts/release.sh notes.md
+   ICLOUD_PROVISIONING_PROFILE=~/.tauri/claude-switch.provisionprofile scripts/release.sh notes.md
    ```
 
    It builds, notarizes, staples, and writes the three files to `apps/claude-switch/src-tauri/target/release-assets/v<version>/`. It then prints the DMG's SHA-256 and the `gh` commands that would publish them.
