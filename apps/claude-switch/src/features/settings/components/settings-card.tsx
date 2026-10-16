@@ -3,11 +3,23 @@ import type { ReactNode } from 'react'
 /**
  * A Settings section: its small-caps title, then a card of rows.
  */
-export function SettingsSection({ title, children }: { title: string; children: ReactNode }) {
+export function SettingsSection({
+  title,
+  action,
+  children,
+}: {
+  title: string
+  /**
+   * A control beside the title, e.g. Undo.
+   */
+  action?: ReactNode
+  children: ReactNode
+}) {
   return (
     <section className="mb-8">
-      <div className="mb-2.5 flex items-center justify-between">
+      <div className="mb-2.5 flex min-h-7 items-center justify-between">
         <span className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-muted-strong">{title}</span>
+        {action}
       </div>
       <div className="rounded-xl border border-border bg-white dark:bg-cream-2">{children}</div>
     </section>

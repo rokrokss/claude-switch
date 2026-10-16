@@ -19,6 +19,25 @@ pub fn bundle_identifier(profile: &Profile) -> String {
     )
 }
 
+/// Architectures a script launcher asks macOS to run it as, most preferred
+/// first. A script carries no architecture of its own, so without this macOS
+/// runs the launcher, and whatever it execs, under Rosetta on Apple silicon.
+/// Intel second, so the same launcher still opens on an Intel Mac.
+pub const ARCHITECTURE_PRIORITY: [&str; 2] = ["arm64", "x86_64"];
+
+/// Whether `info`, a script launcher's Info.plist, asks for
+/// [`ARCHITECTURE_PRIORITY`].
+pub fn architectures_set(info: &Dictionary) -> bool {
+    info.get("LSArchitecturePriority")
+        .and_then(Value::as_array)
+        .is_some_and(|archs| {
+            archs
+                .iter()
+                .map(Value::as_string)
+                .eq(ARCHITECTURE_PRIORITY.map(Some))
+        })
+}
+
 /// The launcher's name in Finder and, for a wrapper, the Dock: `Claude (Work)`.
 pub fn display_name(profile: &Profile) -> String {
     format!("{} ({})", profile.app.spec().display_name, profile.name)
@@ -53,6 +72,15 @@ pub fn info_plist(profile: &Profile, version: &str) -> AppResult<Vec<u8>> {
         Value::String("12.0".into()),
     );
     dict.insert("NSHighResolutionCapable".into(), Value::Boolean(true));
+    dict.insert(
+        "LSArchitecturePriority".into(),
+        Value::Array(
+            ARCHITECTURE_PRIORITY
+                .iter()
+                .map(|arch| Value::String((*arch).into()))
+                .collect(),
+        ),
+    );
     // Don't hide the Dock icon — the launcher exits quickly after exec-ing the
     // real Claude.app, so a fleeting tile is acceptable. Set explicitly to
     // make the intent unambiguous.
@@ -133,6 +161,26 @@ mod tests {
         let xml = String::from_utf8(body).unwrap();
         assert!(xml.contains("<string>Claude (Acme &amp; Co)</string>"));
         assert!(!xml.contains("Acme & Co"));
+    }
+
+    #[test]
+    fn plist_asks_for_apple_silicon_then_intel() {
+        let body = info_plist(&fixture("Personal"), "0.1.0").unwrap();
+        let info = Value::from_reader_xml(body.as_slice())
+            .unwrap()
+            .into_dictionary()
+            .unwrap();
+        assert!(architectures_set(&info));
+
+        let mut intel_first = info.clone();
+        intel_first.insert(
+            "LSArchitecturePriority".into(),
+            Value::Array(vec!["x86_64".into(), "arm64".into()]),
+        );
+        assert!(!architectures_set(&intel_first));
+        let mut unset = info;
+        unset.remove("LSArchitecturePriority");
+        assert!(!architectures_set(&unset));
     }
 
     #[test]

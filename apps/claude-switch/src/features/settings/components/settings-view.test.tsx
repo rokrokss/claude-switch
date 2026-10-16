@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 
 import { invoke } from '@tauri-apps/api/core'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -39,6 +39,43 @@ const DEFAULT_STATE = {
   themeMode: 'system' as const,
   settings: defaultSettings,
 }
+
+const trayEntries = [
+  {
+    id: 'p1',
+    app: 'claude',
+    name: 'Work',
+    command: 'claude-work',
+    plan: null,
+    usage: null,
+    metrics: [
+      {
+        id: 'session',
+        label: 'Session',
+        kind: 'meter',
+        used: 1,
+        limit: 100,
+        unit: { type: 'percent' },
+        resetsAt: null,
+        periodSecs: null,
+        notStarted: false,
+      },
+      {
+        id: 'weekly',
+        label: 'Weekly',
+        kind: 'meter',
+        used: 1,
+        limit: 100,
+        unit: { type: 'percent' },
+        resetsAt: null,
+        periodSecs: null,
+        notStarted: false,
+      },
+      { id: 'resets', label: 'Rate limit resets', kind: 'values', values: [{ amount: 2, unit: { type: 'count' } }] },
+    ],
+    error: null,
+  },
+]
 
 const DEFAULT_EXISTING = {
   guiPath: null,
@@ -92,6 +129,7 @@ function primeInitialLoads({
     login_item: () => 'off',
     update_app_state: () => state,
     set_login_item: (args) => ((args as { enabled: boolean }).enabled ? 'on' : 'off'),
+    tray_usage: () => trayEntries,
   }
   mockInvoke.mockImplementation(async (command: string, args?: unknown) => {
     const answer = answers[command]
@@ -103,6 +141,41 @@ function primeInitialLoads({
 }
 
 describe('SettingsView', () => {
+  it('moves a metric on demand, and undoes it', async () => {
+    primeInitialLoads()
+    renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)
+    const user = userEvent.setup()
+    const where = await screen.findByRole('radiogroup', { name: 'Where Session shows' })
+    await user.click(within(where).getByText('On demand'))
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('update_app_state', {
+        patch: {
+          settings: {
+            layout: {
+              ...defaultSettings.layout,
+              profiles: { p1: { alwaysVisible: ['weekly'], onDemand: ['resets', 'session'] } },
+            },
+            menuBar: defaultSettings.menuBar,
+          },
+        },
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Undo' }))
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenLastCalledWith('update_app_state', {
+        patch: { settings: { layout: defaultSettings.layout, menuBar: defaultSettings.menuBar } },
+      }),
+    )
+  })
+
+  it('refuses a third star for the menu bar', async () => {
+    primeInitialLoads()
+    renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Star Rate limit resets for the menu bar' }))
+    expect(await screen.findByText('Up to 2 stars per profile')).toBeInTheDocument()
+  })
+
   it('saves a usage display setting as its whole group', async () => {
     primeInitialLoads()
     renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)

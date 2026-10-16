@@ -84,7 +84,9 @@ pub fn generate(profile: &Profile, version: &str) -> AppResult<PathBuf> {
 ///
 /// The config home is checked on its own because launchers built before they
 /// set it can carry the version string of a build that does, as a development
-/// build does until release-please bumps it.
+/// build does until release-please bumps it. So are a script launcher's
+/// architectures, for the same reason: one built before it named them runs
+/// under Rosetta on Apple silicon.
 pub fn outdated(profile: &Profile, bundle: &Path, version: &str) -> bool {
     if !bundle.exists() || !is_ours(bundle) {
         return false;
@@ -102,6 +104,9 @@ pub fn outdated(profile: &Profile, bundle: &Path, version: &str) -> bool {
         return true;
     }
     if script && !handoff_current(bundle, profile.signed_clone) {
+        return true;
+    }
+    if script && !plist::architectures_set(&info) {
         return true;
     }
     let built_by = if script {
