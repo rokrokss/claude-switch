@@ -385,12 +385,15 @@ pub fn show_panel(app: &AppHandle) {
 }
 
 fn on_screen(panel: &WebviewWindow, icon: &Rect) -> bool {
+    monitor_under(panel, icon).is_some()
+}
+
+/// The screen the item is on, if it's on one. macOS looks the point up in
+/// points, not the pixels the rest of the placement works in.
+fn monitor_under(panel: &WebviewWindow, icon: &Rect) -> Option<tauri::Monitor> {
     let scale = panel.scale_factor().unwrap_or(1.0);
-    let position = icon.position.to_physical::<f64>(scale);
-    matches!(
-        panel.monitor_from_point(position.x, position.y),
-        Ok(Some(_))
-    )
+    let point = icon.position.to_logical::<f64>(scale);
+    panel.monitor_from_point(point.x, point.y).ok().flatten()
 }
 
 fn open_panel(app: &AppHandle, panel: &WebviewWindow, icon: Rect) {
@@ -439,8 +442,8 @@ fn place_panel(panel: &WebviewWindow, icon: Rect) {
     let margin = PANEL_MARGIN * scale;
     let mut x = position.x + icon_size.width / 2.0 - width / 2.0;
     let mut y = position.y + icon_size.height + margin;
-    match panel.monitor_from_point(position.x, position.y) {
-        Ok(Some(monitor)) => {
+    match monitor_under(panel, &icon) {
+        Some(monitor) => {
             let left = f64::from(monitor.position().x) + margin;
             let right = f64::from(monitor.position().x) + f64::from(monitor.size().width) - margin;
             x = x.min(right - width).max(left);
