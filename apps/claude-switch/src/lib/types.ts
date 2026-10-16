@@ -346,6 +346,14 @@ export type ResetOutcome = 'reset' | 'nothingToReset' | 'noCredit' | 'failed'
 export type LoginItem = 'on' | 'off' | 'needsApproval' | 'unavailable'
 
 /**
+ * A model Codex usage without a price of its own can be estimated at.
+ */
+export type FallbackModel = {
+  id: string
+  title: string
+}
+
+/**
  * Whether the menu bar's fetch is running, and when the next is due.
  */
 export type TrayStatus = {

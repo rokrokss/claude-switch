@@ -131,6 +131,8 @@ function primeInitialLoads({
     set_login_item: (args) => ((args as { enabled: boolean }).enabled ? 'on' : 'off'),
     tray_usage: () => trayEntries,
     command_line: () => ({ path: '~/.local/bin/claude-switch', state: 'notInstalled' }),
+    codex_fallback_models: () => [{ id: 'gpt-5.5', title: 'GPT 5.5' }],
+    refresh_usage: () => undefined,
   }
   mockInvoke.mockImplementation(async (command: string, args?: unknown) => {
     const answer = answers[command]
@@ -198,6 +200,20 @@ describe('SettingsView', () => {
     await user.click(login)
     await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('set_login_item', { enabled: true }))
     await waitFor(() => expect(login).toHaveAttribute('aria-checked', 'true'))
+  })
+
+  it('prices unknown Codex models at a chosen model, then works spend out again', async () => {
+    primeInitialLoads()
+    renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('combobox', { name: 'Price unknown Codex models as' }))
+    await user.click(await screen.findByRole('option', { name: 'GPT 5.5' }))
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('update_app_state', {
+        patch: { settings: { advanced: { ...defaultSettings.advanced, codexFallbackModel: 'gpt-5.5' } } },
+      }),
+    )
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('refresh_usage'))
   })
 
   it('records a shortcut for the panel', async () => {

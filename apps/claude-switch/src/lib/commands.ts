@@ -9,6 +9,7 @@ import type {
   Dependencies,
   ExistingInstallInfo,
   ExistingInstallSizes,
+  FallbackModel,
   ImportExistingInput,
   LaunchResult,
   LoginItem,
@@ -234,6 +235,13 @@ export function claimCodexReset(profileId: string, expiresAt: number): Promise<R
  */
 export function hapticTick(): Promise<void> {
   return invoke('haptic_tick')
+}
+
+/**
+ * The models Codex usage without a price can be estimated at.
+ */
+export function getCodexFallbackModels(): Promise<Array<FallbackModel>> {
+  return invoke<Array<FallbackModel>>('codex_fallback_models')
 }
 
 /**

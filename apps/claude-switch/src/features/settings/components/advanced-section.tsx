@@ -3,10 +3,14 @@ import type { Settings } from '@/lib/types'
 
 import { useState } from 'react'
 
+import { useQuery } from '@tanstack/react-query'
+
 import { Button, Dialog, Kbd, Segmented, Switch, useToast } from '@/design'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/design/ui/select'
 import { useAppState } from '@/lib/app-state/use-app-state'
-import { getLogFile, openInFinder } from '@/lib/commands'
+import { getCodexFallbackModels, getLogFile, openInFinder, refreshUsage } from '@/lib/commands'
 import { extractErrorMessage } from '@/lib/extract-error-message'
+import { queryKeys } from '@/lib/query/keys'
 import { defaultSettings } from '@/lib/settings'
 
 import { SettingRow, SettingsSection } from './settings-card'
@@ -21,7 +25,41 @@ const levelOptions: ReadonlyArray<SegmentedOption<LogLevel>> = [
 ]
 
 /**
- * Update checks, the log, and putting the menu bar's and the panel's
+ * Select's stand-in for no fallback: an item can't have an empty value.
+ */
+const noFallback = 'none'
+
+/**
+ * The model Codex usage without a price is estimated at, if any. Spend is
+ * worked out again right away.
+ */
+function CodexFallbackRow({ value, onChange }: { value: string | null; onChange: (model: string | null) => void }) {
+  const { data: models = [] } = useQuery({ queryKey: queryKeys.codexFallbackModels, queryFn: getCodexFallbackModels })
+  return (
+    <SettingRow
+      title="Price unknown Codex models as"
+      description="Spend leaves out Codex models no price list knows yet. Pick a model to estimate them at its rates instead."
+      control={
+        <Select value={value ?? noFallback} onValueChange={(next) => onChange(next === noFallback ? null : next)}>
+          <SelectTrigger aria-label="Price unknown Codex models as" className="w-44 py-1.5 text-[12.5px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={noFallback}>Leave them out</SelectItem>
+            {models.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
+                {model.title}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      }
+    />
+  )
+}
+
+/**
+ * Update checks, the log, spend estimates, and putting the menu bar's and the panel's
  * settings back as they came.
  */
 export function AdvancedSection() {
@@ -90,6 +128,14 @@ export function AdvancedSection() {
               </Button>
             </div>
           }
+        />
+        <CodexFallbackRow
+          value={advanced.codexFallbackModel}
+          onChange={(codexFallbackModel) => {
+            void appState
+              .update({ settings: { advanced: { ...advanced, codexFallbackModel } } })
+              .then(() => refreshUsage())
+          }}
         />
         <SettingRow
           title="Reset all settings"

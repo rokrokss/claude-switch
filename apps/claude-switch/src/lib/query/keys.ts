@@ -45,5 +45,6 @@ export const queryKeys = {
   appState: ['app-state'] as const,
   notificationPermission: ['notification-permission'] as const,
   commandLine: ['command-line'] as const,
+  codexFallbackModels: ['codex-fallback-models'] as const,
   shell: ['shell'] as const,
 } as const
