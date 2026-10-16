@@ -56,6 +56,7 @@ tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-global-shortcut = "2"
+tauri-plugin-single-instance = "2"
 
 # Focus / reopen a specific already-running Claude instance by PID
 # (single-instance launch behaviour). Already present transitively via tauri.
@@ -69,6 +70,7 @@ objc2-app-kit = { version = "0.3", features = [
     "NSFontDescriptor",
     "NSGraphics",
     "NSGraphicsContext",
+    "NSHapticFeedback",
     "NSImage",
     "NSImageRep",
     "NSResponder",

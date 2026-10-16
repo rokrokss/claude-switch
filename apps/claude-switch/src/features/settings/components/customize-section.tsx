@@ -1,4 +1,4 @@
-import type { DragEndEvent } from '@dnd-kit/core'
+import type { DragEndEvent, DragOverEvent } from '@dnd-kit/core'
 import type { SegmentedOption } from '@/design'
 import type { Settings, TrayEntry } from '@/lib/types'
 import type { CustomizeRow, Place } from '../lib/customize'
@@ -19,7 +19,7 @@ import { Button, cn, Segmented } from '@/design'
 import { BrandMark } from '@/features/profiles/components/brand-mark'
 import { canStar, starsFor, toggleStar } from '@/features/tray/lib/stars'
 import { useAppState } from '@/lib/app-state/use-app-state'
-import { getTrayUsage } from '@/lib/commands'
+import { getTrayUsage, hapticTick } from '@/lib/commands'
 
 import { customizeRows, layoutOf, moveTo, reorder, withoutLayout } from '../lib/customize'
 import { SettingsSection } from './settings-card'
@@ -183,7 +183,7 @@ function PlaceGroup({ title, rows, stars, onReorder, onPlace, onStar }: GroupPro
   return (
     <div className="mt-2">
       <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-strong">{title}</div>
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragOver={snapTick} onDragEnd={handleDragEnd}>
         <SortableContext items={rows.map((row) => row.id)} strategy={verticalListSortingStrategy}>
           <div className="rounded-lg border border-border-soft">
             {rows.map((row) => (
@@ -252,6 +252,24 @@ function SortableMetricRow({ row, starred, onPlace, onStar }: RowProps) {
       />
     </div>
   )
+}
+
+/**
+ * When the last snap tap was played, so a fast drag doesn't buzz.
+ */
+let lastTick = 0
+
+/**
+ * A trackpad tap each time the dragged row moves to another slot.
+ */
+function snapTick({ over }: DragOverEvent) {
+  const now = Date.now()
+  if (over && now - lastTick >= 120) {
+    lastTick = now
+    hapticTick().catch(() => {
+      // No Force Touch trackpad, or not on macOS: the tap is a nicety.
+    })
+  }
 }
 
 /**

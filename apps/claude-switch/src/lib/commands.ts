@@ -194,6 +194,13 @@ export function claimCodexReset(profileId: string, expiresAt: number): Promise<R
 }
 
 /**
+ * One light trackpad tap, for a dragged row snapping into a slot.
+ */
+export function hapticTick(): Promise<void> {
+  return invoke('haptic_tick')
+}
+
+/**
  * Where claude-switch writes its log.
  */
 export function getLogFile(): Promise<string | null> {

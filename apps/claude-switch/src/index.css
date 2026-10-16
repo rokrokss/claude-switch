@@ -96,3 +96,23 @@ body {
     -webkit-user-select: text;
   }
 }
+
+/*
+ * The menu bar panel's party mode (the Konami code): meters fill with a
+ * rainbow, sliding unless animations are reduced.
+ */
+.party-fill {
+  background-image: linear-gradient(90deg, #ff5f6d, #ffc371, #47e3a4, #4fb3ff, #b06bff, #ff5f6d);
+  background-size: 200% 100%;
+}
+
+.party-fill-moving {
+  animation: party-slide 2.4s linear infinite;
+}
+
+@keyframes party-slide {
+  to {
+    background-position: -200% 0;
+  }
+}
+

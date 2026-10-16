@@ -11,6 +11,7 @@ import { useTrayEntries } from '../api/use-tray-entries'
 import { useTrayStatus } from '../api/use-tray-status'
 import { useUpdateNotice } from '../api/use-update-notice'
 import { PanelFooter } from './panel-footer'
+import { PartyContext, usePartyMode } from './party'
 import { ProfileCard } from './profile-card'
 
 /**
@@ -29,6 +30,7 @@ export function TrayPanel() {
   const status = useTrayStatus()
   const { settings, themeMode, hiddenFromMenuBar, update, setShownInMenuBar } = usePanelSettings()
   const [notice, showNotice] = useNotice()
+  const party = usePartyMode()
   const updateVersion = useUpdateNotice()
   const now = useNow()
   const contentRef = useFitWindowToContent()
@@ -36,46 +38,48 @@ export function TrayPanel() {
 
   return (
     <ThemeProvider mode={themeMode}>
-      <div className="h-full overflow-y-auto bg-base text-ink">
-        <div ref={contentRef} className="flex flex-col gap-2 p-2.5">
-          {updateVersion ? (
-            <Banner
-              text={`claude-switch ${updateVersion} is ready to install.`}
-              action="Install…"
-              onAction={() => void openMainWindow()}
-            />
-          ) : null}
-          <FirstRunHint />
-          {entries === null ? <Note>Loading usage…</Note> : null}
-          {entries?.length === 0 ? (
-            <div className="flex flex-col items-start gap-2 px-1 py-2">
-              <Note>No profile reports usage yet. Set up a profile's CLI and sign in to see it here.</Note>
-              <Button size="sm" variant="secondary" onClick={() => void openMainWindow()}>
-                Open claude-switch
-              </Button>
-            </div>
-          ) : null}
-          {entries?.map((entry) => (
-            <ProfileCard
-              key={entry.id}
-              entry={entry}
-              settings={settings}
-              refreshing={status.refreshing}
-              now={now}
-              hidden={hiddenFromMenuBar.includes(entry.id)}
-              onSettingsChange={update}
-              onShownChange={(shown) => setShownInMenuBar(entry.id, shown)}
-              onNotice={showNotice}
-            />
-          ))}
-          {notice ? (
-            <p role="status" className="rounded-md bg-amber/15 px-2 py-1 text-center text-[11.5px] text-ink-soft">
-              {notice}
-            </p>
-          ) : null}
-          <PanelFooter status={status} now={now} />
+      <PartyContext.Provider value={party}>
+        <div className="h-full overflow-y-auto bg-base text-ink">
+          <div ref={contentRef} className="flex flex-col gap-2 p-2.5">
+            {updateVersion ? (
+              <Banner
+                text={`claude-switch ${updateVersion} is ready to install.`}
+                action="Install…"
+                onAction={() => void openMainWindow()}
+              />
+            ) : null}
+            <FirstRunHint />
+            {entries === null ? <Note>Loading usage…</Note> : null}
+            {entries?.length === 0 ? (
+              <div className="flex flex-col items-start gap-2 px-1 py-2">
+                <Note>No profile reports usage yet. Set up a profile's CLI and sign in to see it here.</Note>
+                <Button size="sm" variant="secondary" onClick={() => void openMainWindow()}>
+                  Open claude-switch
+                </Button>
+              </div>
+            ) : null}
+            {entries?.map((entry) => (
+              <ProfileCard
+                key={entry.id}
+                entry={entry}
+                settings={settings}
+                refreshing={status.refreshing}
+                now={now}
+                hidden={hiddenFromMenuBar.includes(entry.id)}
+                onSettingsChange={update}
+                onShownChange={(shown) => setShownInMenuBar(entry.id, shown)}
+                onNotice={showNotice}
+              />
+            ))}
+            {notice ? (
+              <p role="status" className="rounded-md bg-amber/15 px-2 py-1 text-center text-[11.5px] text-ink-soft">
+                {notice}
+              </p>
+            ) : null}
+            <PanelFooter status={status} now={now} />
+          </div>
         </div>
-      </div>
+      </PartyContext.Provider>
     </ThemeProvider>
   )
 }

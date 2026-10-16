@@ -17,6 +17,7 @@ import { openSettings, refreshUsage } from '@/lib/commands'
 import { formatDeadline, formatDuration, meterHeadline, shownFraction, valuesText } from '../lib/format'
 import { paceTick, projectionNote, severityOf } from '../lib/pace'
 import { canStar } from '../lib/stars'
+import { useParty } from './party'
 import { ResetsRow } from './resets-row'
 
 type Meter = Extract<Metric, { kind: 'meter' }>
@@ -161,6 +162,7 @@ function MeterTitle({ meter, display, now }: MeterProps) {
  * projection on hover.
  */
 function MeterBar({ meter, display, now }: MeterProps) {
+  const party = useParty()
   const severity = severityOf(meter.state)
   const fill = shownFraction(meter, display.meterStyle) * 100
   const tick = paceTick(meter, display, now)
@@ -177,19 +179,39 @@ function MeterBar({ meter, display, now }: MeterProps) {
         className="h-1.5 overflow-hidden rounded-full bg-cream-3"
       >
         <div
-          className={cn('h-full rounded-full', severity ? barTone[severity] : 'bg-muted-strong')}
+          className={fillClasses(severity, party, !display.reduceAnimations)}
           style={{ width: `${fill}%`, minWidth: fill > 0 ? 6 : 0 }}
         />
       </div>
-      {tick === null ? null : (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-0.5 h-2.5 w-0.5 rounded-sm bg-ink/55"
-          style={{ left: `calc(${tick * 100}% - 1px)` }}
-        />
-      )}
+      <PaceTick at={tick} />
       {note ? <TooltipBubble>{note}</TooltipBubble> : null}
     </div>
+  )
+}
+
+/**
+ * The bar's fill: coloured by severity, or a rainbow in party mode.
+ */
+function fillClasses(severity: Severity | null, party: boolean, moving: boolean): string {
+  if (party) {
+    return cn('h-full rounded-full party-fill', moving && 'party-fill-moving')
+  }
+  return cn('h-full rounded-full', severity ? barTone[severity] : 'bg-muted-strong')
+}
+
+/**
+ * Where an even pace would be by now, as a mark across the bar.
+ */
+function PaceTick({ at }: { at: number | null }) {
+  if (at === null) {
+    return null
+  }
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute -top-0.5 h-2.5 w-0.5 rounded-sm bg-ink/55"
+      style={{ left: `calc(${at * 100}% - 1px)` }}
+    />
   )
 }
 

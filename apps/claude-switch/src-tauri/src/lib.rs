@@ -8,6 +8,7 @@ mod codex_rpc;
 mod commands;
 mod deps;
 mod error;
+mod haptics;
 mod inherited_env;
 mod launch;
 mod launchers;
@@ -41,7 +42,15 @@ const SKIP_STARTUP_SYNC_ENV: &str = "CLAUDE_SWITCH_SKIP_STARTUP_SYNC";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // One claude-switch at a time: opening it again (from the Finder, say,
+    // while it sits in the menu bar) brings back the running one's window.
+    // Not in a development build, which should run beside the installed app.
+    #[cfg(not(debug_assertions))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        tray::show_main_window(app);
+    }));
+    builder
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Provides `relaunch()` to the frontend so the updater can restart
         // the app itself after `downloadAndInstall` finishes — Tauri 2's
@@ -205,6 +214,7 @@ pub fn run() {
             login_item::login_item,
             login_item::set_login_item,
             logging::log_file,
+            haptics::haptic_tick,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -249,6 +249,28 @@ describe('TrayPanel', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Reset used: your Codex limits start over.')
   })
 
+  it('throws a party on the Konami code', () => {
+    vi.mocked(useTrayEntries).mockReturnValue([makeEntry()])
+    render(<TrayPanel />)
+    const fill = () => screen.getByRole('progressbar', { name: 'Session' }).firstElementChild
+    expect(fill()).not.toHaveClass('party-fill')
+    for (const key of [
+      'ArrowUp',
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowLeft',
+      'ArrowRight',
+      'b',
+      'a',
+    ]) {
+      fireEvent.keyDown(window, { key })
+    }
+    expect(fill()).toHaveClass('party-fill')
+  })
+
   it('says when the next update comes, and updates on a click', async () => {
     vi.mocked(useTrayStatus).mockReturnValue({
       refreshing: false,
