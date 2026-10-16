@@ -34,7 +34,8 @@ import type {
 } from './types'
 
 import { invoke } from '@tauri-apps/api/core'
-import { writeText } from '@tauri-apps/plugin-clipboard-manager'
+import { Image } from '@tauri-apps/api/image'
+import { writeImage, writeText } from '@tauri-apps/plugin-clipboard-manager'
 
 export function listProfiles(): Promise<Array<Profile>> {
   return invoke<Array<Profile>>('list_profiles')
@@ -104,6 +105,18 @@ export function profileAccount(id: string): Promise<AccountStatus> {
 
 export function copyToClipboard(text: string): Promise<void> {
   return writeText(text)
+}
+
+/**
+ * Puts an image on the clipboard: straight RGBA, row by row.
+ */
+export async function copyImageToClipboard(rgba: Uint8Array, width: number, height: number): Promise<void> {
+  const image = await Image.new(rgba, width, height)
+  try {
+    await writeImage(image)
+  } finally {
+    await image.close()
+  }
 }
 
 export function detectExistingInstall(app: AppId): Promise<ExistingInstallInfo> {

@@ -21,6 +21,7 @@ import {
 import { claimCodexReset, openExternalUrl, openSettings, refreshUsage } from '@/lib/commands'
 
 import { cardLayout } from '../lib/layout'
+import { copyAsImage, profileShareCard } from '../lib/share-image'
 import { starsFor, toggleStar } from '../lib/stars'
 import { MetricRow } from './metric-row'
 
@@ -139,6 +140,9 @@ export function ProfileCard({
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => void refreshUsage()}>Update now</ContextMenuItem>
+          <ContextMenuItem onSelect={() => copyAsImage(profileShareCard(entry, settings, now), onNotice)}>
+            Copy as image
+          </ContextMenuItem>
           <ContextMenuItem onSelect={() => void openSettings()}>Settings…</ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>

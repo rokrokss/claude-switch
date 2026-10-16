@@ -3,8 +3,10 @@ import type { Settings, TrayEntry } from '@/lib/types'
 import type { SpendSlice, TotalSpend } from '../lib/total-spend'
 
 import { cn, Segmented } from '@/design'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/design/ui/context-menu'
 
 import { formatCompact, formatCost } from '../lib/format'
+import { copyAsImage, totalSpendShareCard } from '../lib/share-image'
 import { costPerMillion, shareOf, totalSpend } from '../lib/total-spend'
 
 type TotalSpendSettings = Settings['display']['totalSpend']
@@ -38,59 +40,72 @@ type Props = {
   entries: Array<TrayEntry>
   settings: TotalSpendSettings
   onChange: (settings: TotalSpendSettings) => void
+  onNotice: (text: string) => void
 }
 
 /**
  * What every profile spent in a period, read from this Mac's session logs:
  * the total, a bar of each profile's share, and a legend with the figures.
  */
-export function TotalSpendCard({ entries, settings, onChange }: Props) {
+export function TotalSpendCard({ entries, settings, onChange, onNotice }: Props) {
   const total = totalSpend(entries, settings.period)
   return (
-    <section
-      aria-label="Total spend"
-      className="rounded-[10px] border border-border-soft bg-white/40 px-3 py-2 dark:bg-white/[0.03]"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[12.5px] font-medium text-ink">Total spend</h2>
-        <Segmented<Period>
-          ariaLabel="Period"
-          size="small"
-          options={periodOptions}
-          value={settings.period}
-          onChange={(period) => onChange({ ...settings, period })}
-        />
-      </div>
-      {total.slices.length === 0 ? (
-        <p className="mt-1.5 text-[11.5px] text-muted-strong">{nothingIn[settings.period]}</p>
-      ) : (
-        <>
-          <div className="mt-1.5 flex items-center justify-between gap-2">
-            <span className="text-[19px] font-semibold tabular-nums text-ink">
-              {headline(total.cost, total.tokens, settings.metric)}
-            </span>
-            <Segmented<Shown>
-              ariaLabel="Show"
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <section
+          aria-label="Total spend"
+          className="rounded-[10px] border border-border-soft bg-white/40 px-3 py-2 dark:bg-white/[0.03]"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-[12.5px] font-medium text-ink">Total spend</h2>
+            <Segmented<Period>
+              ariaLabel="Period"
               size="small"
-              options={shownOptions}
-              value={settings.metric}
-              onChange={(metric) => onChange({ ...settings, metric })}
+              options={periodOptions}
+              value={settings.period}
+              onChange={(period) => onChange({ ...settings, period })}
             />
           </div>
-          <ShareBar total={total} shown={settings.metric} />
-          <ul className="mt-1.5 space-y-0.5">
-            {total.slices.map((slice) => (
-              <LegendLine
-                key={slice.id}
-                slice={slice}
-                share={shareOf(slice, total, settings.metric)}
-                shown={settings.metric}
-              />
-            ))}
-          </ul>
-        </>
-      )}
-    </section>
+          {total.slices.length === 0 ? (
+            <p className="mt-1.5 text-[11.5px] text-muted-strong">{nothingIn[settings.period]}</p>
+          ) : (
+            <>
+              <div className="mt-1.5 flex items-center justify-between gap-2">
+                <span className="text-[19px] font-semibold tabular-nums text-ink">
+                  {headline(total.cost, total.tokens, settings.metric)}
+                </span>
+                <Segmented<Shown>
+                  ariaLabel="Show"
+                  size="small"
+                  options={shownOptions}
+                  value={settings.metric}
+                  onChange={(metric) => onChange({ ...settings, metric })}
+                />
+              </div>
+              <ShareBar total={total} shown={settings.metric} />
+              <ul className="mt-1.5 space-y-0.5">
+                {total.slices.map((slice) => (
+                  <LegendLine
+                    key={slice.id}
+                    slice={slice}
+                    share={shareOf(slice, total, settings.metric)}
+                    shown={settings.metric}
+                  />
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-52 text-[12px]">
+        <ContextMenuItem
+          disabled={total.slices.length === 0}
+          onSelect={() => copyAsImage(totalSpendShareCard(total, settings), onNotice)}
+        >
+          Copy as image
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 

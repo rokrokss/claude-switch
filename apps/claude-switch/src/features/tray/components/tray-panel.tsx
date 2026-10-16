@@ -65,6 +65,7 @@ export function TrayPanel() {
                 entries={entries}
                 settings={settings.display.totalSpend}
                 onChange={(totalSpend) => update({ display: { ...settings.display, totalSpend } })}
+                onNotice={showNotice}
               />
             ) : null}
             {entries?.map((entry) => (

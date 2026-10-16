@@ -3,5 +3,5 @@
   "identifier": "tray",
   "description": "Capability for the menu bar panel",
   "windows": ["tray"],
-  "permissions": ["core:default", "core:window:allow-set-size"]
+  "permissions": ["core:default", "core:window:allow-set-size", "clipboard-manager:allow-write-image"]
 }
