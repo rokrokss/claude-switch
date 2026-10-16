@@ -61,7 +61,7 @@ pub struct ReqwestUsageClient {
 
 impl ReqwestUsageClient {
     pub fn new(user_agent: String) -> Result<Self, QuotaError> {
-        let client = reqwest::Client::builder()
+        let client = crate::usage::proxy::client_builder()
             .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
             .build()
             .map_err(|_| QuotaError::Network)?;

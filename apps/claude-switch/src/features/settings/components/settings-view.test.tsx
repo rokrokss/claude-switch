@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ThemeProvider, ToastProvider } from '@/design'
+import { defaultSettings } from '@/lib/settings'
 import { renderWithQuery } from '@/test/render-with-query'
 
 import { SettingsView } from './settings-view'
@@ -36,6 +37,7 @@ const DEFAULT_STATE = {
   migrationDismissedAt: null,
   pathBannerDismissedAt: null,
   themeMode: 'system' as const,
+  settings: defaultSettings,
 }
 
 const DEFAULT_EXISTING = {
@@ -77,27 +79,23 @@ function primeInitialLoads({
   existing?: unknown
   metadata?: unknown
 } = {}) {
+  const answers: Record<string, unknown> = {
+    check_dependencies: deps,
+    list_migration_backups: backups,
+    load_app_state: state,
+    detect_shell: shell,
+    get_app_metadata: metadata,
+    command_line: { path: '~/.local/bin/claude-switch', state: 'notInstalled' },
+  }
   mockInvoke.mockImplementation(async (command: string, args?: unknown) => {
-    if (command === 'check_dependencies') {
-      return deps
-    }
-    if (command === 'list_migration_backups') {
-      return backups
-    }
-    if (command === 'load_app_state') {
-      return state
-    }
-    if (command === 'detect_shell') {
-      return shell
-    }
     if (command === 'detect_existing_install') {
       // `existing` describes the Claude stock install under test; Codex
       // detects nothing so exactly one Re-import card renders.
       const app = (args as { app?: string } | undefined)?.app
       return app === 'codex' ? DEFAULT_EXISTING : existing
     }
-    if (command === 'get_app_metadata') {
-      return metadata
+    if (command in answers) {
+      return answers[command]
     }
     throw new Error(`unexpected command in test: ${command}`)
   })

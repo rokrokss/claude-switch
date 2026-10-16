@@ -42,9 +42,13 @@ icns = "0.4.0"
 plist = "1.9.0"
 trash = "5.2.6"
 tauri-plugin-clipboard-manager = "2"
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip", "brotli", "deflate"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip", "brotli", "deflate", "socks"] }
 sha2 = "0.10"
-tokio = { version = "1", features = ["rt", "macros", "process", "time"] }
+tokio = { version = "1", features = ["rt", "macros", "process", "time", "net", "sync"] }
+# The local API (local_api), which serves usage on 127.0.0.1 when turned on.
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
 portable-pty = "0.9.0"
 profile-shim = { path = "shim" }
 

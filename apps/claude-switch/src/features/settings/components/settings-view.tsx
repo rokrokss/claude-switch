@@ -6,6 +6,7 @@ import { PaneLayout } from '@/components/pane-layout'
 import { Button, Kbd } from '@/design'
 
 import { AppearanceSection } from './appearance-section'
+import { CommandLineSection, CommandLineSectionFallback } from './command-line-section'
 import { DataSection, DataSectionFallback } from './data-section'
 import { SettingsFooterRow } from './settings-footer-row'
 import { SystemSection, SystemSectionFallback } from './system-section'
@@ -46,6 +47,9 @@ export function SettingsView({ onClose, onOpenMigration, onOpenAbout }: Props) {
       </Suspense>
       <Suspense fallback={<DataSectionFallback />}>
         <DataSection onReimport={onOpenMigration} />
+      </Suspense>
+      <Suspense fallback={<CommandLineSectionFallback />}>
+        <CommandLineSection />
       </Suspense>
       <SettingsFooterRow onOpenAbout={onOpenAbout} />
     </PaneLayout>

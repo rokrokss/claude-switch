@@ -17,7 +17,7 @@
 //! nothing drawn for a window without data — follow OpenUsage's menu bar
 //! (MIT, <https://github.com/robinebers/openusage>).
 
-mod cache;
+pub(crate) mod cache;
 #[cfg(target_os = "macos")]
 mod render;
 mod strip;
@@ -56,7 +56,7 @@ const POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
 /// answer), the next comes this much sooner.
 const RETRY_AFTER: Duration = Duration::from_secs(60);
 /// A profile whose fetch takes longer than this is given up on until the next.
-const FETCH_DEADLINE: Duration = Duration::from_secs(120);
+pub(crate) const FETCH_DEADLINE: Duration = Duration::from_secs(120);
 /// Opening the panel fetches again only if the last fetch is older than this.
 const REFRESH_ON_OPEN_AFTER: Duration = Duration::from_secs(60);
 /// A click on the item this soon after the panel was hidden is the click that
@@ -180,6 +180,11 @@ pub fn tray_usage(state: tauri::State<'_, TrayState>) -> Option<Vec<TrayEntry>> 
     (fetched || !entries.is_empty()).then(|| for_panel(&entries))
 }
 
+/// The entries as of the last fetch or, before it, as last saved.
+pub(crate) fn entries(app: &AppHandle) -> Vec<TrayEntry> {
+    app.state::<TrayState>().entries.lock().unwrap().clone()
+}
+
 /// From the panel: hides it and shows the main window.
 #[tauri::command]
 pub fn open_main_window(app: AppHandle) {
@@ -295,17 +300,17 @@ fn round_corners(panel: &WebviewWindow) {
 }
 
 /// A profile to report on, before its usage is fetched.
-struct Target {
-    id: String,
-    app: AppKind,
-    name: String,
-    command: String,
+pub(crate) struct Target {
+    pub(crate) id: String,
+    pub(crate) app: AppKind,
+    pub(crate) name: String,
+    pub(crate) command: String,
 }
 
 /// The profiles the item reports on, in the sidebar's order: by app, each
 /// app's stock install before its profiles. Usage is read with the CLI's
 /// sign-in, so only those with the CLI set up have any.
-fn targets() -> AppResult<Vec<Target>> {
+pub(crate) fn targets() -> AppResult<Vec<Target>> {
     let profiles = profiles::load()?;
     let custom_names = app_state::load()
         .map(|state| state.default_profile_names)
@@ -428,10 +433,11 @@ fn for_panel(entries: &[TrayEntry]) -> Vec<TrayEntry> {
 }
 
 /// The user changed what the item or the panel shows: redraws the one and
-/// tells the other, fetching nothing.
+/// tells the other, fetching nothing. Starts or stops the local API too.
 pub fn settings_changed(app: &AppHandle, state: &AppState) {
     let _ = app.emit_to(PANEL_WINDOW, SETTINGS_EVENT, &state.settings);
     redraw(app);
+    crate::local_api::apply(app, state.settings.integrations.local_api);
 }
 
 /// Redraws the item from the figures it has, fetching nothing. With none yet

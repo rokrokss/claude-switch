@@ -43,5 +43,6 @@ export const queryKeys = {
   // just done must not refetch its check.
   sessionRepairCheck: (profileId: string) => ['session-repair-check', profileId] as const,
   appState: ['app-state'] as const,
+  commandLine: ['command-line'] as const,
   shell: ['shell'] as const,
 } as const

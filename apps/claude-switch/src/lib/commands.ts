@@ -5,6 +5,7 @@ import type {
   AppMetadata,
   AppState,
   AppStatePatch,
+  CommandLine,
   Dependencies,
   ExistingInstallInfo,
   ExistingInstallSizes,
@@ -130,6 +131,18 @@ export function detectShell(): Promise<Shell> {
 
 export function installPathHook(shell: Shell): Promise<PathHookOutcome> {
   return invoke<PathHookOutcome>('install_path_hook', { shell })
+}
+
+export function checkCommandLine(): Promise<CommandLine> {
+  return invoke<CommandLine>('command_line')
+}
+
+export function installCommandLine(): Promise<CommandLine> {
+  return invoke<CommandLine>('install_command_line')
+}
+
+export function uninstallCommandLine(): Promise<CommandLine> {
+  return invoke<CommandLine>('uninstall_command_line')
 }
 
 export function loadAppState(): Promise<AppState> {

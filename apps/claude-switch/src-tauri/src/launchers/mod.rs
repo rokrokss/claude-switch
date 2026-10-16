@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod clone;
 pub mod clone_watch;
+pub mod command;
 pub mod gui;
 pub mod icons;
 pub mod link_handler;
