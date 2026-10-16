@@ -11,6 +11,7 @@ mod error;
 mod inherited_env;
 mod launch;
 mod launchers;
+mod login_item;
 mod migration;
 mod path_setup;
 mod paths;
@@ -199,6 +200,8 @@ pub fn run() {
             tray::open_settings,
             tray::open_about,
             tray::quit_app,
+            login_item::login_item,
+            login_item::set_login_item,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -5,10 +5,13 @@ import { Suspense } from 'react'
 import { PaneLayout } from '@/components/pane-layout'
 import { Button, Kbd } from '@/design'
 
+import { AdvancedSection } from './advanced-section'
 import { AppearanceSection } from './appearance-section'
 import { DataSection, DataSectionFallback } from './data-section'
+import { MenuBarSection } from './menu-bar-section'
 import { SettingsFooterRow } from './settings-footer-row'
 import { SystemSection, SystemSectionFallback } from './system-section'
+import { UsageSection } from './usage-section'
 
 type Props = {
   onClose: () => void
@@ -41,12 +44,15 @@ export function SettingsView({ onClose, onOpenMigration, onOpenAbout }: Props) {
       }
     >
       <AppearanceSection />
+      <MenuBarSection />
+      <UsageSection />
       <Suspense fallback={<SystemSectionFallback />}>
         <SystemSection />
       </Suspense>
       <Suspense fallback={<DataSectionFallback />}>
         <DataSection onReimport={onOpenMigration} />
       </Suspense>
+      <AdvancedSection />
       <SettingsFooterRow onOpenAbout={onOpenAbout} />
     </PaneLayout>
   )

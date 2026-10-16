@@ -328,6 +328,13 @@ export type TrayEntry = {
 }
 
 /**
+ * Whether claude-switch opens at login, as macOS has it. `needsApproval`:
+ * turned on, waiting to be allowed in System Settings. `unavailable`: this
+ * copy can't be a login item (a development build).
+ */
+export type LoginItem = 'on' | 'off' | 'needsApproval' | 'unavailable'
+
+/**
  * Whether the menu bar's fetch is running, and when the next is due.
  */
 export type TrayStatus = {

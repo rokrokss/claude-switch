@@ -1,9 +1,25 @@
 import type { SegmentedOption, ThemeMode } from '@/design'
+import type { Settings } from '@/lib/types'
 
 import { Monitor, Moon, Sun } from 'lucide-react'
 
-import { Segmented, useTheme } from '@/design'
+import { Segmented, Switch, useTheme } from '@/design'
 import { useAppState } from '@/lib/app-state/use-app-state'
+
+import { SettingRow } from './settings-card'
+
+type Display = Settings['display']
+
+const densityOptions: ReadonlyArray<SegmentedOption<Display['density']>> = [
+  { value: 'default', label: 'Default' },
+  { value: 'compact', label: 'Compact' },
+]
+
+const timeOptions: ReadonlyArray<SegmentedOption<Display['timeFormat']>> = [
+  { value: 'auto', label: 'System' },
+  { value: '12h', label: '12-hour' },
+  { value: '24h', label: '24-hour' },
+]
 
 const themeOptions: ReadonlyArray<SegmentedOption<ThemeMode>> = [
   {
@@ -56,6 +72,61 @@ export function AppearanceSection() {
         </span>
       </div>
       <Segmented<ThemeMode> ariaLabel="Theme" options={themeOptions} value={theme.mode} onChange={handleChange} />
+      <MenuBarPanelAppearance />
     </section>
+  )
+}
+
+/**
+ * How the menu bar's panel is laid out and moves.
+ */
+function MenuBarPanelAppearance() {
+  const appState = useAppState()
+  const display = appState.state.settings.display
+
+  function save(next: Display) {
+    void appState.update({ settings: { display: next } })
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-border bg-white dark:bg-cream-2">
+      <SettingRow
+        title="Panel density"
+        description="Compact fits more profiles in the menu bar's panel."
+        control={
+          <Segmented<Display['density']>
+            ariaLabel="Panel density"
+            size="small"
+            options={densityOptions}
+            value={display.density}
+            onChange={(density) => save({ ...display, density })}
+          />
+        }
+      />
+      <SettingRow
+        title="Time format"
+        description="How the panel prints times of day."
+        control={
+          <Segmented<Display['timeFormat']>
+            ariaLabel="Time format"
+            size="small"
+            options={timeOptions}
+            value={display.timeFormat}
+            onChange={(timeFormat) => save({ ...display, timeFormat })}
+          />
+        }
+      />
+      <SettingRow
+        title="Reduce animations"
+        description="Stills the panel's spinners and transitions. macOS's own Reduce Motion does the same."
+        control={
+          <Switch
+            ariaLabel="Reduce animations"
+            checked={display.reduceAnimations}
+            onChange={(reduceAnimations) => save({ ...display, reduceAnimations })}
+          />
+        }
+      />
+    </div>
   )
 }

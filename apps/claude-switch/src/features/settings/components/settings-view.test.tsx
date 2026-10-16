@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ThemeProvider, ToastProvider } from '@/design'
+import { defaultSettings } from '@/lib/settings'
 import { renderWithQuery } from '@/test/render-with-query'
 
 import { SettingsView } from './settings-view'
@@ -36,6 +37,7 @@ const DEFAULT_STATE = {
   migrationDismissedAt: null,
   pathBannerDismissedAt: null,
   themeMode: 'system' as const,
+  settings: defaultSettings,
 }
 
 const DEFAULT_EXISTING = {
@@ -77,33 +79,66 @@ function primeInitialLoads({
   existing?: unknown
   metadata?: unknown
 } = {}) {
+  const answers: Record<string, (args: unknown) => unknown> = {
+    check_dependencies: () => deps,
+    list_migration_backups: () => backups,
+    load_app_state: () => state,
+    detect_shell: () => shell,
+    // `existing` describes the Claude stock install under test; Codex
+    // detects nothing so exactly one Re-import card renders.
+    detect_existing_install: (args) =>
+      (args as { app?: string } | undefined)?.app === 'codex' ? DEFAULT_EXISTING : existing,
+    get_app_metadata: () => metadata,
+    login_item: () => 'off',
+    update_app_state: () => state,
+    set_login_item: (args) => ((args as { enabled: boolean }).enabled ? 'on' : 'off'),
+  }
   mockInvoke.mockImplementation(async (command: string, args?: unknown) => {
-    if (command === 'check_dependencies') {
-      return deps
+    const answer = answers[command]
+    if (!answer) {
+      throw new Error(`unexpected command in test: ${command}`)
     }
-    if (command === 'list_migration_backups') {
-      return backups
-    }
-    if (command === 'load_app_state') {
-      return state
-    }
-    if (command === 'detect_shell') {
-      return shell
-    }
-    if (command === 'detect_existing_install') {
-      // `existing` describes the Claude stock install under test; Codex
-      // detects nothing so exactly one Re-import card renders.
-      const app = (args as { app?: string } | undefined)?.app
-      return app === 'codex' ? DEFAULT_EXISTING : existing
-    }
-    if (command === 'get_app_metadata') {
-      return metadata
-    }
-    throw new Error(`unexpected command in test: ${command}`)
+    return answer(args)
   })
 }
 
 describe('SettingsView', () => {
+  it('saves a usage display setting as its whole group', async () => {
+    primeInitialLoads()
+    renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('switch', { name: 'Always show pacing' }))
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('update_app_state', {
+        patch: { settings: { display: { ...defaultSettings.display, alwaysShowPacing: true } } },
+      }),
+    )
+  })
+
+  it('turns opening at login on through macOS', async () => {
+    primeInitialLoads()
+    renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)
+    const user = userEvent.setup()
+    const login = await screen.findByRole('switch', { name: 'Open at login' })
+    await waitFor(() => expect(login).toBeEnabled())
+    await user.click(login)
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('set_login_item', { enabled: true }))
+    await waitFor(() => expect(login).toHaveAttribute('aria-checked', 'true'))
+  })
+
+  it('records a shortcut for the panel', async () => {
+    primeInitialLoads()
+    renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Record shortcut' }))
+    await user.keyboard('{Meta>}{Shift>}u{/Shift}{/Meta}')
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('update_app_state', {
+        patch: { settings: { menuBar: { ...defaultSettings.menuBar, shortcut: 'Command+Shift+U' } } },
+      }),
+    )
+  })
+
   it('renders the app version in the footer row', async () => {
     primeInitialLoads()
     renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)

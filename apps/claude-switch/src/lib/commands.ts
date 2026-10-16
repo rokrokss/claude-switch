@@ -10,6 +10,7 @@ import type {
   ExistingInstallSizes,
   ImportExistingInput,
   LaunchResult,
+  LoginItem,
   MigrationBackupInfo,
   MovePlan,
   MoveReport,
@@ -181,6 +182,17 @@ export function getTrayStatus(): Promise<TrayStatus> {
  */
 export function refreshUsage(): Promise<void> {
   return invoke('refresh_usage')
+}
+
+/**
+ * Whether claude-switch opens at login, as macOS has it.
+ */
+export function getLoginItem(): Promise<LoginItem> {
+  return invoke<LoginItem>('login_item')
+}
+
+export function setLoginItem(enabled: boolean): Promise<LoginItem> {
+  return invoke<LoginItem>('set_login_item', { enabled })
 }
 
 /**
