@@ -354,6 +354,41 @@ export type FallbackModel = {
 }
 
 /**
+ * A Mac with a usage history file in iCloud.
+ */
+type SyncDevice = {
+  id: string
+  name: string
+  updatedAt: string
+  thisMac: boolean
+  /**
+   * This Mac's profiles signed in to an account that Mac has history of.
+   */
+  profiles: Array<string>
+}
+
+/**
+ * iCloud sync of the usage history, as Settings shows it. Mirrors
+ * `SyncStatus` in src-tauri/src/usage/sync/mod.rs.
+ */
+export type ICloudSync = {
+  on: boolean
+  syncing: boolean
+  /**
+   * Why sync isn't working, while it isn't.
+   */
+  problem: string | null
+  /**
+   * The files that didn't read, and why.
+   */
+  unreadable: Array<string>
+  /**
+   * Every Mac with a file, this one first, then the most recent.
+   */
+  devices: Array<SyncDevice>
+}
+
+/**
  * Whether the menu bar's fetch is running, and when the next is due.
  */
 export type TrayStatus = {

@@ -32,11 +32,20 @@ pub struct ProfileAccount {
     pub organization: Option<String>,
     /// The subscription, e.g. "Max" or "Pro".
     pub plan: Option<String>,
+    /// What tells this account from every other: Claude's account and
+    /// organization ids, or the ChatGPT workspace and email. Never shown;
+    /// iCloud sync matches histories on a hash of it.
+    #[serde(skip)]
+    pub key: Option<String>,
 }
 
 impl ProfileAccount {
+    /// Whether it names no one. A key alone doesn't.
     fn is_empty(&self) -> bool {
-        *self == ProfileAccount::default()
+        ProfileAccount {
+            key: None,
+            ..self.clone()
+        } == ProfileAccount::default()
     }
 }
 
@@ -256,6 +265,15 @@ fn account_from_claude_json(document: &Value) -> Option<ProfileAccount> {
         name: text("displayName").or_else(|| text("fullName")),
         organization: text("organizationName"),
         plan: text("organizationType").as_deref().map(pretty_plan),
+        // One person's personal and team organizations are separate plans,
+        // so separate accounts. As OpenUsage's `claudeIdentityKey` has it.
+        key: text("accountUuid").map(|account| {
+            match text("organizationUuid") {
+                Some(organization) => format!("claude|{account}|{organization}"),
+                None => format!("claude|{account}"),
+            }
+            .to_lowercase()
+        }),
     };
     (!account.is_empty()).then_some(account)
 }
@@ -281,8 +299,19 @@ fn account_from_codex_auth(document: &Value) -> Option<ProfileAccount> {
             .map(str::to_owned)
     };
     let openai = claims.get("https://api.openai.com/auth");
+    let email = text(claims.get("email"));
+    // The workspace and who is in it, both: either alone may stand for more
+    // than one account. As OpenUsage's `CodexAccountIdentity` has it.
+    let workspace = text(
+        openai
+            .and_then(|auth| auth.get("chatgpt_account_id"))
+            .or_else(|| claims.get("chatgpt_account_id")),
+    );
+    let key = workspace
+        .zip(email.as_ref())
+        .map(|(workspace, email)| format!("codex|{workspace}|{email}").to_lowercase());
     let account = ProfileAccount {
-        email: text(claims.get("email")),
+        email,
         name: text(claims.get("name")),
         organization: text(
             openai
@@ -304,6 +333,7 @@ fn account_from_codex_auth(document: &Value) -> Option<ProfileAccount> {
         plan: text(openai.and_then(|auth| auth.get("chatgpt_plan_type")))
             .as_deref()
             .map(pretty_plan),
+        key,
     };
     (!account.is_empty()).then_some(account)
 }
@@ -374,6 +404,7 @@ mod tests {
                 name: Some("Ada".into()),
                 organization: Some("Ada's Organization".into()),
                 plan: Some("Max".into()),
+                key: None,
             })
         );
     }
@@ -385,6 +416,50 @@ mod tests {
             account_from_claude_json(&json!({ "oauthAccount": { "emailAddress": "  " } })),
             None
         );
+        // An id names no one to show.
+        assert_eq!(
+            account_from_claude_json(&json!({ "oauthAccount": { "accountUuid": "A" } })),
+            None
+        );
+    }
+
+    #[test]
+    fn a_claude_account_is_keyed_by_account_and_organization() {
+        let key = |oauth: Value| {
+            account_from_claude_json(&json!({ "oauthAccount": oauth })).and_then(|a| a.key)
+        };
+        assert_eq!(
+            key(json!({ "emailAddress": "ada@example.com", "accountUuid": "A1", "organizationUuid": "O1" }))
+                .as_deref(),
+            Some("claude|a1|o1")
+        );
+        assert_eq!(
+            key(json!({ "emailAddress": "ada@example.com", "accountUuid": "A1" })).as_deref(),
+            Some("claude|a1")
+        );
+        assert_eq!(key(json!({ "emailAddress": "ada@example.com" })), None);
+    }
+
+    #[test]
+    fn a_codex_account_is_keyed_by_workspace_and_email() {
+        let key = |claims: Value| {
+            account_from_codex_auth(&json!({ "tokens": { "id_token": fake_id_token(claims) } }))
+                .and_then(|a| a.key)
+        };
+        assert_eq!(
+            key(json!({
+                "email": "Ada@Example.com",
+                "https://api.openai.com/auth": { "chatgpt_account_id": "W1" },
+            }))
+            .as_deref(),
+            Some("codex|w1|ada@example.com")
+        );
+        assert_eq!(
+            key(json!({ "email": "ada@example.com", "chatgpt_account_id": "W1" })).as_deref(),
+            Some("codex|w1|ada@example.com")
+        );
+        // Either alone may stand for more than one account.
+        assert_eq!(key(json!({ "email": "ada@example.com" })), None);
     }
 
     /// `{"alg":"none"}` . claims . (empty signature), base64url, unpadded.
@@ -706,6 +781,7 @@ mod tests {
                 name: Some("Ada Lovelace".into()),
                 organization: Some("Personal".into()),
                 plan: Some("Prolite".into()),
+                key: None,
             })
         );
     }

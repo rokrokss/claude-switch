@@ -157,6 +157,7 @@ pub fn run() {
             let local_api =
                 app_state::load().is_ok_and(|state| state.settings.integrations.local_api);
             local_api::apply(app.handle(), local_api);
+            usage::sync::setup(app.handle());
             Ok(())
         })
         // Closing the main window leaves claude-switch running in the menu
@@ -211,6 +212,7 @@ pub fn run() {
             commands::move_session,
             commands::check_session_repair,
             commands::repair_sessions,
+            usage::sync::icloud_sync,
             tray::tray_usage,
             tray::tray_status,
             tray::refresh_usage,
