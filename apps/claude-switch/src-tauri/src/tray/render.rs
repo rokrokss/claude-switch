@@ -8,9 +8,9 @@ use objc2::rc::{autoreleasepool, Retained};
 use objc2::runtime::AnyObject;
 use objc2::AnyThread;
 use objc2_app_kit::{
-    NSAttributedStringNSStringDrawing, NSBitmapImageRep, NSColor, NSCompositingOperation,
-    NSDeviceRGBColorSpace, NSFont, NSFontAttributeName, NSFontWeightBold, NSFontWeightSemibold,
-    NSForegroundColorAttributeName, NSGraphicsContext, NSImage,
+    NSAttributedStringNSStringDrawing, NSBezierPath, NSBitmapImageRep, NSColor,
+    NSCompositingOperation, NSDeviceRGBColorSpace, NSFont, NSFontAttributeName, NSFontWeightBold,
+    NSFontWeightSemibold, NSForegroundColorAttributeName, NSGraphicsContext, NSImage,
 };
 use objc2_foundation::{
     NSAttributedString, NSData, NSDictionary, NSPoint, NSRect, NSSize, NSString,
@@ -99,6 +99,151 @@ pub fn app_mark() -> Rendered {
     }
 }
 
+/// The Bars style: up to four meters as bars in an 18-point square, each a
+/// faint track, its fill, and a fainter remainder past it.
+pub fn bars(fractions: &[f64]) -> Option<Rendered> {
+    if fractions.is_empty() {
+        return None;
+    }
+    autoreleasepool(|_| draw(HEIGHT, || draw_bars(fractions)))
+}
+
+/// claude-switch's mark and name, drawn in place of usage while the screen
+/// is shared or recorded.
+pub fn concealed() -> Option<Rendered> {
+    autoreleasepool(|_| {
+        let font = NSFont::boldSystemFontOfSize(SINGLE_FONT);
+        let label = attributed("claude-switch", &font);
+        let width = MARK + MARK_GAP + label.size().width;
+        draw(width, || {
+            NSColor::blackColor().set();
+            let top = (HEIGHT - MARK) / 2.0 + MARK;
+            for (row, cells) in APP_MARK.iter().enumerate() {
+                for (column, cell) in cells.chars().enumerate() {
+                    if cell == '#' {
+                        NSBezierPath::fillRect(NSRect::new(
+                            NSPoint::new(column as f64, top - (row as f64) - 1.0),
+                            NSSize::new(1.0, 1.0),
+                        ));
+                    }
+                }
+            }
+            let baseline = (HEIGHT - font.capHeight()) / 2.0;
+            let height = label.size().height;
+            label.drawAtPoint(NSPoint::new(
+                MARK + MARK_GAP,
+                baseline - (height - font.ascender()),
+            ));
+        })
+    })
+}
+
+fn draw_bars(fractions: &[f64]) {
+    let side = HEIGHT;
+    let count = fractions.len().clamp(1, 4);
+    let pad = (side * 0.08).round().max(1.0);
+    let gap = (side * 0.03).round().max(1.0);
+    let track_width = side - 2.0 * pad;
+    let rows = count.max(2) as f64;
+    let track_height = ((side - 2.0 * pad - (rows - 1.0) * gap) / rows)
+        .floor()
+        .max(1.0);
+    let radius = (track_height / 3.0).floor().max(1.0);
+    let total = count as f64 * track_height + (count as f64 - 1.0) * gap;
+    let top_offset = pad + ((side - 2.0 * pad - total) / 2.0).floor();
+    for (index, fraction) in fractions.iter().take(count).enumerate() {
+        // From the top, as the glyph is laid out; AppKit counts from the bottom.
+        let top = top_offset + index as f64 * (track_height + gap) + 1.0;
+        let y = side - top - track_height;
+        let rect = |x: f64, width: f64| {
+            NSRect::new(NSPoint::new(pad + x, y), NSSize::new(width, track_height))
+        };
+        fill_rounded(rect(0.0, track_width), radius, 0.16);
+        let fill = bar_fill(track_width, *fraction);
+        if fill.fill_width > 0.0 {
+            fill_rounded(rect(0.0, fill.fill_width), radius, 1.0);
+            if let Some(divider) = fill.divider_x {
+                fill_rounded(rect(divider, fill.remainder_width), radius, 0.24);
+            }
+        }
+    }
+}
+
+fn fill_rounded(rect: NSRect, radius: f64, alpha: f64) {
+    NSColor::colorWithWhite_alpha(0.0, alpha).set();
+    NSBezierPath::bezierPathWithRoundedRect_xRadius_yRadius(rect, radius, radius).fill();
+}
+
+/// A bar's fill and remainder across a track `track_width` points long.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct BarFill {
+    fill_width: f64,
+    remainder_width: f64,
+    /// Where the remainder starts, when one is drawn.
+    divider_x: Option<f64>,
+}
+
+/// Fills between 70% and full are drawn in steps of 15% left, so a nearly
+/// full bar still shows a tail rather than reading as full.
+fn visual_fraction(fraction: f64) -> f64 {
+    if !fraction.is_finite() {
+        return 0.0;
+    }
+    let clamped = fraction.clamp(0.0, 1.0);
+    if clamped > 0.7 && clamped < 1.0 {
+        let quantized = (((1.0 - clamped) / 0.15).ceil() * 0.15).min(1.0);
+        return (1.0 - quantized).max(0.0);
+    }
+    clamped
+}
+
+/// The fill of a bar `fraction` full, keeping a visible remainder of at least
+/// four points (or a fifth of the track) until it is truly full.
+fn bar_fill(track_width: f64, fraction: f64) -> BarFill {
+    let empty = BarFill {
+        fill_width: 0.0,
+        remainder_width: 0.0,
+        divider_x: None,
+    };
+    if !fraction.is_finite() || fraction <= 0.0 {
+        return empty;
+    }
+    let visual = visual_fraction(fraction);
+    if visual >= 1.0 {
+        return BarFill {
+            fill_width: track_width,
+            ..empty
+        };
+    }
+    let min_visible = (track_width * 0.2).round().max(4.0);
+    let max_fill = (track_width - min_visible).max(1.0);
+    let fill_width = (track_width * visual).round().min(max_fill).max(1.0);
+    let remainder_width = (track_width - fill_width)
+        .max(min_visible)
+        .min(track_width - 1.0);
+    BarFill {
+        fill_width,
+        remainder_width,
+        divider_x: Some(track_width - remainder_width),
+    }
+}
+
+fn attributed(text: &str, font: &NSFont) -> Retained<NSAttributedString> {
+    let black = NSColor::blackColor();
+    let keys = unsafe { [NSFontAttributeName, NSForegroundColorAttributeName] };
+    let values: [&AnyObject; 2] = [font.as_ref(), black.as_ref()];
+    let attributes = NSDictionary::from_slices(&keys, &values);
+    // SAFETY: the attributes map AppKit's own keys to a font and a colour,
+    // the types those keys take.
+    unsafe {
+        NSAttributedString::initWithString_attributes(
+            NSAttributedString::alloc(),
+            &NSString::from_str(text),
+            Some(&attributes),
+        )
+    }
+}
+
 /// A group laid out: its mark and its values, ready to draw.
 struct Laid {
     mark: Retained<NSImage>,
@@ -172,23 +317,11 @@ fn lay_out(group: &Group) -> Option<Laid> {
     };
     // Figures of equal width, so a value doesn't change width as its digits do.
     let font = NSFont::monospacedDigitSystemFontOfSize_weight(size, weight);
-    let black = NSColor::blackColor();
-    let keys = unsafe { [NSFontAttributeName, NSForegroundColorAttributeName] };
-    let values: [&AnyObject; 2] = [font.as_ref(), black.as_ref()];
-    let attributes = NSDictionary::from_slices(&keys, &values);
     let lines: Vec<_> = group
         .values
         .iter()
         .map(|value| {
-            // SAFETY: the attributes map AppKit's own keys to a font and a
-            // colour, the types those keys take.
-            let line = unsafe {
-                NSAttributedString::initWithString_attributes(
-                    NSAttributedString::alloc(),
-                    &NSString::from_str(value),
-                    Some(&attributes),
-                )
-            };
+            let line = attributed(value, &font);
             let width = line.size().width;
             (line, width)
         })
@@ -296,6 +429,35 @@ mod tests {
         assert_eq!(one.rgba.len(), (one.width * one.height * 4) as usize);
         assert!(two.width > one.width + (GROUP_GAP * SCALE) as u32);
         assert!(one.rgba.chunks_exact(4).any(|pixel| pixel[3] > 0));
+    }
+
+    #[test]
+    fn nearly_full_bars_keep_a_visible_tail() {
+        assert_eq!(visual_fraction(0.5), 0.5);
+        assert!((visual_fraction(0.97) - 0.85).abs() < 1e-9);
+        assert!((visual_fraction(0.8) - 0.7).abs() < 1e-9);
+        assert_eq!(visual_fraction(1.0), 1.0);
+        let fill = bar_fill(16.0, 0.97);
+        assert!(fill.remainder_width >= 4.0);
+        assert_eq!(fill.divider_x, Some(16.0 - fill.remainder_width));
+    }
+
+    #[test]
+    fn an_empty_or_full_bar_has_no_remainder() {
+        assert_eq!(bar_fill(16.0, 0.0).fill_width, 0.0);
+        let full = bar_fill(16.0, 1.2);
+        assert_eq!((full.fill_width, full.divider_x), (16.0, None));
+    }
+
+    #[test]
+    fn bars_and_the_concealed_mark_are_eighteen_points_tall() {
+        let drawn = bars(&[0.2, 0.9]).unwrap();
+        assert_eq!((drawn.width, drawn.height), (36, 36));
+        assert!(drawn.rgba.chunks_exact(4).any(|pixel| pixel[3] == 255));
+        assert!(bars(&[]).is_none());
+        let concealed = concealed().unwrap();
+        assert_eq!(concealed.height, 36);
+        assert!(concealed.width > 36);
     }
 
     #[test]

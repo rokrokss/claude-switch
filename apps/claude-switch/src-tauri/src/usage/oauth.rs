@@ -600,4 +600,16 @@ mod tests {
         assert_eq!(plan(&pro).as_deref(), Some("Pro"));
         assert_eq!(plan(&OAuthLogin::default()), None);
     }
+
+    /// Renews the real sign-in at `$CLAUDE_SWITCH_RENEW_SMOKE` (a Claude config
+    /// dir, e.g. `~/.claude`) if it is due, and prints only the outcome.
+    #[tokio::test]
+    #[ignore = "renews a real sign-in; opt in via CLAUDE_SWITCH_RENEW_SMOKE"]
+    async fn renew_smoke() {
+        let Ok(dir) = std::env::var("CLAUDE_SWITCH_RENEW_SMOKE") else {
+            eprintln!("set CLAUDE_SWITCH_RENEW_SMOKE=<claude config dir> to run");
+            return;
+        };
+        println!("renewal: {:?}", renew(Path::new(&dir), None).await);
+    }
 }

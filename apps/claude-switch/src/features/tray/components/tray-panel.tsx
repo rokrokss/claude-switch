@@ -27,7 +27,8 @@ const hintKey = 'claude-switch-tray-hint-dismissed'
 export function TrayPanel() {
   const entries = useTrayEntries()
   const status = useTrayStatus()
-  const { settings, themeMode, update } = usePanelSettings()
+  const { settings, themeMode, hiddenFromMenuBar, update, setShownInMenuBar } = usePanelSettings()
+  const [notice, showNotice] = useNotice()
   const updateVersion = useUpdateNotice()
   const now = useNow()
   const contentRef = useFitWindowToContent()
@@ -61,9 +62,17 @@ export function TrayPanel() {
               settings={settings}
               refreshing={status.refreshing}
               now={now}
+              hidden={hiddenFromMenuBar.includes(entry.id)}
               onSettingsChange={update}
+              onShownChange={(shown) => setShownInMenuBar(entry.id, shown)}
+              onNotice={showNotice}
             />
           ))}
+          {notice ? (
+            <p role="status" className="rounded-md bg-amber/15 px-2 py-1 text-center text-[11.5px] text-ink-soft">
+              {notice}
+            </p>
+          ) : null}
           <PanelFooter status={status} now={now} />
         </div>
       </div>
@@ -128,6 +137,21 @@ function FirstRunHint() {
       </button>
     </div>
   )
+}
+
+/**
+ * A short message that clears itself after a few seconds.
+ */
+function useNotice(): [string | null, (text: string) => void] {
+  const [notice, setNotice] = useState<string | null>(null)
+  useEffect(() => {
+    if (notice === null) {
+      return
+    }
+    const id = setTimeout(() => setNotice(null), 3_000)
+    return () => clearTimeout(id)
+  }, [notice])
+  return [notice, setNotice]
 }
 
 /**

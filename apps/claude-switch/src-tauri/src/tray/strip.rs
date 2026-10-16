@@ -14,6 +14,8 @@ use crate::usage::metrics::{id, Metric, MetricValue, Unit};
 /// At most this many of a profile's starred metrics are drawn: two stack
 /// beside its mark.
 const MAX_VALUES: usize = 2;
+/// The Bars glyph holds this many bars.
+const MAX_BARS: usize = 4;
 
 /// The strip, one group per profile that has a value to show, in the order
 /// the profiles were given.
@@ -67,6 +69,48 @@ pub fn build(entries: &[TrayEntry], options: &Options, now: DateTime<Utc>) -> St
     Strip { groups }
 }
 
+/// The Bars style's bars: the first four starred meters, across profiles
+/// in order, each as the share shown (used or left).
+pub fn bars(entries: &[TrayEntry], options: &Options, now: DateTime<Utc>) -> Vec<f64> {
+    entries
+        .iter()
+        .flat_map(|entry| starred(entry, options))
+        .filter_map(|metric| bar(metric, options.meter_style, now))
+        .take(MAX_BARS)
+        .collect()
+}
+
+fn bar(metric: &Metric, meter_style: MeterStyle, now: DateTime<Utc>) -> Option<f64> {
+    let MetricValue::Meter {
+        used,
+        limit,
+        resets_at,
+        ..
+    } = &metric.value
+    else {
+        return None;
+    };
+    if *limit <= 0.0 {
+        return None;
+    }
+    let used = if has_reset(resets_at.as_deref(), now) {
+        0.0
+    } else {
+        (used / limit).clamp(0.0, 1.0)
+    };
+    Some(match meter_style {
+        MeterStyle::Used => used,
+        MeterStyle::Left => 1.0 - used,
+    })
+}
+
+/// Whether a window resetting at `resets_at` has reset by `now`.
+fn has_reset(resets_at: Option<&str>, now: DateTime<Utc>) -> bool {
+    resets_at
+        .and_then(|at| DateTime::parse_from_rfc3339(at).ok())
+        .is_some_and(|at| at <= now)
+}
+
 /// The item's tooltip: which profile each group belongs to, since two
 /// profiles of one app wear the same mark.
 pub fn tooltip(entries: &[TrayEntry], options: &Options, now: DateTime<Utc>) -> String {
@@ -109,11 +153,11 @@ fn value(metric: &Metric, meter_style: MeterStyle, now: DateTime<Utc>) -> Option
         } => {
             // A window whose reset has passed since it was fetched has started
             // over: nothing used until the next fetch says otherwise.
-            let reset = resets_at
-                .as_deref()
-                .and_then(|at| DateTime::parse_from_rfc3339(at).ok())
-                .is_some_and(|at| at <= now);
-            let used = if reset { 0.0 } else { *used };
+            let used = if has_reset(resets_at.as_deref(), now) {
+                0.0
+            } else {
+                *used
+            };
             let shown = match meter_style {
                 MeterStyle::Used => used,
                 MeterStyle::Left => limit - used,
@@ -329,6 +373,25 @@ mod tests {
             strip(&entries, &menu_bar, MeterStyle::Used),
             [["20%", "30%"]]
         );
+    }
+
+    #[test]
+    fn bars_are_the_first_four_starred_meters() {
+        let entries = [
+            entry(AppKind::Claude, vec![session(20.0), weekly(40.0)]),
+            entry(AppKind::Claude, vec![session(60.0), weekly(80.0)]),
+            entry(AppKind::Codex, vec![weekly(10.0)]),
+        ];
+        let options = Options {
+            menu_bar: &MenuBarSettings::default(),
+            meter_style: MeterStyle::Used,
+        };
+        assert_eq!(bars(&entries, &options, now()), [0.2, 0.4, 0.6, 0.8]);
+        let left = Options {
+            meter_style: MeterStyle::Left,
+            ..options
+        };
+        assert_eq!(bars(&entries[2..], &left, now()), [0.9]);
     }
 
     #[test]

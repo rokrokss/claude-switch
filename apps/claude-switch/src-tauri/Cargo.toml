@@ -55,6 +55,7 @@ tempfile = "3.27.0"
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
+tauri-plugin-global-shortcut = "2"
 
 # Focus / reopen a specific already-running Claude instance by PID
 # (single-instance launch behaviour). Already present transitively via tauri.
@@ -93,7 +94,7 @@ objc2-foundation = { version = "0.3", features = [
 ] }
 # Hand the `claude://` scheme to claude-switch while a profile signs in, the way
 # Claude takes it (launchers::link_handler). Already present via objc2-foundation.
-objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFString"] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFDictionary", "CFNumber", "CFString"] }
 objc2-core-services = { version = "0.3", default-features = false, features = ["std", "LaunchServices", "LSInfo"] }
 
 # Profile for the `profile-shim` binary build.rs embeds. One copy is written

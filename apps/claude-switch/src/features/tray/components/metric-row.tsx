@@ -2,12 +2,21 @@ import type { Metric, Settings } from '@/lib/types'
 import type { Placed } from '../lib/layout'
 import type { Severity } from '../lib/pace'
 
-import { Flame } from 'lucide-react'
+import { Flame, Star } from 'lucide-react'
 
 import { cn, TooltipBubble } from '@/design'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/design/ui/context-menu'
+import { openSettings, refreshUsage } from '@/lib/commands'
 
 import { formatDeadline, formatDuration, meterHeadline, shownFraction, valuesText } from '../lib/format'
 import { paceTick, projectionNote, severityOf } from '../lib/pace'
+import { canStar } from '../lib/stars'
 
 type Meter = Extract<Metric, { kind: 'meter' }>
 type Display = Settings['display']
@@ -17,7 +26,12 @@ type Props = {
   display: Display
   now: number
   compact: boolean
+  /**
+   * Whether the metric is starred for the menu bar.
+   */
+  starred: boolean
   onDisplayChange: (display: Display) => void
+  onStarToggle: () => void
 }
 
 const barTone: Record<Severity, string> = {
@@ -37,10 +51,41 @@ const detailClasses = 'text-[11.5px] tabular-nums text-muted-strong'
 const toggleClasses = 'cursor-pointer rounded px-0.5 -mx-0.5 hover:bg-ink/[0.06] hover:text-ink'
 
 /**
- * One metric of a profile's card: a meter, a reading, or — for a metric the
- * user placed that the profile doesn't report — "No data".
+ * One metric of a profile's card, with its right-click menu: stars it for
+ * the menu bar, updates, or opens Settings.
  */
-export function MetricRow({ placed, display, now, compact, onDisplayChange }: Props) {
+export function MetricRow({ starred, onStarToggle, ...props }: Props) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="relative">
+          {starred ? (
+            <Star
+              aria-label="In the menu bar"
+              size={8}
+              className="absolute top-2 -left-2.5 fill-current text-muted-strong"
+            />
+          ) : null}
+          <MetricBody {...props} />
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-52 text-[12px]">
+        <ContextMenuItem disabled={!starred && !canStar(props.placed.id)} onSelect={onStarToggle}>
+          {starred ? 'Remove from menu bar' : 'Star for menu bar'}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => void refreshUsage()}>Update now</ContextMenuItem>
+        <ContextMenuItem onSelect={() => void openSettings()}>Settings…</ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  )
+}
+
+/**
+ * The metric itself: a meter, a reading, or — for a metric the user placed
+ * that the profile doesn't report — "No data".
+ */
+function MetricBody({ placed, display, now, compact, onDisplayChange }: Omit<Props, 'starred' | 'onStarToggle'>) {
   const spacing = compact ? 'py-0.5' : 'py-1'
   if (placed.metric === null) {
     return (

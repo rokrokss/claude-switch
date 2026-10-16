@@ -12,9 +12,17 @@ type PanelSettings = {
   settings: Settings
   themeMode: ThemeMode
   /**
+   * The entries taken out of the menu bar.
+   */
+  hiddenFromMenuBar: Array<string>
+  /**
    * Saves the groups given; the backend tells every window.
    */
   update: (patch: Partial<Settings>) => void
+  /**
+   * Shows an entry in the menu bar, or takes it out.
+   */
+  setShownInMenuBar: (id: string, shown: boolean) => void
 }
 
 /**
@@ -25,12 +33,14 @@ type PanelSettings = {
 export function usePanelSettings(): PanelSettings {
   const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [themeMode, setThemeMode] = useState<ThemeMode>('system')
+  const [hiddenFromMenuBar, setHidden] = useState<Array<string>>([])
 
   useEffect(() => {
     function load() {
       void loadAppState().then((state) => {
         setSettings(state.settings)
         setThemeMode(state.themeMode)
+        setHidden(state.hiddenFromMenuBar)
       })
     }
     load()
@@ -39,9 +49,8 @@ export function usePanelSettings(): PanelSettings {
         load()
       }
     })
-    const unlistenSettings = listen<Settings>('settings-changed', (event) => {
-      setSettings(event.payload)
-    })
+    // A window changed the settings or what the menu bar shows: read both again.
+    const unlistenSettings = listen('settings-changed', load)
     return () => {
       for (const unlisten of [unlistenFocus, unlistenSettings]) {
         void unlisten.then((stop) => {
@@ -57,5 +66,10 @@ export function usePanelSettings(): PanelSettings {
     void updateAppState({ settings: patch })
   }
 
-  return { settings, themeMode, update }
+  function setShownInMenuBar(id: string, shown: boolean) {
+    setHidden((current) => (shown ? current.filter((hidden) => hidden !== id) : [...current, id]))
+    void updateAppState({ menuBar: { id, shown } })
+  }
+
+  return { settings, themeMode, hiddenFromMenuBar, update, setShownInMenuBar }
 }

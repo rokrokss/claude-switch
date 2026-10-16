@@ -18,10 +18,12 @@
 //! (MIT, <https://github.com/robinebers/openusage>).
 
 mod cache;
+mod privacy;
 #[cfg(target_os = "macos")]
 mod render;
 mod strip;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -35,6 +37,7 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, Rect, WebviewWindow, 
 use crate::app_kind::{default_id, AppKind};
 use crate::app_state::AppState;
 use crate::error::AppResult;
+use crate::settings::MenuBarStyle;
 use crate::usage::metrics::{self, Metric};
 use crate::usage::{ProfileUsage, QuotaError};
 use crate::{app_state, commands, migration, profiles};
@@ -45,6 +48,7 @@ pub const MAIN_WINDOW: &str = "main";
 pub const PANEL_WINDOW: &str = "tray";
 const TRAY_ID: &str = "usage";
 const OPEN_ID: &str = "tray-open";
+const SETTINGS_ID: &str = "tray-settings";
 const QUIT_ID: &str = "tray-quit";
 /// Carries the entries to the panel whenever they change.
 const USAGE_EVENT: &str = "tray-usage";
@@ -63,6 +67,8 @@ const POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
 const RETRY_AFTER: Duration = Duration::from_secs(60);
 /// A profile whose fetch takes longer than this is given up on until the next.
 const FETCH_DEADLINE: Duration = Duration::from_secs(120);
+/// How often the screen is checked for capture while usage hides from it.
+const SCREEN_CAPTURE_POLL: Duration = Duration::from_secs(3);
 /// Opening the panel fetches again only if the last fetch is older than this.
 const REFRESH_ON_OPEN_AFTER: Duration = Duration::from_secs(60);
 /// A click on the item this soon after the panel was hidden is the click that
@@ -70,6 +76,8 @@ const REFRESH_ON_OPEN_AFTER: Duration = Duration::from_secs(60);
 const REOPEN_GUARD: Duration = Duration::from_millis(300);
 /// Points between the menu bar and the panel, and kept from a screen edge.
 const PANEL_MARGIN: f64 = 6.0;
+/// The menu bar's height in points, for placing the panel without its item.
+const MENU_BAR_HEIGHT: f64 = 24.0;
 const PANEL_CORNER_RADIUS: f64 = 12.0;
 
 /// A profile the item reports on, as the panel shows it.
@@ -101,6 +109,10 @@ pub struct TrayState {
     refreshed_at: Mutex<Option<Instant>>,
     panel_hidden_at: Mutex<Option<Instant>>,
     status: Mutex<TrayStatus>,
+    /// Usage is hidden because the screen is being captured.
+    concealed: AtomicBool,
+    /// The shortcut that opens the panel, as registered.
+    shortcut: Mutex<Option<String>>,
 }
 
 /// Whether a fetch is running and when the next is due, for the panel's footer.
@@ -122,6 +134,7 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
         app,
         &[
             &MenuItem::with_id(app, OPEN_ID, "Open claude-switch", true, None::<&str>)?,
+            &MenuItem::with_id(app, SETTINGS_ID, "Settings…", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, QUIT_ID, "Quit claude-switch", true, None::<&str>)?,
         ],
@@ -134,6 +147,7 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
             OPEN_ID => show_main_window(app),
+            SETTINGS_ID => open_settings(app.clone()),
             QUIT_ID => app.exit(0),
             _ => {}
         })
@@ -162,6 +176,10 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
     }
 
     redraw(app.handle());
+    watch_screen_capture(app.handle().clone());
+    if let Ok(state) = app_state::load() {
+        apply_shortcut(app.handle(), state.settings.menu_bar.shortcut.as_deref());
+    }
     let handle = app.handle().clone();
     tauri::async_runtime::spawn(async move {
         loop {
@@ -179,6 +197,27 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
         }
     });
     Ok(())
+}
+
+/// While "hide while screen sharing" is on, checks every few seconds whether
+/// the screen is being captured, and redraws the item when that changes.
+fn watch_screen_capture(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let wanted = app_state::load()
+                .map(|state| state.settings.privacy.hide_while_screen_sharing)
+                .unwrap_or(false);
+            let concealed = wanted && privacy::screen_captured();
+            let was = app
+                .state::<TrayState>()
+                .concealed
+                .swap(concealed, Ordering::Relaxed);
+            if was != concealed {
+                redraw(&app);
+            }
+            tokio::time::sleep(SCREEN_CAPTURE_POLL).await;
+        }
+    });
 }
 
 /// Brings the main window back, e.g. after it was closed to the menu bar.
@@ -316,12 +355,24 @@ fn place_panel(panel: &WebviewWindow, icon: Rect) {
     let width = f64::from(size.width);
     let margin = PANEL_MARGIN * scale;
     let mut x = position.x + icon_size.width / 2.0 - width / 2.0;
-    if let Ok(Some(monitor)) = panel.monitor_from_point(position.x, position.y) {
-        let left = f64::from(monitor.position().x) + margin;
-        let right = f64::from(monitor.position().x) + f64::from(monitor.size().width) - margin;
-        x = x.min(right - width).max(left);
+    let mut y = position.y + icon_size.height + margin;
+    match panel.monitor_from_point(position.x, position.y) {
+        Ok(Some(monitor)) => {
+            let left = f64::from(monitor.position().x) + margin;
+            let right = f64::from(monitor.position().x) + f64::from(monitor.size().width) - margin;
+            x = x.min(right - width).max(left);
+        }
+        // The item is out of sight (hidden behind the notch, or opened from
+        // the shortcut): the top right of the main screen, under the menu bar.
+        _ => {
+            if let Ok(Some(monitor)) = panel.primary_monitor() {
+                x = f64::from(monitor.position().x) + f64::from(monitor.size().width)
+                    - width
+                    - margin;
+                y = f64::from(monitor.position().y) + MENU_BAR_HEIGHT * scale + margin;
+            }
+        }
     }
-    let y = position.y + icon_size.height + margin;
     let _ = panel.set_position(PhysicalPosition::new(x, y));
 }
 
@@ -506,7 +557,48 @@ fn for_panel(entries: &[TrayEntry]) -> Vec<TrayEntry> {
 /// tells the other, fetching nothing.
 pub fn settings_changed(app: &AppHandle, state: &AppState) {
     let _ = app.emit_to(PANEL_WINDOW, SETTINGS_EVENT, &state.settings);
+    apply_shortcut(app, state.settings.menu_bar.shortcut.as_deref());
     redraw(app);
+}
+
+/// Registers `shortcut` (e.g. `CommandOrControl+Shift+U`) to open the panel
+/// from anywhere, in place of the one registered before. One macOS or
+/// another app already holds is reported and left unregistered.
+fn apply_shortcut(app: &AppHandle, shortcut: Option<&str>) {
+    use tauri_plugin_global_shortcut::GlobalShortcutExt;
+
+    let state = app.state::<TrayState>();
+    let mut registered = state.shortcut.lock().unwrap();
+    if registered.as_deref() == shortcut {
+        return;
+    }
+    if let Some(old) = registered.take() {
+        let _ = app.global_shortcut().unregister(old.as_str());
+    }
+    if let Some(new) = shortcut.filter(|new| !new.is_empty()) {
+        match app.global_shortcut().register(new) {
+            Ok(()) => *registered = Some(new.to_owned()),
+            Err(err) => eprintln!("claude-switch: could not register the shortcut {new}: {err}"),
+        }
+    }
+}
+
+/// Opens or closes the panel from the global shortcut: under the item, or at
+/// the top right of the main screen when the item is out of sight.
+pub fn toggle_panel_from_shortcut(app: &AppHandle) {
+    let rect = app
+        .tray_by_id(TRAY_ID)
+        .and_then(|tray| tray.rect().ok().flatten());
+    match rect {
+        Some(rect) => toggle_panel(app, rect),
+        None => toggle_panel(
+            app,
+            Rect {
+                position: tauri::Position::Physical(PhysicalPosition::new(-1, -1)),
+                size: tauri::Size::Physical(tauri::PhysicalSize::new(0, 0)),
+            },
+        ),
+    }
 }
 
 /// Redraws the item from the figures it has, fetching nothing. With none yet
@@ -534,7 +626,14 @@ fn draw(app: &AppHandle, entries: &[TrayEntry]) {
         meter_style: state.settings.display.meter_style,
     };
     let now = Utc::now();
-    let strip = strip::build(&entries, &options, now);
+    let look = if app.state::<TrayState>().concealed.load(Ordering::Relaxed) {
+        Look::Concealed
+    } else {
+        match state.settings.menu_bar.style {
+            MenuBarStyle::Text => Look::Text(strip::build(&entries, &options, now)),
+            MenuBarStyle::Bars => Look::Bars(strip::bars(&entries, &options, now)),
+        }
+    };
     let tooltip = strip::tooltip(&entries, &options, now);
     let handle = app.clone();
     // AppKit draws on the main thread.
@@ -542,22 +641,35 @@ fn draw(app: &AppHandle, entries: &[TrayEntry]) {
         let Some(tray) = handle.tray_by_id(TRAY_ID) else {
             return;
         };
-        let _ = tray.set_icon(Some(strip_icon(&strip)));
+        let _ = tray.set_icon(Some(icon(&look)));
         let _ = tray.set_icon_as_template(true);
         let _ = tray.set_tooltip(Some(tooltip));
     });
 }
 
-/// The strip drawn, or claude-switch's mark when it has nothing to show.
+/// What the item shows.
+enum Look {
+    Text(strip::Strip),
+    Bars(Vec<f64>),
+    /// The app's mark and name instead of usage, while the screen is captured.
+    Concealed,
+}
+
+/// `look` drawn, or claude-switch's mark when there is nothing to show.
 #[cfg(target_os = "macos")]
-fn strip_icon(strip: &strip::Strip) -> Image<'static> {
-    render::strip(strip)
+fn icon(look: &Look) -> Image<'static> {
+    let drawn = match look {
+        Look::Text(strip) => render::strip(strip),
+        Look::Bars(fractions) => render::bars(fractions),
+        Look::Concealed => render::concealed(),
+    };
+    drawn
         .map(|drawn| Image::new_owned(drawn.rgba, drawn.width, drawn.height))
         .unwrap_or_else(fallback_icon)
 }
 
 #[cfg(not(target_os = "macos"))]
-fn strip_icon(_strip: &strip::Strip) -> Image<'static> {
+fn icon(_look: &Look) -> Image<'static> {
     fallback_icon()
 }
 

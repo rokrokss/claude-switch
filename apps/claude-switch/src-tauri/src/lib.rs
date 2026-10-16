@@ -52,6 +52,16 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_clipboard_manager::init())
+        // The shortcut that opens the menu bar panel from anywhere (Settings).
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, _shortcut, event| {
+                    if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                        tray::toggle_panel_from_shortcut(app);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             // Bring the desktop launchers an earlier version built up to this
             // one, so every profile changes over now rather than whenever it

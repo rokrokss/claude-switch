@@ -5,15 +5,23 @@ import type { Placed } from '../lib/layout'
 import { AlertTriangle, ChevronDown, LoaderCircle } from 'lucide-react'
 
 import { cn } from '@/design'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/design/ui/context-menu'
 import { BrandMark } from '@/features/profiles/components/brand-mark'
 import {
   formatUpdatedAgo,
   quotaErrorMessage,
   quotaErrorShort,
 } from '@/features/profiles/components/profile-detail-usage-card'
-import { openExternalUrl } from '@/lib/commands'
+import { openExternalUrl, openSettings, refreshUsage } from '@/lib/commands'
 
 import { cardLayout } from '../lib/layout'
+import { starsFor, toggleStar } from '../lib/stars'
 import { MetricRow } from './metric-row'
 
 /**
@@ -37,15 +45,34 @@ type Props = {
   settings: Settings
   refreshing: boolean
   now: number
+  /**
+   * Whether the profile was taken out of the menu bar.
+   */
+  hidden: boolean
   onSettingsChange: (patch: Partial<Settings>) => void
+  onShownChange: (shown: boolean) => void
+  /**
+   * Says something briefly at the foot of the panel, e.g. why a star was refused.
+   */
+  onNotice: (text: string) => void
 }
 
 /**
  * A profile's card: its name and plan, its always-visible metrics, and —
  * opened — its on-demand ones and links to its status and usage pages.
  */
-export function ProfileCard({ entry, settings, refreshing, now, onSettingsChange }: Props) {
+export function ProfileCard({
+  entry,
+  settings,
+  refreshing,
+  now,
+  hidden,
+  onSettingsChange,
+  onShownChange,
+  onNotice,
+}: Props) {
   const layout = cardLayout(entry, settings.layout)
+  const stars = starsFor(settings.menuBar, entry.id)
   const compact = settings.display.density === 'compact'
   const expanded = settings.layout.expanded.includes(entry.id)
   const reportsNothing = layout.alwaysVisible.length === 0 && layout.onDemand.length === 0
@@ -63,7 +90,19 @@ export function ProfileCard({ entry, settings, refreshing, now, onSettingsChange
         display={settings.display}
         now={now}
         compact={compact}
+        starred={!hidden && stars.includes(slot.id)}
         onDisplayChange={(display) => onSettingsChange({ display })}
+        onStarToggle={() => {
+          const result = toggleStar(settings.menuBar, entry.id, slot.id)
+          if ('refused' in result) {
+            onNotice(result.refused)
+            return
+          }
+          onSettingsChange({ menuBar: result.menuBar })
+          if (hidden) {
+            onShownChange(true)
+          }
+        }}
       />
     ))
   }
@@ -75,14 +114,28 @@ export function ProfileCard({ entry, settings, refreshing, now, onSettingsChange
         compact ? 'px-2.5 py-1.5' : 'px-3 py-2',
       )}
     >
-      <CardHeader
-        entry={entry}
-        compact={compact}
-        refreshing={refreshing}
-        now={now}
-        showError={!reportsNothing}
-        reduceAnimations={settings.display.reduceAnimations}
-      />
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div>
+            <CardHeader
+              entry={entry}
+              compact={compact}
+              refreshing={refreshing}
+              now={now}
+              showError={!reportsNothing}
+              reduceAnimations={settings.display.reduceAnimations}
+            />
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-52 text-[12px]">
+          <ContextMenuItem onSelect={() => onShownChange(hidden)}>
+            {hidden ? 'Show in menu bar' : 'Hide from menu bar'}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => void refreshUsage()}>Update now</ContextMenuItem>
+          <ContextMenuItem onSelect={() => void openSettings()}>Settings…</ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
       {reportsNothing ? (
         <p className="py-1 font-mono text-mono text-muted-strong">
           {quotaErrorMessage(entry.app, entry.error ?? 'unknown', entry.command)}
