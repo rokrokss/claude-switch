@@ -1,8 +1,9 @@
 import type { SegmentedOption } from '@/design'
 import type { Settings } from '@/lib/types'
 
-import { Segmented, Switch } from '@/design'
+import { Button, Segmented, Switch } from '@/design'
 import { useAppState } from '@/lib/app-state/use-app-state'
+import { quitApp } from '@/lib/commands'
 
 import { useLoginItem } from '../api/use-login-item'
 import { SettingRow, SettingsSection } from './settings-card'
@@ -17,7 +18,8 @@ const styleOptions: ReadonlyArray<SegmentedOption<Style>> = [
 
 /**
  * Settings for the menu bar item: opening at login, how it looks, the
- * shortcut to its panel, and hiding it from an audience.
+ * shortcut to its panel, hiding it from an audience, and quitting, which
+ * closing the window doesn't.
  */
 export function MenuBarSection() {
   const appState = useAppState()
@@ -82,6 +84,15 @@ export function MenuBarSection() {
             checked={privacy.hideWhileScreenSharing}
             onChange={(hideWhileScreenSharing) => save({ privacy: { ...privacy, hideWhileScreenSharing } })}
           />
+        }
+      />
+      <SettingRow
+        title="Quit claude-switch"
+        description="Closing the window keeps claude-switch in the menu bar. This stops it, menu bar item and all, until you open it again."
+        control={
+          <Button size="sm" variant="secondary" onClick={() => void quitApp()}>
+            Quit
+          </Button>
         }
       />
     </SettingsSection>

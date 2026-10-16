@@ -127,6 +127,7 @@ function primeInitialLoads({
       (args as { app?: string } | undefined)?.app === 'codex' ? DEFAULT_EXISTING : existing,
     get_app_metadata: () => metadata,
     login_item: () => 'off',
+    quit_app: () => undefined,
     update_app_state: () => state,
     set_login_item: (args) => ((args as { enabled: boolean }).enabled ? 'on' : 'off'),
     tray_usage: () => trayEntries,
@@ -200,6 +201,14 @@ describe('SettingsView', () => {
     await user.click(login)
     await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('set_login_item', { enabled: true }))
     await waitFor(() => expect(login).toHaveAttribute('aria-checked', 'true'))
+  })
+
+  it('quits claude-switch altogether, menu bar item and all', async () => {
+    primeInitialLoads()
+    renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Quit' }))
+    await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith('quit_app'))
   })
 
   it('prices unknown Codex models at a chosen model, then works spend out again', async () => {

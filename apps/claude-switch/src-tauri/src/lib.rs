@@ -160,12 +160,16 @@ pub fn run() {
             Ok(())
         })
         // Closing the main window leaves claude-switch running in the menu
-        // bar; the item, the Dock icon or Quit bring it back or end it.
+        // bar alone, its Dock icon gone until the window opens again; the
+        // item brings it back, and Quit (⌘Q, the item's menu, Settings) ends
+        // it.
         .on_window_event(|window, event| {
             if window.label() == tray::MAIN_WINDOW {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     let _ = window.hide();
+                    #[cfg(target_os = "macos")]
+                    let _ = tauri::Manager::app_handle(window).set_dock_visibility(false);
                 }
             }
         })

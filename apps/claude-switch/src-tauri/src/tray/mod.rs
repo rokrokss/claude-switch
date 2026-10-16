@@ -6,7 +6,9 @@
 //! out those the user hid from the menu bar. A click opens a panel with every
 //! profile's meters, hidden or not (the `tray` window, `tray.html`);
 //! a right-click offers to open claude-switch or quit it. Closing the main
-//! window only hides it, so the item stays.
+//! window only hides it, and the Dock icon with it, so the item stays. The
+//! item goes at the right end of the menu bar, where a full bar can't hide
+//! it, unless the user has moved it.
 //!
 //! Usage is fetched here, every five minutes and when the panel opens, rather
 //! than by the main window, which stops polling while it isn't focused. These
@@ -143,7 +145,7 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
             &MenuItem::with_id(app, QUIT_ID, "Quit claude-switch", true, None::<&str>)?,
         ],
     )?;
-    TrayIconBuilder::with_id(TRAY_ID)
+    let tray = TrayIconBuilder::with_id(TRAY_ID)
         .icon(fallback_icon())
         .icon_as_template(true)
         .tooltip("claude-switch")
@@ -167,6 +169,8 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
             }
         })
         .build(app)?;
+    #[cfg(target_os = "macos")]
+    keep_in_sight(&tray);
 
     if let Some(panel) = app.get_webview_window(PANEL_WINDOW) {
         #[cfg(target_os = "macos")]
@@ -225,8 +229,36 @@ fn watch_screen_capture(app: AppHandle) {
     });
 }
 
+/// The autosave name macOS files the item's place in the menu bar under.
+#[cfg(target_os = "macos")]
+const ITEM_NAME: &str = "claude-switch-usage";
+
+/// Puts the item at the right end of the menu bar, next to the system's own,
+/// unless the user has ⌘-dragged it elsewhere (macOS remembers that place
+/// under the item's autosave name). Left to itself, macOS adds an item at the
+/// left end, the first place a full menu bar hides behind the notch.
+#[cfg(target_os = "macos")]
+fn keep_in_sight(tray: &tauri::tray::TrayIcon) {
+    use objc2_foundation::{NSString, NSUserDefaults};
+
+    let _ = tray.with_inner_tray_icon(|inner| {
+        let Some(item) = inner.ns_status_item() else {
+            return;
+        };
+        let defaults = NSUserDefaults::standardUserDefaults();
+        // The key AppKit reads the place from; smaller is further right.
+        let place = NSString::from_str(&format!("NSStatusItem Preferred Position {ITEM_NAME}"));
+        if defaults.objectForKey(&place).is_none() {
+            defaults.setDouble_forKey(0.0, &place);
+        }
+        item.setAutosaveName(Some(&NSString::from_str(ITEM_NAME)));
+    });
+}
+
 /// Brings the main window back, e.g. after it was closed to the menu bar.
 pub fn show_main_window(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    let _ = app.set_dock_visibility(true);
     if let Some(window) = app.get_webview_window(MAIN_WINDOW) {
         let _ = window.unminimize();
         let _ = window.show();

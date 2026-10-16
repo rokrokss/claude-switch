@@ -82,6 +82,7 @@ objc2-app-kit = { version = "0.3", features = [
     "NSImageRep",
     "NSResponder",
     "NSRunningApplication",
+    "NSStatusItem",
     "NSStringDrawing",
     "NSView",
     "NSWindow",
@@ -100,6 +101,7 @@ objc2-foundation = { version = "0.3", features = [
     "NSError",
     "NSString",
     "NSURL",
+    "NSUserDefaults",
 ] }
 # Post notifications as claude-switch, and hear about clicks on them.
 block2 = "0.6"
