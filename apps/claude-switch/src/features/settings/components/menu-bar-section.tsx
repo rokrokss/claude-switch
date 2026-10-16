@@ -43,7 +43,7 @@ export function MenuBarSection() {
         note={loginNote}
         control={
           <Switch
-            ariaLabel="Open at login"
+            aria-label="Open at login"
             checked={login.status === 'on' || login.status === 'needsApproval'}
             disabled={login.status === null || login.status === 'unavailable'}
             onChange={login.set}
@@ -78,7 +78,7 @@ export function MenuBarSection() {
         description="Shows claude-switch's mark instead of usage while the screen is shared or recorded."
         control={
           <Switch
-            ariaLabel="Hide while screen sharing"
+            aria-label="Hide while screen sharing"
             checked={privacy.hideWhileScreenSharing}
             onChange={(hideWhileScreenSharing) => save({ privacy: { ...privacy, hideWhileScreenSharing } })}
           />

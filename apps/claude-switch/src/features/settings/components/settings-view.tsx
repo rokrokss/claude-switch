@@ -10,6 +10,7 @@ import { AppearanceSection } from './appearance-section'
 import { CustomizeSection } from './customize-section'
 import { DataSection, DataSectionFallback } from './data-section'
 import { MenuBarSection } from './menu-bar-section'
+import { NotificationsSection } from './notifications-section'
 import { SettingsFooterRow } from './settings-footer-row'
 import { SystemSection, SystemSectionFallback } from './system-section'
 import { UsageSection } from './usage-section'
@@ -48,6 +49,7 @@ export function SettingsView({ onClose, onOpenMigration, onOpenAbout }: Props) {
       <MenuBarSection />
       <UsageSection />
       <CustomizeSection />
+      <NotificationsSection />
       <Suspense fallback={<SystemSectionFallback />}>
         <SystemSection />
       </Suspense>

@@ -15,6 +15,7 @@ mod launchers;
 mod logging;
 mod login_item;
 mod migration;
+mod notifications;
 mod path_setup;
 mod paths;
 mod profiles;
@@ -149,6 +150,7 @@ pub fn run() {
             app.set_menu(menu)?;
 
             tray::setup(app)?;
+            notifications::setup(app);
             Ok(())
         })
         // Closing the main window leaves claude-switch running in the menu
@@ -215,6 +217,9 @@ pub fn run() {
             login_item::set_login_item,
             logging::log_file,
             haptics::haptic_tick,
+            notifications::notification_permission,
+            notifications::request_notification_permission,
+            notifications::open_notification_settings,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

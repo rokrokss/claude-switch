@@ -44,7 +44,7 @@ trash = "5.2.6"
 tauri-plugin-clipboard-manager = "2"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip", "brotli", "deflate"] }
 sha2 = "0.10"
-tokio = { version = "1", features = ["rt", "macros", "process", "time"] }
+tokio = { version = "1", features = ["rt", "macros", "process", "sync", "time"] }
 portable-pty = "0.9.0"
 profile-shim = { path = "shim" }
 
@@ -93,6 +93,20 @@ objc2-foundation = { version = "0.3", features = [
     "NSError",
     "NSString",
     "NSURL",
+] }
+# Post notifications as claude-switch, and hear about clicks on them.
+block2 = "0.6"
+objc2-user-notifications = { version = "0.3", default-features = false, features = [
+    "std",
+    "block2",
+    "UNNotification",
+    "UNNotificationContent",
+    "UNNotificationRequest",
+    "UNNotificationResponse",
+    "UNNotificationSettings",
+    "UNNotificationSound",
+    "UNNotificationTrigger",
+    "UNUserNotificationCenter",
 ] }
 # Hand the `claude://` scheme to claude-switch while a profile signs in, the way
 # Claude takes it (launchers::link_handler). Already present via objc2-foundation.

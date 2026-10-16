@@ -62,7 +62,7 @@ export function UsageSection() {
         description="Marks the even pace and where usage lands at the reset on every meter, not only those running close."
         control={
           <Switch
-            ariaLabel="Always show pacing"
+            aria-label="Always show pacing"
             checked={display.alwaysShowPacing}
             onChange={(alwaysShowPacing) => save({ ...display, alwaysShowPacing })}
           />

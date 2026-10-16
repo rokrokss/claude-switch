@@ -178,6 +178,12 @@ export type AppState = {
   settings: Settings
 }
 
+/**
+ * Whether macOS lets claude-switch post notifications. `unavailable` from a build that runs outside
+ * an app bundle, which can't post any.
+ */
+export type NotificationPermission = 'notDetermined' | 'denied' | 'granted' | 'unavailable'
+
 export type AppStatePatch = {
   welcomeShown?: boolean
   migrationDismissedAt?: string

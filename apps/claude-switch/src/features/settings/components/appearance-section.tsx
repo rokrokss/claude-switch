@@ -121,7 +121,7 @@ function MenuBarPanelAppearance() {
         description="Stills the panel's spinners and transitions. macOS's own Reduce Motion does the same."
         control={
           <Switch
-            ariaLabel="Reduce animations"
+            aria-label="Reduce animations"
             checked={display.reduceAnimations}
             onChange={(reduceAnimations) => save({ ...display, reduceAnimations })}
           />

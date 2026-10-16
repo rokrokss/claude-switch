@@ -55,7 +55,7 @@ export function AdvancedSection() {
           description="Looks for a new claude-switch at launch and every six hours. Off, only Settings → System checks."
           control={
             <Switch
-              ariaLabel="Check for updates automatically"
+              aria-label="Check for updates automatically"
               checked={updates.checkAutomatically}
               onChange={(checkAutomatically) =>
                 void appState.update({ settings: { updates: { ...updates, checkAutomatically } } })
