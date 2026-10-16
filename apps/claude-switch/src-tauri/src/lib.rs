@@ -229,6 +229,7 @@ pub fn run() {
             launchers::command::command_line,
             launchers::command::install_command_line,
             launchers::command::uninstall_command_line,
+            usage::spend::codex_fallback_models,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -143,7 +143,9 @@ fn resource(metric: &Metric) -> Option<Resource> {
                 ..Resource::default()
             })
         }
-        MetricValue::Values { values, expires_at } => {
+        MetricValue::Values {
+            values, expires_at, ..
+        } => {
             let reading = values.first()?;
             let balance = BALANCES.contains(&metric.id.as_str());
             Some(Resource {
@@ -160,6 +162,7 @@ fn resource(metric: &Metric) -> Option<Resource> {
                 ..Resource::default()
             })
         }
+        MetricValue::Chart { .. } => None,
     }
 }
 
@@ -168,6 +171,7 @@ fn unit_name(unit: &Unit) -> String {
         Unit::Percent => "percent".to_owned(),
         Unit::Count => "count".to_owned(),
         Unit::Money { currency } => currency.to_lowercase(),
+        Unit::Tokens => "tokens".to_owned(),
     }
 }
 
@@ -385,6 +389,7 @@ pub(crate) mod tests {
                         unit: Unit::Count,
                     }],
                     expires_at: vec!["2026-11-01T00:00:00+00:00".into()],
+                    breakdown: None,
                 },
                 state: None,
             },
@@ -399,6 +404,7 @@ pub(crate) mod tests {
                         },
                     }],
                     expires_at: Vec::new(),
+                    breakdown: None,
                 },
                 state: None,
             },
@@ -434,6 +440,7 @@ pub(crate) mod tests {
                     },
                 }],
                 expires_at: Vec::new(),
+                breakdown: None,
             },
             state: None,
         });

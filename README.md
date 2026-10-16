@@ -226,7 +226,7 @@ To send the usage requests through a proxy, create `~/Library/Application Suppor
 
 - **Schemes:** `socks5://`, `http://` or `https://`. Put `user:pass@` in the URL if the proxy needs it. Without a port, 1080, 80 or 443 applies, and a SOCKS proxy resolves the hostnames itself.
 - **When it applies:** the file is read at launch, so restart claude-switch after changing it. A missing, disabled or invalid file means no proxy, and `localhost`, `127.0.0.1` and `::1` always go direct.
-- **What it covers:** Claude's usage lookups and sign-in renewals. ChatGPT profiles' lookups go through `codex app-server`, which follows its own proxy settings.
+- **What it covers:** Claude's usage lookups and sign-in renewals, and the price lists spend is estimated with. ChatGPT profiles' lookups go through `codex app-server`, which follows its own proxy settings.
 
 ### Sessions
 
@@ -280,7 +280,7 @@ Claude Code names its Keychain entry after the config directory, which changes w
 Claude: the undocumented quota endpoint may have changed shape. Codex: the `codex` CLI isn't on your `PATH`, or its protocol changed.
 
 **Does it send my data anywhere?**
-No. There is no analytics, telemetry or remote logging. Its network requests are the usage lookups above, made with each profile's own credentials, and the update check: it reads `latest.json` from this repository's latest release, and downloads the update only when you install it. The usage lookups go through your [proxy](#proxy) if you set one.
+No. There is no analytics, telemetry or remote logging. Its network requests are the usage lookups above, made with each profile's own credentials; the update check, which reads `latest.json` from this repository's latest release and downloads the update only when you install it; and, about once an hour, three public price lists it estimates local spend with: LiteLLM's (from raw.githubusercontent.com), models.dev's, and claude-switch's own (from claude-switch.shizue.net). The price list requests carry no usage data: what your sessions cost is worked out on your Mac from their logs. The usage lookups and the price lists go through your [proxy](#proxy) if you set one.
 
 Nothing listens for connections unless you turn on the [local API](#local-api). It's off by default, and when on it serves usage figures, never credentials, to this Mac only.
 

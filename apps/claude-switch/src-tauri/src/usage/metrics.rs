@@ -26,14 +26,10 @@ pub mod id {
     /// Codex Spark's own session and weekly windows.
     pub const SPARK: &str = "spark";
     pub const SPARK_WEEKLY: &str = "spark.weekly";
-    // Spend and history from the local logs; reported once those are read.
-    #[allow(dead_code)]
+    // Spend and history from the local logs.
     pub const TODAY: &str = "today";
-    #[allow(dead_code)]
     pub const YESTERDAY: &str = "yesterday";
-    #[allow(dead_code)]
     pub const LAST_30_DAYS: &str = "last30";
-    #[allow(dead_code)]
     pub const TREND: &str = "trend";
 
     /// A weekly window scoped to one model: `weekly.<model>`, e.g. `weekly.fable`.
@@ -89,7 +85,13 @@ pub enum MetricValue {
         /// When each counted item lapses, soonest first (resets).
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         expires_at: Vec<String>,
+        /// What spend estimated from the local logs is made of.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        breakdown: Option<SpendBreakdown>,
     },
+    /// A reading per day, oldest first.
+    #[serde(rename_all = "camelCase")]
+    Chart { unit: Unit, points: Vec<ChartPoint> },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -108,6 +110,45 @@ pub enum Unit {
     Money {
         currency: String,
     },
+    Tokens,
+}
+
+/// Spend estimated from the local logs, period by period: each model's
+/// share, and the models whose usage it leaves out or estimates.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpendBreakdown {
+    /// Most expensive first; models under 5% of the period, and any past
+    /// the fifth, are folded into one named `Other`.
+    pub models: Vec<ModelSpend>,
+    /// Models used in the period that no price list knows. Their tokens
+    /// aren't counted, unless priced at a fallback model's rates.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unknown_models: Vec<String>,
+    /// The fallback models whose rates priced part of the period.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fallback_models: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelSpend {
+    pub model: String,
+    pub tokens: u64,
+    /// In USD, to the cent.
+    pub cost: f64,
+    /// For `Other`, the models folded into it; for a model logged under
+    /// several spellings, each.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variants: Vec<ModelSpend>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartPoint {
+    /// The local day, `YYYY-MM-DD`.
+    pub date: String,
+    pub value: f64,
 }
 
 /// The metrics `usage` reports for a profile of `app`, in the panel's
@@ -259,6 +300,7 @@ fn credits(quota: &QuotaUsage) -> Option<Metric> {
                 },
             ],
             expires_at: Vec::new(),
+            breakdown: None,
         },
         state: None,
     })
@@ -312,6 +354,7 @@ fn extra(quota: &QuotaUsage) -> Option<Metric> {
         None => MetricValue::Values {
             values: vec![Reading { amount: used, unit }],
             expires_at: Vec::new(),
+            breakdown: None,
         },
     };
     Some(Metric {
@@ -342,6 +385,7 @@ fn resets(quota: &QuotaUsage) -> Option<Metric> {
                 unit: Unit::Count,
             }],
             expires_at,
+            breakdown: None,
         },
         state: None,
     })
@@ -512,6 +556,7 @@ mod tests {
                     }
                 }],
                 expires_at: Vec::new(),
+                breakdown: None,
             }
         );
     }
@@ -540,7 +585,10 @@ mod tests {
             ]),
         });
         let metrics = from_usage(AppKind::Codex, &usage(q));
-        let MetricValue::Values { values, expires_at } = &metrics[0].value else {
+        let MetricValue::Values {
+            values, expires_at, ..
+        } = &metrics[0].value
+        else {
             panic!("resets are a count");
         };
         assert_eq!(values[0].amount, 2.0);

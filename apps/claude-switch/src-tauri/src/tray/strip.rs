@@ -168,7 +168,7 @@ fn value(metric: &Metric, meter_style: MeterStyle, now: DateTime<Utc>) -> Option
                     Some(format!("{}%", percent.round() as i64))
                 }
                 Unit::Money { currency } => Some(money(shown.max(0.0), currency)),
-                Unit::Count => Some(compact(shown.max(0.0))),
+                Unit::Count | Unit::Tokens => Some(compact(shown.max(0.0))),
             }
         }
         MetricValue::Values { values, .. } => {
@@ -178,11 +178,12 @@ fn value(metric: &Metric, meter_style: MeterStyle, now: DateTime<Utc>) -> Option
                 Unit::Count if metric.id == id::RESETS => {
                     format!("{} resets", compact(reading.amount))
                 }
-                Unit::Count => compact(reading.amount),
+                Unit::Count | Unit::Tokens => compact(reading.amount),
                 Unit::Percent => format!("{}%", reading.amount.round() as i64),
             };
             Some(text)
         }
+        MetricValue::Chart { .. } => None,
     }
 }
 
@@ -422,6 +423,7 @@ mod tests {
                             },
                         }],
                         expires_at: Vec::new(),
+                        breakdown: None,
                     },
                     state: None,
                 },
@@ -434,6 +436,7 @@ mod tests {
                             unit: Unit::Count,
                         }],
                         expires_at: Vec::new(),
+                        breakdown: None,
                     },
                     state: None,
                 },

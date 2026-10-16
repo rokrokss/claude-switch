@@ -203,6 +203,7 @@ mod tests {
                     unit: Unit::Count,
                 }],
                 expires_at: Vec::new(),
+                breakdown: None,
             },
             state: None,
         };

@@ -116,6 +116,9 @@ function MetricBody({
     }
     return <ValuesRow metric={placed.metric} now={now} spacing={spacing} />
   }
+  if (placed.metric.kind === 'chart') {
+    return null
+  }
   return (
     <MeterRow meter={placed.metric} display={display} now={now} spacing={spacing} onDisplayChange={onDisplayChange} />
   )

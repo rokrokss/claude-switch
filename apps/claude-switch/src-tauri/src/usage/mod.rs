@@ -8,6 +8,7 @@ pub(crate) mod proxy;
 pub(crate) mod quota;
 pub(crate) mod refresh;
 pub(crate) mod resets;
+pub(crate) mod spend;
 
 use serde::{Deserialize, Serialize};
 

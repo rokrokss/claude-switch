@@ -207,6 +207,7 @@ fn rounded_as_shown(value: f64, unit: &Unit) -> f64 {
         Unit::Percent => value.round(),
         Unit::Count => (value * 10.0).round() / 10.0,
         Unit::Money { .. } => (value * 100.0).round() / 100.0,
+        Unit::Tokens => value.round(),
     }
 }
 
@@ -371,6 +372,7 @@ mod tests {
         let values = MetricValue::Values {
             values: Vec::new(),
             expires_at: Vec::new(),
+            breakdown: None,
         };
         assert_eq!(meter_state(&values, now()), None);
     }
