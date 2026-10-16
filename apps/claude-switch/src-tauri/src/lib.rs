@@ -32,6 +32,10 @@ use tauri::{Emitter, WindowEvent};
 /// click opens our own Atelier-styled `<AboutDialog>` instead.
 const OPEN_ABOUT_ID: &str = "open-about";
 
+/// Set (to anything) to leave the launchers and the clone watch as they are
+/// at startup: `CLAUDE_SWITCH_SKIP_STARTUP_SYNC=1 pnpm tauri dev`.
+const SKIP_STARTUP_SYNC_ENV: &str = "CLAUDE_SWITCH_SKIP_STARTUP_SYNC";
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -51,8 +55,13 @@ pub fn run() {
             // Bring the desktop launchers an earlier version built up to this
             // one, so every profile changes over now rather than whenever it
             // next happens to be rebuilt. Off the main thread: a wrapper takes
-            // seconds to build.
-            std::thread::spawn(|| {
+            // seconds to build. A development run sets SKIP_STARTUP_SYNC_ENV:
+            // otherwise it would point the user's clone watch at itself.
+            let skip_sync = std::env::var_os(SKIP_STARTUP_SYNC_ENV).is_some();
+            std::thread::spawn(move || {
+                if skip_sync {
+                    return;
+                }
                 let Ok(all) = profiles::load() else {
                     return;
                 };
