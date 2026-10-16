@@ -103,6 +103,21 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+/**
+ * What a profile spent today.
+ */
+function today(cost: number, tokens: number): Metric {
+  return {
+    id: 'today',
+    label: 'Today',
+    kind: 'values',
+    values: [
+      { amount: cost, unit: { type: 'money', currency: 'USD' } },
+      { amount: tokens, unit: { type: 'tokens' } },
+    ],
+  }
+}
+
 describe('TrayPanel', () => {
   it('shows each profile with its plan and meters', () => {
     vi.mocked(useTrayEntries).mockReturnValue([makeEntry(), makeEntry({ id: 'personal', name: 'Personal' })])
@@ -115,15 +130,6 @@ describe('TrayPanel', () => {
   })
 
   it('totals what every profile spent, and keeps the period chosen', () => {
-    const today = (cost: number, tokens: number): Metric => ({
-      id: 'today',
-      label: 'Today',
-      kind: 'values',
-      values: [
-        { amount: cost, unit: { type: 'money', currency: 'USD' } },
-        { amount: tokens, unit: { type: 'tokens' } },
-      ],
-    })
     vi.mocked(useTrayEntries).mockReturnValue([
       makeEntry({ metrics: [today(6, 2_000_000)] }),
       makeEntry({ id: 'personal', name: 'Personal', metrics: [today(2, 6_000_000)] }),
@@ -138,6 +144,16 @@ describe('TrayPanel', () => {
         ...defaultSettings.display,
         totalSpend: { ...defaultSettings.display.totalSpend, period: 'yesterday' },
       },
+    })
+  })
+
+  it('hides the total spend card from its right-click menu', async () => {
+    vi.mocked(useTrayEntries).mockReturnValue([makeEntry({ metrics: [today(6, 2_000_000)] })])
+    render(<TrayPanel />)
+    fireEvent.contextMenu(screen.getByRole('region', { name: 'Total spend' }))
+    fireEvent.click(await screen.findByText('Hide total spend'))
+    expect(update).toHaveBeenCalledWith({
+      display: { ...defaultSettings.display, totalSpend: { ...defaultSettings.display.totalSpend, shown: false } },
     })
   })
 

@@ -3,7 +3,13 @@ import type { Settings, TrayEntry } from '@/lib/types'
 import type { SpendSlice, TotalSpend } from '../lib/total-spend'
 
 import { cn, Segmented } from '@/design'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/design/ui/context-menu'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/design/ui/context-menu'
 
 import { formatCompact, formatCost } from '../lib/format'
 import { copyAsImage, totalSpendShareCard } from '../lib/share-image'
@@ -46,6 +52,8 @@ type Props = {
 /**
  * What every profile spent in a period, read from this Mac's session logs:
  * the total, a bar of each profile's share, and a legend with the figures.
+ * Its right-click menu copies it as an image or hides it (Settings → Usage
+ * shows it again).
  */
 export function TotalSpendCard({ entries, settings, onChange, onNotice }: Props) {
   const total = totalSpend(entries, settings.period)
@@ -104,6 +112,8 @@ export function TotalSpendCard({ entries, settings, onChange, onNotice }: Props)
         >
           Copy as image
         </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => onChange({ ...settings, shown: false })}>Hide total spend</ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
   )
