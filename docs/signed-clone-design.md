@@ -28,7 +28,7 @@ The two existing modes stay as they are.
 | P2 | The app is named claude-switch: its data lives in `~/Library/Application Support/claude-switch/` and its bundles and agent are identified as `app.claude-switch.*`. | Profiles inside that folder never move. |
 | P3 | A signed clone is available for Claude profiles on macOS only. | Gated by `AppSpec.supports_signed_clone` in Rust and `appSpecs[app].signedClone` in TypeScript. |
 | P4 | The script and wrapper modes keep their code and behavior. | Kept. |
-| Q2 | Whether to install the background watch by default. | Installed while any profile uses a signed clone. It acts on its own only on strays younger than 20 seconds. |
+| Q2 | Whether to install the background watch by default. | Installed while any profile uses a signed clone, or runs the stock Claude in script mode (for its first sign-in, §5.10). It acts on its own only on strays younger than 20 seconds. |
 | Q3 | Whether to accept that `codesign --strict` fails. | Accepted. If the runtime checks (C1, C4, F1) show a problem, the mode is put on hold. |
 | Q4 | Whether to ship if the Dock doesn't show the icon on macOS 26 (D2). | Ship. Keeping the signature and permissions is worth it on its own. |
 | U1 | A Claude Desktop update must never require an update of this app. | §5.8 |
@@ -115,7 +115,7 @@ In short: the signature itself is preserved, but to strict validation the bundle
       clone.json                         # {clonedFromVersion, color, builtBy}
       .lock                              # cross-process lock
 /Applications/Claude (<Name>).app        # script launcher shape; the script hands off to claude-switch
-~/Library/LaunchAgents/app.claude-switch.clone-watch.plist   # only while a profile uses a signed clone
+~/Library/LaunchAgents/app.claude-switch.clone-watch.plist   # only while a Claude profile uses a signed clone or the stock app
 ```
 
 - **Ownership by path.** The clone keeps Anthropic's identifier and its Info.plist is sealed. So the existing identifier check (`is_ours`) can't recognize it, and nothing can be recorded inside it. What is known about it goes in `clone.json`, outside the bundle.
@@ -194,7 +194,7 @@ A stray is a process whose executable is `profiles/<id>/app.noindex/*.app/Conten
 
 - **Why S6 is not reopened automatically**: Squirrel also installs updates silently when the user simply quits. So from outside there is no telling whether a relaunch was meant. Instead the notification says "updated; if it didn't reopen, open it again", which is right either way. A clone this app made itself matches `clonedFromVersion` in `clone.json`, so it causes no notification.
 - **Installing and removing the watch**: `clone_watch::sync` runs after a profile is created, edited or deleted, after a surface is switched, and when the app starts.
-  - If any GUI profile uses a signed clone, the watch is installed with `launchctl bootstrap`.
+  - If any GUI profile uses a signed clone, or is a Claude profile in script mode (for sign-in, §5.10), the watch is installed with `launchctl bootstrap`.
   - If none does, it is booted out and its plist deleted.
   - If the executable has moved, the plist is rewritten.
   - The user can switch it off in System Settings → General → Login Items & Extensions.
@@ -204,7 +204,7 @@ A stray is a process whose executable is `profiles/<id>/app.noindex/*.app/Conten
 | Switch | What happens | Data |
 |--------|--------------|------|
 | Script → signed clone | The clone is built **first**; if that fails the launcher is left as it was. Then the launcher is rebuilt in the handoff shape and the watch installed. | Untouched |
-| Signed clone → script or wrapper | The launcher is rebuilt, and the clone (a cache) deleted unless in use; one in use is left and cleared later. The watch is removed with the last such profile. | Untouched |
+| Signed clone → script or wrapper | The launcher is rebuilt, and the clone (a cache) deleted unless in use; one in use is left and cleared later. The watch stays for a script-mode Claude profile (§5.10), and is removed once no profile needs it. | Untouched |
 | Wrapper ↔ signed clone | Refused while the wrapper runs, by the existing `ensure_wrapper_not_running`. | Untouched |
 | Rename or recolor | Only the launcher is rebuilt; the clone changes on its next launch. | Untouched |
 | Desktop surface off | The launcher is removed, and the clone too unless in use. | Untouched |
@@ -234,7 +234,7 @@ A Claude Desktop update never requires rebuilding or updating claude-switch. Not
 
 ### 5.9 Known limitations
 
-- The bundle ID is shared, so a `claude://` link goes to whichever instance LaunchServices picks. Google sign-in is kept off that path while a signed-clone profile signs in (§5.10). Script-mode profiles have no watch to do this: for their **first sign-in, quit every other Claude**.
+- The bundle ID is shared, so a `claude://` link goes to whichever instance LaunchServices picks. Google sign-in is kept off that path while a signed-clone or script-mode Claude profile signs in (§5.10).
 - Notification settings, default-app choices and login items are shared with the original.
 - The original and every clone share the ShipIt cache (`~/Library/Caches/com.anthropic.claudefordesktop.ShipIt`) (check F4).
 - A clone that updated itself becomes a separate copy of about 650 MB. It is not excluded from Time Machine.
@@ -248,13 +248,15 @@ Measured with Claude 2.42304.0 (2026-10-16):
   - If they match, Claude signs in through the default browser, which returns the result as `claude://login/google-auth?code=…&hop_nonce=…`.
   - If they don't, Claude signs in through an `ASWebAuthenticationSession`, which returns the result to the process that started it.
 - **Why a clone failed.** A clone has the stock app's bundle ID, so it always took the browser path. LaunchServices gave the link to the running stock app, which rejected it because the nonce didn't match ("Google sign-in code does not answer a sign-in this app started; ignoring"). The profile was left signed out.
-- **The fix.** `claude-switch.app` declares the `claude` scheme (`src-tauri/Info.plist`). On every look, the clone watch checks whether a signed-clone profile runs signed out (`accounts::desktop_signed_in` on its `gui-data`).
+- **Script mode too.** A script-mode profile runs `/Applications/Claude.app` itself with `--user-data-dir`, under the same bundle ID, so it failed the same way. A wrapper (`distinctDockIcon`) has a bundle ID of its own, so Claude in it is never the handler and already signs in through `ASWebAuthenticationSession`.
+- **The fix.** `claude-switch.app` declares the `claude` scheme (`src-tauri/Info.plist`). On every look, the clone watch checks whether a Claude profile under Claude's bundle ID, a signed clone or script mode (`link_handler::covers`), runs signed out (`accounts::desktop_signed_in` on its `gui-data`).
   - If one does and Claude is the handler, the watch makes claude-switch the handler, using `LSSetDefaultHandlerForURLScheme`, as Electron does.
   - Once none does, the watch makes Claude the handler again.
   - A handler the user chose (anything other than Claude or claude-switch) is never touched.
   - Every Claude makes itself the handler again when its window loads, so the watch takes it back on its next look, within 2 s.
+  - The watch is installed while such a profile exists, even without a signed clone. Re-homing strays and reporting updates stay limited to signed clones.
 - **Links in the meantime.** Any `claude://` link that reaches claude-switch while it is the handler is passed on with `open -b <Claude's bundle ID>`. That is the instance LaunchServices would have picked anyway. If claude-switch isn't running, LaunchServices starts it to take the link.
-- **Verified by hand.** A throwaway bundle that declared `claude` was made the handler. Clicking Google sign-in in the clone then logged `Not the claude:// handler; keeping ASWebAuth`, and the profile signed in.
+- **Verified by hand.** A throwaway bundle that declared `claude` was made the handler. Clicking Google sign-in in the clone then logged `Not the claude:// handler; keeping ASWebAuth`, and the profile signed in. Script mode is not yet verified by hand (check C1).
 
 ---
 

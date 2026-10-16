@@ -26,11 +26,13 @@
 //!   when the user quits), so it is reported, not reopened.
 //! - **A profile signing in**: while one runs signed out, claude-switch opens
 //!   `claude://` links, so that its Google sign-in comes back to it rather than
-//!   to the stock app (see [`link_handler`]).
+//!   to another Claude. This covers profiles that run the stock app too, not
+//!   only signed clones (see [`link_handler`]).
 //!
-//! The agent is installed while some profile has a signed clone and removed when
-//! none has (see [`sync`]). It can also be switched off in System Settings →
-//! General → Login Items & Extensions, where macOS lists it.
+//! The agent is installed while some profile has a signed clone, or runs Claude
+//! under Claude's own bundle identifier ([`link_handler::covers`]), and removed
+//! when none does (see [`sync`]). It can also be switched off in System Settings
+//! → General → Login Items & Extensions, where macOS lists it.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -66,11 +68,14 @@ const UPDATE_SETTLE: Duration = Duration::from_secs(30);
 const LAUNCHCTL: &str = "/bin/launchctl";
 
 /// Pure: whether the watch is wanted: some profile opens its desktop app from a
-/// signed clone.
+/// signed clone, or signs in to Claude under Claude's own bundle identifier.
 pub fn wanted(profiles: &[Profile]) -> bool {
-    profiles.iter().any(watched)
+    profiles
+        .iter()
+        .any(|profile| watched(profile) || link_handler::covers(profile))
 }
 
+/// Whether the watch puts `profile`'s strays right and reports its updates.
 fn watched(profile: &Profile) -> bool {
     profile.signed_clone && profile.surfaces.gui
 }
@@ -131,9 +136,9 @@ pub fn log_path() -> AppResult<PathBuf> {
     Ok(app_data_dir()?.join("clone-watch.log"))
 }
 
-/// Install, refresh or remove the agent so that it runs exactly while
-/// `profiles` has a signed clone to watch, from the claude-switch executable
-/// running now. Leaves an agent that is already as it should be alone.
+/// Install, refresh or remove the agent so that it runs exactly while it is
+/// [`wanted`] for `profiles`, from the claude-switch executable running now.
+/// Leaves an agent that is already as it should be alone.
 pub fn sync(profiles: &[Profile]) -> AppResult<()> {
     let plist = plist_path()?;
     let domain = format!("gui/{}", user_id()?);
@@ -259,12 +264,14 @@ struct Watch {
 
 impl Watch {
     fn look(&mut self, version: &str) -> AppResult<()> {
-        let profiles: Vec<Profile> = profiles::load()?.into_iter().filter(watched).collect();
-        // Before the early return, so that the scheme goes back to Claude even
-        // when the last such profile has just gone.
-        if let Err(err) = link_handler::sync(&profiles) {
+        let all = profiles::load()?;
+        // Before the early return, and on every profile, signed clone or not:
+        // a profile running the stock app signs in the same way, and the scheme
+        // must go back to Claude even when the last such profile has just gone.
+        if let Err(err) = link_handler::sync(&all) {
             eprintln!("claude-switch: clone watch: {}", err.message());
         }
+        let profiles: Vec<Profile> = all.into_iter().filter(watched).collect();
         if profiles.is_empty() {
             return Ok(());
         }
@@ -364,12 +371,42 @@ mod tests {
         }
     }
 
+    fn wrapper() -> Profile {
+        Profile {
+            distinct_dock_icon: true,
+            ..profile(false, true)
+        }
+    }
+
+    fn codex() -> Profile {
+        Profile {
+            app: AppKind::Codex,
+            ..profile(false, true)
+        }
+    }
+
     #[test]
-    fn the_watch_runs_only_while_a_desktop_profile_has_a_clone() {
+    fn the_watch_runs_while_a_desktop_profile_has_a_clone_or_runs_the_stock_claude() {
         assert!(!wanted(&[]));
-        assert!(!wanted(&[profile(false, true)]));
+        assert!(wanted(&[profile(true, true)]));
+        assert!(
+            wanted(&[profile(false, true)]),
+            "the stock app signs in through claude:// too"
+        );
         assert!(!wanted(&[profile(true, false)]), "no desktop app to watch");
-        assert!(wanted(&[profile(false, true), profile(true, true)]));
+        assert!(!wanted(&[profile(false, false)]), "no desktop app to watch");
+        assert!(!wanted(&[wrapper()]), "a wrapper has its own bundle id");
+        assert!(!wanted(&[codex()]), "not Claude");
+        assert!(wanted(&[wrapper(), codex(), profile(false, true)]));
+    }
+
+    #[test]
+    fn only_signed_clones_have_their_strays_put_right_and_updates_reported() {
+        assert!(watched(&profile(true, true)));
+        assert!(!watched(&profile(true, false)), "no desktop app to watch");
+        assert!(!watched(&profile(false, true)), "no clone to stray from");
+        assert!(!watched(&wrapper()));
+        assert!(!watched(&codex()));
     }
 
     #[test]

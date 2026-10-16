@@ -162,7 +162,7 @@ These five decide whether the mode is worth having. About 30 minutes.
 
 **C1 — No new sign-in after switching modes (★)**
 - Steps:
-  1. In script mode, sign in with the test account. For a first sign-in, quit every other Claude.
+  1. In script mode, sign in with Google using the test account, leaving the default Claude running. It should sign in through a system sheet, not a browser tab, while the clone watch's log says `a profile is signing in`, then `no profile is signing in` once it has (design §5.10).
   2. Quit the profile.
   3. In Edit profile, turn on Signed clone and save.
   4. Open the profile.

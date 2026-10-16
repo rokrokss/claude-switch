@@ -42,12 +42,12 @@ Claude profiles can run from a **signed clone**: a copy of Claude.app that keeps
 - **What it creates**:
   - `~/Library/Application Support/claude-switch/profiles/<id>/app.noindex/Claude (<Name>).app` — the clone. It's a cache: delete it and it is made again on the next launch.
   - `/Applications/Claude (<Name>).app` — the launcher. It hands launches to the app, and opens the stock Claude if the app is gone.
-  - `~/Library/LaunchAgents/app.claude-switch.clone-watch.plist` — the clone watch, installed only while some profile uses a signed clone.
+  - `~/Library/LaunchAgents/app.claude-switch.clone-watch.plist` — the clone watch, installed only while some Claude profile uses a signed clone or the stock app (the stock app needs it for first sign-in).
 - **Your data stays where it is**: the clone runs on the profile's own `gui-data` (`--user-data-dir`) and `cli-config` (`CLAUDE_CONFIG_DIR`). Account data is never moved or deleted automatically, and a running clone is never replaced.
 - **Already running?** Opening the profile brings its window forward.
 - **Reopened by an update or the Dock?** macOS starts the clone without the profile's arguments. Within 20 seconds it is quit and reopened as the profile; an older one is only quit after asking, and an update that left a profile closed is reported in a notification.
 - **Claude Desktop updated?** Nothing to update here. Claude's version, executable, signing requirement and icon are read from the installed app every time, and clones catch up on their next launch.
-- **First sign-in**: while the profile runs signed out, claude-switch opens `claude://` links in Claude's place. Claude then does its Google sign-in in a system sheet that answers the profile's own window, instead of a `claude://` link that would land in whichever Claude is running. Links that come in meanwhile are passed on to Claude, and the scheme goes back to Claude once the profile has signed in or quit.
+- **First sign-in**: while the profile runs signed out, claude-switch opens `claude://` links in Claude's place. Claude then does its Google sign-in in a system sheet that answers the profile's own window, instead of a `claude://` link that would land in whichever Claude is running. Links that come in meanwhile are passed on to Claude, and the scheme goes back to Claude once the profile has signed in or quit. Claude profiles on the stock app get the same; those with a distinct Dock icon don't need it.
 
 More: [design](docs/signed-clone-design.md) · [verification guide](docs/signed-clone-verification.md)
 

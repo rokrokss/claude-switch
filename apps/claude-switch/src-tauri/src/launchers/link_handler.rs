@@ -5,11 +5,12 @@
 //! the default browser, which hands the result back as a `claude://` link. If it
 //! isn't, it signs in in an `ASWebAuthenticationSession`, which hands the result
 //! straight back to the process that asked. It tells by bundle identifier, and a
-//! signed clone has the stock app's, so a clone always takes the browser — and
-//! LaunchServices gives the link to the stock app, which drops a sign-in it did
-//! not start. The profile never signs in while the stock app runs.
+//! signed clone has the stock app's, as does a profile that runs the stock app
+//! itself, so either always takes the browser — and LaunchServices gives the
+//! link to whichever Claude it picks, which drops a sign-in it did not start.
+//! The profile never signs in while another Claude runs.
 //!
-//! So while a profile with a signed clone runs signed out, the clone watch makes
+//! So while such a profile ([`covers`]) runs signed out, the clone watch makes
 //! claude-switch the default handler, and once none does it hands the scheme
 //! back ([`sync`]). Every Claude makes itself the default handler again when it
 //! starts, so the watch takes it again on its next look. claude-switch declares
@@ -17,7 +18,7 @@
 //! meanwhile on to Claude, where it would have gone otherwise ([`forward`]).
 
 use crate::accounts;
-use crate::app_kind::CLAUDE;
+use crate::app_kind::{AppKind, CLAUDE};
 use crate::error::{AppError, AppResult};
 use crate::launch;
 use crate::launchers::{clone, wrapper};
@@ -56,9 +57,17 @@ fn plan(signing_in: bool, current: Option<&str>, vendor: &str, host_can: bool) -
     }
 }
 
+/// Pure: whether `profile`'s desktop app is Claude under Claude's own bundle
+/// identifier — the stock app or a signed clone — and so signs in through the
+/// browser whenever Claude is the default handler. A wrapper
+/// (`distinct_dock_icon`) has an identifier of its own and never is.
+pub fn covers(profile: &Profile) -> bool {
+    profile.app == AppKind::Claude && profile.surfaces.gui && !profile.distinct_dock_icon
+}
+
 /// Make claude-switch the default handler of [`SCHEME`] while one of
-/// `profiles` runs signed out, and hand the scheme back to Claude once none
-/// does.
+/// `profiles` that it [`covers`] runs signed out, and hand the scheme back to
+/// Claude once none does.
 pub fn sync(profiles: &[Profile]) -> AppResult<()> {
     let Some(vendor) = resolve_gui_app(&CLAUDE) else {
         return Ok(());
@@ -92,9 +101,10 @@ pub fn sync(profiles: &[Profile]) -> AppResult<()> {
     Ok(())
 }
 
-/// Whether one of `profiles` has its desktop app running, signed out.
+/// Whether one of `profiles` that it [`covers`] has its desktop app running,
+/// signed out.
 fn signing_in(profiles: &[Profile], processes: &str, exec: &str) -> AppResult<bool> {
-    for profile in profiles {
+    for profile in profiles.iter().filter(|profile| covers(profile)) {
         let gui_data = profile_dir(&profile.id)?.join("gui-data");
         let running =
             launch::find_running_pid(processes, &gui_data.display().to_string(), exec).is_some();
@@ -207,8 +217,52 @@ fn set_handler(_id: &str) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::profiles::Surfaces;
 
     const VENDOR: &str = "com.anthropic.claudefordesktop";
+
+    fn profile(app: AppKind, gui: bool, distinct_dock_icon: bool, signed_clone: bool) -> Profile {
+        Profile {
+            id: "a".into(),
+            app,
+            name: "Work".into(),
+            slug: "work".into(),
+            color: "#7C3AED".into(),
+            created_at: "2026-10-16T00:00:00Z".into(),
+            surfaces: Surfaces { gui, cli: false },
+            distinct_dock_icon,
+            signed_clone,
+            last_used_at: None,
+        }
+    }
+
+    #[test]
+    fn profiles_running_claude_under_its_own_bundle_id_are_covered() {
+        assert!(
+            covers(&profile(AppKind::Claude, true, false, false)),
+            "the stock app"
+        );
+        assert!(
+            covers(&profile(AppKind::Claude, true, false, true)),
+            "a signed clone"
+        );
+        assert!(
+            !covers(&profile(AppKind::Claude, true, true, false)),
+            "a wrapper has its own bundle id"
+        );
+        assert!(
+            !covers(&profile(AppKind::Claude, false, false, false)),
+            "no desktop app"
+        );
+        assert!(
+            !covers(&profile(AppKind::Claude, false, false, true)),
+            "no desktop app"
+        );
+        assert!(
+            !covers(&profile(AppKind::Codex, true, false, false)),
+            "not Claude"
+        );
+    }
 
     #[test]
     fn claude_is_replaced_only_while_a_profile_signs_in_and_claude_switch_can_take_over() {
