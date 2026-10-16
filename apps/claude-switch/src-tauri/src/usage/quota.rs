@@ -21,7 +21,7 @@ const REQUEST_TIMEOUT_SECS: u64 = 8;
 /// query per profile) into roughly one upstream call per token per window.
 const QUOTA_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 /// Cooldown applied to a 429 that carries no usable `Retry-After`.
-const DEFAULT_RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(60);
+pub(crate) const DEFAULT_RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(60);
 /// Upper bound on an honoured `Retry-After`. This endpoint hands out up to
 /// ~1h windows; cap there so a bogus header can't lock the card out longer.
 const MAX_RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(60 * 60);
@@ -61,7 +61,7 @@ pub struct ReqwestUsageClient {
 
 impl ReqwestUsageClient {
     pub fn new(user_agent: String) -> Result<Self, QuotaError> {
-        let client = reqwest::Client::builder()
+        let client = crate::usage::proxy::client_builder()
             .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
             .build()
             .map_err(|_| QuotaError::Network)?;
@@ -291,6 +291,19 @@ impl ClaudeQuotaCache {
             .entry(key.to_string())
             .or_insert_with(|| Arc::new(TokioMutex::new(())))
             .clone()
+    }
+
+    /// What's left of the rate limit cached for the token stored in
+    /// `cli_config_dir`, if one is: for the command line, which keeps it past
+    /// its process.
+    pub fn rate_limit_remaining(&self, cli_config_dir: &Path) -> Option<Duration> {
+        let key = token_cache_key(&read_access_token(cli_config_dir).ok()?);
+        let entries = self.entries.lock().unwrap();
+        let entry = entries.get(&key)?;
+        match entry.outcome {
+            CachedOutcome::RateLimited => entry.expires_at.checked_duration_since(Instant::now()),
+            CachedOutcome::Success(_) => None,
+        }
     }
 }
 
@@ -1146,6 +1159,35 @@ mod tests {
         let _ = fetch_quota_cached(dir.path(), &client, &cache, &registry).await;
 
         assert_eq!(*client.calls.lock().unwrap(), 2);
+    }
+
+    #[tokio::test]
+    async fn rate_limit_remaining_is_what_is_left_of_the_cooldown() {
+        let dir = dir_with_token();
+        let cache = ClaudeQuotaCache::new();
+        let registry = DeadCredentialRegistry::new();
+        assert_eq!(cache.rate_limit_remaining(dir.path()), None);
+        let client = CountingClient {
+            calls: std::sync::Mutex::new(0),
+            status: 429,
+            body: b"".to_vec(),
+            retry_after: Some(Duration::from_secs(1800)),
+        };
+        let _ = fetch_quota_cached(dir.path(), &client, &cache, &registry).await;
+        let remaining = cache.rate_limit_remaining(dir.path()).unwrap();
+        assert!(remaining <= Duration::from_secs(1800));
+        assert!(remaining > Duration::from_secs(1790));
+
+        // A success is no rate limit.
+        let ok = dir_with_named_token("sk-ok");
+        let client = CountingClient {
+            calls: std::sync::Mutex::new(0),
+            status: 200,
+            body: br#"{"five_hour":{"utilization":42.0,"resets_at":null}}"#.to_vec(),
+            retry_after: None,
+        };
+        let _ = fetch_quota_cached(ok.path(), &client, &cache, &registry).await;
+        assert_eq!(cache.rate_limit_remaining(ok.path()), None);
     }
 
     #[tokio::test]

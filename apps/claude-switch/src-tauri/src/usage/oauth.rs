@@ -119,7 +119,7 @@ pub struct AnthropicEndpoint {
 
 impl AnthropicEndpoint {
     pub fn new(user_agent: &str) -> Option<Self> {
-        let client = reqwest::Client::builder()
+        let client = crate::usage::proxy::client_builder()
             .user_agent(user_agent)
             .timeout(EXCHANGE_TIMEOUT)
             .build()

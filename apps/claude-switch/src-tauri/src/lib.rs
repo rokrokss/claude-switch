@@ -12,6 +12,7 @@ mod haptics;
 mod inherited_env;
 mod launch;
 mod launchers;
+mod local_api;
 mod logging;
 mod login_item;
 mod migration;
@@ -27,6 +28,7 @@ mod slug;
 mod test_support;
 mod tray;
 mod usage;
+mod usage_command;
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{Emitter, WindowEvent};
@@ -98,8 +100,9 @@ pub fn run() {
                     }
                 }
                 // The clone watch runs this executable, which may have moved
-                // since it was installed.
+                // since it was installed; so does the `claude-switch` command.
                 launchers::clone_watch::sync_best_effort();
+                launchers::command::sync_best_effort();
             });
 
             // Build the macOS app menu manually so we can swap the default
@@ -151,6 +154,9 @@ pub fn run() {
 
             tray::setup(app)?;
             notifications::setup(app);
+            let local_api =
+                app_state::load().is_ok_and(|state| state.settings.integrations.local_api);
+            local_api::apply(app.handle(), local_api);
             Ok(())
         })
         // Closing the main window leaves claude-switch running in the menu
@@ -220,6 +226,9 @@ pub fn run() {
             notifications::notification_permission,
             notifications::request_notification_permission,
             notifications::open_notification_settings,
+            launchers::command::command_line,
+            launchers::command::install_command_line,
+            launchers::command::uninstall_command_line,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

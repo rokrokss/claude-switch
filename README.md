@@ -148,6 +148,86 @@ The first refresh asks for Keychain access; choose "Always Allow".
 
 The menu bar shows the same quota for every profile with a CLI: the app's mark beside the share used of its 5-hour and weekly windows (hover over it to see which profile is which). Click it for each profile's meters, or right-click to open or quit claude-switch. It refreshes every 5 minutes whether or not the window is open, and closing the window leaves claude-switch running in the menu bar; quit from there or with ⌘Q. These background refreshes never start `claude` to renew an expired sign-in. Open the profile's detail page, or run its command once, to do that.
 
+### Usage from the command line
+
+Settings → Command line → **Install** puts a `claude-switch` command in `~/.local/bin`. It prints each profile's limits as JSON and exits; it never opens the app.
+
+```sh
+claude-switch usage            # every profile
+claude-switch usage work       # one profile, by its id, slug or name
+claude-switch usage codex      # every ChatGPT profile (`claude` for every Claude one)
+claude-switch usage --force    # fetch again, however recent the figures
+```
+
+Figures fetched in the last five minutes, by the app or an earlier run, are reused. The rest are fetched one profile at a time and saved for the app and the next run. The command never renews a sign-in: a lapsed one shows as an error until the app, or the profile's own command, renews it. The first run from a terminal may ask for Keychain access.
+
+Exit status:
+
+- `0`: success.
+- `2`: a misuse or an unknown profile.
+- `4`: a fetch failed (the JSON still holds the last figures), or the profiles can't be read.
+
+```json
+{
+  "schema": "claude-switch.limits.v1",
+  "generatedAt": "2026-10-17T12:01:00.000Z",
+  "profiles": {
+    "1b4e28ba-2fa1-11d2-883f-0016d3cca427": {
+      "app": "claude",
+      "name": "Work",
+      "plan": "Max 20x",
+      "fetchedAt": "2026-10-17T12:00:00.000Z",
+      "expiresAt": "2026-10-17T12:05:00.000Z",
+      "stale": false,
+      "resources": {
+        "session": { "kind": "consumption", "unit": "percent", "used": 18.0, "limit": 100.0, "remaining": 82.0, "utilization": 0.18, "resetsAt": "2026-10-17T15:00:00.000Z", "windowSeconds": 18000 }
+      }
+    }
+  },
+  "errors": []
+}
+```
+
+Profiles are keyed by id; a stock install is `default:claude` or `default:codex`. The resources are:
+
+- `session` and `weekly`.
+- `weekly.<model>`, e.g. `weekly.fable`.
+- `extra`: pay-as-you-go spend, in its currency.
+- `resets`: rate-limit resets left.
+
+`kind` is `consumption` (`used`, plus `limit`, `remaining` and `utilization` for a meter) or `balance` (`available`). A value that isn't known is left out rather than given as zero. A profile with no figures yet has no entry. A failed fetch keeps the last figures and adds `{"profileId", "code", "message"}` to `errors`.
+
+### Local API
+
+The local API is off by default. Turn it on in Settings → Command line → **Local API**, and claude-switch serves the same figures on `http://127.0.0.1:6741` while it runs:
+
+| Route | Returns |
+| --- | --- |
+| `GET /v1/limits` | What `claude-switch usage` prints, for every profile |
+| `GET /v1/limits/:id` | The same for one profile (its exact id) or one app (`claude`, `codex`) |
+| `GET /v1/usage` | Every profile as the menu bar's panel shows it, metrics and pacing included. This shape may grow |
+| `GET /v1/usage/:id` | The same, for one profile or app; always an array |
+
+It serves what the menu bar last fetched, and fetches nothing itself. Errors are JSON, `{"error": "<code>"}`:
+
+- `404`: `not_found` or `profile_not_found`.
+- `405`: `method_not_allowed`, for anything but `GET` and `OPTIONS`.
+- `503`: `server_busy`, beyond 16 connections at once.
+
+It listens on the loopback interface only, so other machines can't reach it. But it answers with `Access-Control-Allow-Origin: *`, so **any web page open on this Mac can read your usage figures** while it's on. It never serves credentials. If the port is taken, the API stays off until you turn it off and on again.
+
+### Proxy
+
+To send the usage requests through a proxy, create `~/Library/Application Support/claude-switch/config.json`:
+
+```json
+{ "proxy": { "enabled": true, "url": "socks5://127.0.0.1:1080" } }
+```
+
+- **Schemes:** `socks5://`, `http://` or `https://`. Put `user:pass@` in the URL if the proxy needs it. Without a port, 1080, 80 or 443 applies, and a SOCKS proxy resolves the hostnames itself.
+- **When it applies:** the file is read at launch, so restart claude-switch after changing it. A missing, disabled or invalid file means no proxy, and `localhost`, `127.0.0.1` and `::1` always go direct.
+- **What it covers:** Claude's usage lookups and sign-in renewals. ChatGPT profiles' lookups go through `codex app-server`, which follows its own proxy settings.
+
 ### Sessions
 
 Each profile lists its local coding sessions: Claude Code for Claude profiles (the CLI and the desktop app's Code tab), Codex for ChatGPT profiles. Chats on claude.ai and in ChatGPT live on the server and don't appear here.
@@ -200,7 +280,9 @@ Claude Code names its Keychain entry after the config directory, which changes w
 Claude: the undocumented quota endpoint may have changed shape. Codex: the `codex` CLI isn't on your `PATH`, or its protocol changed.
 
 **Does it send my data anywhere?**
-No. There is no analytics, telemetry or remote logging. Its network requests are the usage lookups above, made with each profile's own credentials, and the update check: it reads `latest.json` from this repository's latest release, and downloads the update only when you install it.
+No. There is no analytics, telemetry or remote logging. Its network requests are the usage lookups above, made with each profile's own credentials, and the update check: it reads `latest.json` from this repository's latest release, and downloads the update only when you install it. The usage lookups go through your [proxy](#proxy) if you set one.
+
+Nothing listens for connections unless you turn on the [local API](#local-api). It's off by default, and when on it serves usage figures, never credentials, to this Mac only.
 
 **Can I run it next to another build of this app?**
 Not on the same data directory. A build that doesn't know `signedClone` drops the field when it saves, and that profile falls back to the stock launcher (its data is safe).

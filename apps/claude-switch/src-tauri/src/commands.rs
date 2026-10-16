@@ -669,6 +669,41 @@ pub async fn use_codex_reset(
     Ok(outcome)
 }
 
+/// The usage of `profile_id` read with its sign-in as stored, which is never
+/// renewed here: for the command line, since only the app rotates a
+/// profile's tokens. A lapsed Claude sign-in reads as `Unauthorized`. Codex
+/// is read as always, through `codex app-server`, which renews its own.
+pub(crate) async fn stored_profile_usage(profile_id: &str) -> AppResult<ProfileUsage> {
+    let app = resolve_app(profile_id)?;
+    let config_dir = resolve_cli_config_dir(profile_id)?;
+    if !spec(app).has_usage {
+        return Ok(ProfileUsage {
+            quota: None,
+            quota_error: None,
+            fetched_at: chrono::Utc::now().to_rfc3339(),
+        });
+    }
+    let user_agent = format!("claude-switch/{}", env!("CARGO_PKG_VERSION"));
+    match app {
+        AppKind::Claude => {
+            let cache = CLAUDE_QUOTA_CACHE.get_or_init(ClaudeQuotaCache::new);
+            let dead_credentials =
+                CLAUDE_DEAD_CREDS.get_or_init(usage::dead_credentials::DeadCredentialRegistry::new);
+            let provider = ClaudeQuotaProvider::new(user_agent, cache, dead_credentials)
+                .map_err(|_| AppError::Io(std::io::Error::other("could not build HTTP client")))?;
+            Ok(usage::build(&config_dir, &provider).await)
+        }
+        AppKind::Codex => Ok(usage::build(&config_dir, &CodexQuotaProvider).await),
+    }
+}
+
+/// What's left of the cooldown a rate limit of Claude profile `profile_id`'s
+/// usage set in this process, if one is running.
+pub(crate) fn rate_limit_remaining(profile_id: &str) -> Option<std::time::Duration> {
+    let config_dir = resolve_cli_config_dir(profile_id).ok()?;
+    CLAUDE_QUOTA_CACHE.get()?.rate_limit_remaining(&config_dir)
+}
+
 /// The plan profile `profile_id` is signed in under, as its app names it
 /// (`Max 20x`), when its stored sign-in says.
 pub(crate) fn profile_plan(profile_id: &str) -> Option<String> {

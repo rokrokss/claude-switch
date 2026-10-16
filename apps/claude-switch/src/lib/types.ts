@@ -398,6 +398,20 @@ export type Metric =
     })
 
 /**
+ * The `claude-switch` command Settings installs, as `command_line` reports it.
+ */
+export type CommandLine = {
+  /**
+   * Where it is, or would be, installed, `~` for the home directory.
+   */
+  path: string
+  /**
+   * `conflict`: something that isn't claude-switch's has the name.
+   */
+  state: 'notInstalled' | 'installed' | 'conflict'
+}
+
+/**
  * Mirrors `Settings` in src-tauri/src/settings.rs; one group per Settings section.
  */
 export type Settings = {

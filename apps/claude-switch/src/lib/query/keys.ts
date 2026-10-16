@@ -44,5 +44,6 @@ export const queryKeys = {
   sessionRepairCheck: (profileId: string) => ['session-repair-check', profileId] as const,
   appState: ['app-state'] as const,
   notificationPermission: ['notification-permission'] as const,
+  commandLine: ['command-line'] as const,
   shell: ['shell'] as const,
 } as const

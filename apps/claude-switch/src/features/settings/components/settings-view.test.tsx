@@ -130,6 +130,7 @@ function primeInitialLoads({
     update_app_state: () => state,
     set_login_item: (args) => ((args as { enabled: boolean }).enabled ? 'on' : 'off'),
     tray_usage: () => trayEntries,
+    command_line: () => ({ path: '~/.local/bin/claude-switch', state: 'notInstalled' }),
   }
   mockInvoke.mockImplementation(async (command: string, args?: unknown) => {
     const answer = answers[command]
