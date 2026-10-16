@@ -385,7 +385,7 @@ fn draw(width: f64, paint: impl FnOnce()) -> Option<Rendered> {
     let rows = unsafe { std::slice::from_raw_parts(data, row_bytes * height) };
     let mut rgba = Vec::with_capacity(width * height * 4);
     for row in rows.chunks_exact(row_bytes).take(height) {
-        for pixel in row[..width * 4].chunks_exact(4) {
+        for pixel in row[..width * 4].as_chunks::<4>().0 {
             rgba.extend_from_slice(&[0, 0, 0, pixel[3]]);
         }
     }
