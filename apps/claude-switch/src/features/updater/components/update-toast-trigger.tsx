@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 import { useEffect, useRef } from 'react'
 
+import { emitTo } from '@tauri-apps/api/event'
+
 import { useToast } from '@/design'
 
 import { useUpdater } from '../api/use-updater'
@@ -26,6 +28,10 @@ export function UpdateToastTrigger() {
       return
     }
     toastedVersionRef.current = version
+    // The menu bar panel shows it too, and sends the user here to install it.
+    emitTo('tray', 'update-available', { version }).catch(() => {
+      // No panel to tell; the toast is enough.
+    })
     toast.show({
       tone: 'info',
       title: 'Update available',

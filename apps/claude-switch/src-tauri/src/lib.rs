@@ -182,7 +182,12 @@ pub fn run() {
             commands::check_session_repair,
             commands::repair_sessions,
             tray::tray_usage,
+            tray::tray_status,
+            tray::refresh_usage,
             tray::open_main_window,
+            tray::close_panel,
+            tray::open_settings,
+            tray::open_about,
             tray::quit_app,
         ])
         .build(tauri::generate_context!())

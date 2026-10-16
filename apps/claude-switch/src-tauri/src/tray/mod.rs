@@ -50,6 +50,12 @@ const QUIT_ID: &str = "tray-quit";
 const USAGE_EVENT: &str = "tray-usage";
 /// Carries the settings to the panel whenever they change.
 const SETTINGS_EVENT: &str = "settings-changed";
+/// Carries [`TrayStatus`] to the panel whenever it changes.
+const STATUS_EVENT: &str = "tray-status";
+/// Asks the main window to show its Settings pane.
+const OPEN_SETTINGS_EVENT: &str = "open-settings";
+/// Asks the main window to show its About dialog (the App menu's own event).
+const OPEN_ABOUT_EVENT: &str = "open-about";
 
 const POLL_INTERVAL: Duration = Duration::from_secs(5 * 60);
 /// After a fetch that failed for a passing reason (no network, an unexpected
@@ -94,6 +100,15 @@ pub struct TrayState {
     refreshing: tokio::sync::Mutex<()>,
     refreshed_at: Mutex<Option<Instant>>,
     panel_hidden_at: Mutex<Option<Instant>>,
+    status: Mutex<TrayStatus>,
+}
+
+/// Whether a fetch is running and when the next is due, for the panel's footer.
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrayStatus {
+    pub refreshing: bool,
+    pub next_refresh_at: Option<String>,
 }
 
 /// Puts the item in the menu bar and starts polling. Called once, from setup.
@@ -156,6 +171,10 @@ pub fn setup(app: &tauri::App) -> tauri::Result<()> {
             } else {
                 POLL_INTERVAL
             };
+            let next = Utc::now() + chrono::Duration::from_std(wait).unwrap_or_default();
+            update_status(&handle, |status| {
+                status.next_refresh_at = Some(next.to_rfc3339())
+            });
             tokio::time::sleep(wait).await;
         }
     });
@@ -185,6 +204,50 @@ pub fn tray_usage(state: tauri::State<'_, TrayState>) -> Option<Vec<TrayEntry>> 
 pub fn open_main_window(app: AppHandle) {
     hide_panel(&app);
     show_main_window(&app);
+}
+
+/// From the panel (Esc): hides it.
+#[tauri::command]
+pub fn close_panel(app: AppHandle) {
+    hide_panel(&app);
+}
+
+/// From the panel: shows the main window on its Settings pane.
+#[tauri::command]
+pub fn open_settings(app: AppHandle) {
+    open_main_window(app.clone());
+    let _ = app.emit_to(MAIN_WINDOW, OPEN_SETTINGS_EVENT, ());
+}
+
+/// From the panel: shows the main window with its About dialog.
+#[tauri::command]
+pub fn open_about(app: AppHandle) {
+    open_main_window(app.clone());
+    let _ = app.emit_to(MAIN_WINDOW, OPEN_ABOUT_EVENT, ());
+}
+
+/// From the panel: fetches every profile's usage now, rather than at the
+/// next scheduled fetch.
+#[tauri::command]
+pub fn refresh_usage(app: AppHandle) {
+    tauri::async_runtime::spawn(async move { refresh(&app).await });
+}
+
+/// Whether a fetch is running and when the next is due.
+#[tauri::command]
+pub fn tray_status(state: tauri::State<'_, TrayState>) -> TrayStatus {
+    state.status.lock().unwrap().clone()
+}
+
+/// Changes the status and tells the panel.
+fn update_status(app: &AppHandle, change: impl FnOnce(&mut TrayStatus)) {
+    let status = {
+        let state = app.state::<TrayState>();
+        let mut status = state.status.lock().unwrap();
+        change(&mut status);
+        status.clone()
+    };
+    let _ = app.emit_to(PANEL_WINDOW, STATUS_EVENT, status);
 }
 
 /// From the panel: ends claude-switch, menu bar item and all.
@@ -347,6 +410,15 @@ fn targets() -> AppResult<Vec<Target>> {
 async fn refresh(app: &AppHandle) -> bool {
     let state = app.state::<TrayState>();
     let _refreshing = state.refreshing.lock().await;
+    update_status(app, |status| status.refreshing = true);
+    let passing_failure = fetch_all(app).await;
+    update_status(app, |status| status.refreshing = false);
+    passing_failure
+}
+
+/// The body of [`refresh`], run under its lock.
+async fn fetch_all(app: &AppHandle) -> bool {
+    let state = app.state::<TrayState>();
     let targets = match targets() {
         Ok(targets) => targets,
         Err(err) => {

@@ -25,6 +25,7 @@ import type {
   Surface,
   Surfaces,
   TrayEntry,
+  TrayStatus,
 } from './types'
 
 import { invoke } from '@tauri-apps/api/core'
@@ -166,6 +167,41 @@ export function getTrayUsage(): Promise<Array<TrayEntry> | null> {
 
 export function openMainWindow(): Promise<void> {
   return invoke('open_main_window')
+}
+
+/**
+ * Whether the menu bar's fetch is running, and when the next is due.
+ */
+export function getTrayStatus(): Promise<TrayStatus> {
+  return invoke<TrayStatus>('tray_status')
+}
+
+/**
+ * Fetches every profile's usage for the menu bar now.
+ */
+export function refreshUsage(): Promise<void> {
+  return invoke('refresh_usage')
+}
+
+/**
+ * Hides the menu bar panel.
+ */
+export function closePanel(): Promise<void> {
+  return invoke('close_panel')
+}
+
+/**
+ * Shows the main window on its Settings pane.
+ */
+export function openSettings(): Promise<void> {
+  return invoke('open_settings')
+}
+
+/**
+ * Shows the main window with its About dialog.
+ */
+export function openAbout(): Promise<void> {
+  return invoke('open_about')
 }
 
 export function quitApp(): Promise<void> {

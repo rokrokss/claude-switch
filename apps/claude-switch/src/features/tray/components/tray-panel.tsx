@@ -1,56 +1,70 @@
-import type { ThemeMode, TrayEntry } from '@/lib/types'
-
 import { useEffect, useRef, useState } from 'react'
 
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window'
+import { X } from 'lucide-react'
 
 import { Button, ThemeProvider } from '@/design'
-import { narrowProfileUsage } from '@/features/profiles/api/narrow-usage'
-import { BrandMark } from '@/features/profiles/components/brand-mark'
-import {
-  formatUpdatedAgo,
-  Meters,
-  quotaErrorMessage,
-  quotaErrorShort,
-} from '@/features/profiles/components/profile-detail-usage-card'
-import { loadAppState, openMainWindow, quitApp } from '@/lib/commands'
+import { closePanel, openMainWindow, openSettings, refreshUsage } from '@/lib/commands'
 
+import { usePanelSettings } from '../api/use-panel-settings'
 import { useTrayEntries } from '../api/use-tray-entries'
+import { useTrayStatus } from '../api/use-tray-status'
+import { useUpdateNotice } from '../api/use-update-notice'
+import { PanelFooter } from './panel-footer'
+import { ProfileCard } from './profile-card'
 
 /**
- * Space kept between a panel at its tallest and the bottom of the screen,
- * the menu bar included.
+ * The panel is never taller than this share of the screen; past it, it scrolls.
  */
-const screenMargin = 64
+const maxScreenShare = 0.85
+const minHeight = 160
+const hintKey = 'claude-switch-tray-hint-dismissed'
 
 /**
- * The menu bar panel: every profile's meters, the same ones its detail page
- * shows, with a way back to the main window.
+ * The menu bar panel: every profile's usage, card by card, with the
+ * footer's next update and Options menu.
  */
 export function TrayPanel() {
   const entries = useTrayEntries()
-  const themeMode = usePersistedThemeMode()
+  const status = useTrayStatus()
+  const { settings, themeMode, update } = usePanelSettings()
+  const updateVersion = useUpdateNotice()
+  const now = useNow()
   const contentRef = useFitWindowToContent()
+  usePanelKeys()
 
   return (
     <ThemeProvider mode={themeMode}>
       <div className="h-full overflow-y-auto bg-base text-ink">
-        <div ref={contentRef} className="flex flex-col gap-2.5 p-3">
+        <div ref={contentRef} className="flex flex-col gap-2 p-2.5">
+          {updateVersion ? (
+            <Banner
+              text={`claude-switch ${updateVersion} is ready to install.`}
+              action="Install…"
+              onAction={() => void openMainWindow()}
+            />
+          ) : null}
+          <FirstRunHint />
           {entries === null ? <Note>Loading usage…</Note> : null}
           {entries?.length === 0 ? (
-            <Note>No profile reports usage yet. Set up a profile's CLI and sign in to see it here.</Note>
+            <div className="flex flex-col items-start gap-2 px-1 py-2">
+              <Note>No profile reports usage yet. Set up a profile's CLI and sign in to see it here.</Note>
+              <Button size="sm" variant="secondary" onClick={() => void openMainWindow()}>
+                Open claude-switch
+              </Button>
+            </div>
           ) : null}
           {entries?.map((entry) => (
-            <TrayProfileCard key={entry.id} entry={entry} />
+            <ProfileCard
+              key={entry.id}
+              entry={entry}
+              settings={settings}
+              refreshing={status.refreshing}
+              now={now}
+              onSettingsChange={update}
+            />
           ))}
-          <footer className="flex items-center justify-end gap-1.5 pt-0.5">
-            <Button size="sm" variant="ghost" onClick={() => void quitApp()}>
-              Quit
-            </Button>
-            <Button size="sm" variant="secondary" onClick={() => void openMainWindow()}>
-              Open claude-switch
-            </Button>
-          </footer>
+          <PanelFooter status={status} now={now} />
         </div>
       </div>
     </ThemeProvider>
@@ -58,74 +72,118 @@ export function TrayPanel() {
 }
 
 function Note({ children }: { children: string }) {
-  return <p className="px-1 py-2 font-mono text-mono text-muted-strong">{children}</p>
+  return <p className="px-1 py-1.5 font-mono text-mono text-muted-strong">{children}</p>
 }
 
-function TrayProfileCard({ entry }: { entry: TrayEntry }) {
-  const usage = entry.usage ? narrowProfileUsage(entry.usage) : null
-  const quota = usage?.quota ?? null
+function Banner({ text, action, onAction }: { text: string; action: string; onAction: () => void }) {
   return (
-    <section className="rounded-[10px] border border-border-soft bg-white/30 px-[13px] py-[9px] dark:bg-white/[0.02]">
-      <header className="mb-1.5 flex min-h-[22px] items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <BrandMark app={entry.app} size={14} />
-          <span className="truncate font-medium text-body">{entry.name}</span>
-        </div>
-        {usage ? (
-          <span className="shrink-0 font-mono text-mono text-muted-strong">
-            updated {formatUpdatedAgo(Date.now() - new Date(usage.fetchedAt).getTime())}
-          </span>
-        ) : null}
-      </header>
-      {quota ? (
-        <div className="flex flex-col gap-2">
-          <Meters app={entry.app} quota={quota} />
-          {entry.error ? (
-            <p className="font-mono text-mono text-muted-strong">Couldn't refresh — {quotaErrorShort(entry.error)}.</p>
-          ) : null}
-        </div>
-      ) : (
-        <p className="font-mono text-mono text-muted-strong">
-          {quotaErrorMessage(entry.app, entry.error ?? 'unknown', entry.command)}
-        </p>
-      )}
-    </section>
+    <div className="flex items-center justify-between gap-2 rounded-[10px] border border-border-soft bg-mint/20 px-3 py-2 text-[12px]">
+      <span>{text}</span>
+      <Button size="sm" variant="secondary" onClick={onAction}>
+        {action}
+      </Button>
+    </div>
   )
 }
 
 /**
- * The theme the user picked in Settings. Read again whenever the panel gains
- * focus, which is each time it opens, so a change made in the main window
- * reaches it.
+ * Says once what the panel is and where to change it, until dismissed.
  */
-function usePersistedThemeMode(): ThemeMode {
-  const [mode, setMode] = useState<ThemeMode>('system')
+function FirstRunHint() {
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return window.localStorage.getItem(hintKey) !== null
+    } catch {
+      return false
+    }
+  })
+  if (dismissed) {
+    return null
+  }
+  function dismiss() {
+    setDismissed(true)
+    try {
+      window.localStorage.setItem(hintKey, new Date().toISOString())
+    } catch {
+      // Without storage it comes back next launch; nothing else depends on it.
+    }
+  }
+  return (
+    <div className="relative rounded-[10px] border border-border-soft bg-white/40 px-3 py-2 pr-7 text-[12px] dark:bg-white/[0.03]">
+      <p className="font-medium">Every profile's usage, at a glance</p>
+      <p className="mt-0.5 text-muted-strong">
+        Choose what the menu bar shows and what each card lists in{' '}
+        <button type="button" className="cursor-pointer underline hover:text-ink" onClick={() => void openSettings()}>
+          Settings
+        </button>
+        .
+      </p>
+      <button
+        type="button"
+        aria-label="Dismiss"
+        className="absolute top-1.5 right-1.5 cursor-pointer rounded p-0.5 text-muted-strong hover:bg-ink/[0.06] hover:text-ink"
+        onClick={dismiss}
+      >
+        <X aria-hidden size={12} />
+      </button>
+    </div>
+  )
+}
 
+/**
+ * The time, ticking every few seconds so countdowns and "outdated" stay true.
+ */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    function load() {
-      void loadAppState().then((state) => {
-        setMode(state.themeMode)
-      })
-    }
-    load()
-    const unlistenPromise = getCurrentWindow().onFocusChanged((event) => {
-      if (event.payload) {
-        load()
-      }
-    })
-    return () => {
-      void unlistenPromise.then((unlisten) => {
-        unlisten()
-      })
-    }
+    const id = setInterval(() => setNow(Date.now()), 5_000)
+    return () => clearInterval(id)
   }, [])
+  return now
+}
 
-  return mode
+/**
+ * Esc closes the panel, ⌘R updates now, ⌘, (or Return) opens Settings.
+ */
+function usePanelKeys() {
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const action = keyAction(event)
+      if (action) {
+        event.preventDefault()
+        void action()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+}
+
+/**
+ * What a key press in the panel does, if anything. Keys typed into a field
+ * or an open menu are theirs.
+ */
+export function keyAction(event: KeyboardEvent): (() => Promise<void>) | null {
+  const target = event.target instanceof Element ? event.target : null
+  if (target?.closest('input, textarea, [role="menu"]')) {
+    return null
+  }
+  const onPage = target === null || target === document.body
+  if (event.key === 'Escape') {
+    return closePanel
+  }
+  if (event.metaKey && event.key === 'r') {
+    return refreshUsage
+  }
+  if ((event.metaKey && event.key === ',') || (event.key === 'Enter' && onPage)) {
+    return openSettings
+  }
+  return null
 }
 
 /**
  * Keeps the window as tall as the element the returned ref is attached to,
- * up to what fits on screen; past that, the panel scrolls.
+ * within limits; past the top one, the panel scrolls.
  */
 function useFitWindowToContent() {
   const ref = useRef<HTMLDivElement>(null)
@@ -137,7 +195,8 @@ function useFitWindowToContent() {
     }
     const appWindow = getCurrentWindow()
     const observer = new ResizeObserver(() => {
-      const height = Math.min(element.offsetHeight, window.screen.availHeight - screenMargin)
+      const max = window.screen.availHeight * maxScreenShare
+      const height = Math.max(minHeight, Math.min(element.offsetHeight, max))
       void appWindow.setSize(new LogicalSize(window.innerWidth, Math.ceil(height)))
     })
     observer.observe(element)

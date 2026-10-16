@@ -51,22 +51,22 @@ function useContextMenuSuppression() {
 }
 
 /**
- * Bridges the macOS App menu's "About claude-switch" item to our custom
- * dialog. The menu item (set up in src-tauri/src/lib.rs) emits the
- * `open-about` event; this listener catches it and calls `onOpen`.
- * Replaces the tiny native About panel macOS would otherwise show.
+ * Calls `onEvent` whenever the backend emits `name` to this window. Bridges
+ * the macOS App menu's "About claude-switch" item (`open-about`, emitted from
+ * src-tauri/src/lib.rs) to our own dialog in place of the tiny native About
+ * panel, and the menu bar panel's Settings… and About items to this window.
  */
-function useAboutMenuEvent(onOpen: () => void) {
+function useBackendEvent(name: string, onEvent: () => void) {
   useEffect(() => {
-    const unlistenPromise = listen('open-about', () => {
-      onOpen()
+    const unlistenPromise = listen(name, () => {
+      onEvent()
     })
     return () => {
       void unlistenPromise.then((unlisten) => {
         unlisten()
       })
     }
-  }, [onOpen])
+  }, [name, onEvent])
 }
 
 /**
@@ -98,18 +98,24 @@ type WindowIntegrationInput = {
    */
   selected: SidebarEntry | null
   /**
-   * Called when the App menu's "About claude-switch" item is chosen.
+   * Called when the App menu's "About claude-switch" item is chosen, or the
+   * menu bar panel's About item.
    */
   onOpenAbout: () => void
+  /**
+   * Called when the menu bar panel asks for Settings.
+   */
+  onOpenSettings: () => void
 }
 
 /**
  * Syncs the window with the app shell: persisted theme, context-menu
  * suppression, the App menu's About item and the per-app tint.
  */
-export function useWindowIntegration({ themeMode, selected, onOpenAbout }: WindowIntegrationInput) {
+export function useWindowIntegration({ themeMode, selected, onOpenAbout, onOpenSettings }: WindowIntegrationInput) {
   useThemeSync(themeMode)
   useContextMenuSuppression()
-  useAboutMenuEvent(onOpenAbout)
+  useBackendEvent('open-about', onOpenAbout)
+  useBackendEvent('open-settings', onOpenSettings)
   useAppTint(selected)
 }

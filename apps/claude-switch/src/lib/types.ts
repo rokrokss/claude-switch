@@ -327,6 +327,14 @@ export type TrayEntry = {
   error: QuotaError | null
 }
 
+/**
+ * Whether the menu bar's fetch is running, and when the next is due.
+ */
+export type TrayStatus = {
+  refreshing: boolean
+  nextRefreshAt: string | null
+}
+
 export type MetricUnit = { type: 'percent' } | { type: 'count' } | { type: 'money'; currency: string }
 
 /**
