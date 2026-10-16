@@ -1,8 +1,8 @@
 /**
  * Design module CSS entry — wires the Tailwind `dark` variant to the
  * data-theme attribute, applies the body background (shizue's dot grid on
- * the canvas, under soft color fields), and defines the light theme's glass
- * surfaces.
+ * the canvas, under soft color fields), and defines the glass surfaces both
+ * themes draw.
  *
  * Imported once from src/index.css; downstream code never touches this file.
  */
