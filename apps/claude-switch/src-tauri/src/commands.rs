@@ -672,6 +672,13 @@ pub(crate) async fn stored_profile_usage(profile_id: &str) -> AppResult<ProfileU
     }
 }
 
+/// What's left of the cooldown a rate limit of Claude profile `profile_id`'s
+/// usage set in this process, if one is running.
+pub(crate) fn rate_limit_remaining(profile_id: &str) -> Option<std::time::Duration> {
+    let config_dir = resolve_cli_config_dir(profile_id).ok()?;
+    CLAUDE_QUOTA_CACHE.get()?.rate_limit_remaining(&config_dir)
+}
+
 /// The plan profile `profile_id` is signed in under, as its app names it
 /// (`Max 20x`), when its stored sign-in says.
 pub(crate) fn profile_plan(profile_id: &str) -> Option<String> {
