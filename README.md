@@ -60,14 +60,18 @@ More: [design](docs/signed-clone-design.md) · [verification guide](docs/signed-
 
 ## Install
 
-Build it from source:
+Download the `.dmg` from the [latest release](https://github.com/rokrokss/claude-switch/releases/latest), open it and drag claude-switch to Applications. It is a universal build for Apple Silicon and Intel Macs, signed with a Developer ID and notarized by Apple. The app keeps its data in `~/Library/Application Support/claude-switch/`.
+
+The app doesn't update itself: download the new release to upgrade.
+
+Or build it from source:
 
 ```sh
 pnpm install
 pnpm --filter claude-switch tauri build --bundles app --config '{"bundle":{"createUpdaterArtifacts":false}}'
 ```
 
-Then copy `apps/claude-switch/src-tauri/target/release/bundle/macos/claude-switch.app` to `/Applications`. The build isn't notarized, so open it the first time with right-click → Open. The app keeps its data in `~/Library/Application Support/claude-switch/`. This repository publishes no releases, so the app never updates itself; build a new version to upgrade.
+Then copy `apps/claude-switch/src-tauri/target/release/bundle/macos/claude-switch.app` to `/Applications`. A build from source isn't notarized, so open it the first time with right-click → Open.
 
 ## Using it
 
