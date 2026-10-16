@@ -14,7 +14,8 @@ use serde_json::Value;
 
 use crate::codex_rpc::{CodexRpc, CodexRpcError, CodexTransport};
 use crate::usage::{
-    credentials, QuotaError, QuotaProvider, QuotaUsage, RateLimitResetCredits, Window,
+    credentials, Credits, NamedLimit, QuotaError, QuotaProvider, QuotaUsage, RateLimitResetCredits,
+    Window,
 };
 
 const APP_SERVER_TIMEOUT: Duration = Duration::from_secs(12);
@@ -31,12 +32,29 @@ struct RateLimitsResult {
 
 #[derive(Deserialize)]
 struct RateLimitSnapshot {
+    #[serde(default, rename = "limitName")]
+    limit_name: Option<String>,
     #[serde(default)]
     primary: Option<RateLimitWindow>,
     #[serde(default)]
     secondary: Option<RateLimitWindow>,
     #[serde(default, rename = "rateLimitReachedType")]
     rate_limit_reached_type: Option<String>,
+    #[serde(default)]
+    credits: Option<RawCredits>,
+    #[serde(default, rename = "planType")]
+    plan_type: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawCredits {
+    #[serde(default, rename = "hasCredits")]
+    has_credits: bool,
+    #[serde(default)]
+    unlimited: bool,
+    /// A decimal string (`"62500.0000000000"`), or a number.
+    #[serde(default)]
+    balance: Option<Value>,
 }
 
 #[derive(Deserialize)]
@@ -59,16 +77,30 @@ struct RateLimitWindow {
 /// data is present to show.
 fn parse_rate_limits(body: &[u8]) -> Result<QuotaUsage, QuotaError> {
     let parsed: RateLimitsResult = serde_json::from_slice(body).map_err(|_| QuotaError::Unknown)?;
-    let snapshot = parsed
-        .rate_limits_by_limit_id
-        .and_then(|mut buckets| buckets.remove("codex"))
-        .unwrap_or(parsed.rate_limits);
+    let mut buckets = parsed.rate_limits_by_limit_id.unwrap_or_default();
+    let snapshot = buckets.remove("codex").unwrap_or(parsed.rate_limits);
+    // Other limits with windows of their own; Spark is the one shown.
+    let mut additional_limits: Vec<NamedLimit> = buckets
+        .into_iter()
+        .filter(|(id, bucket)| {
+            let name = bucket.limit_name.as_deref().unwrap_or_default();
+            id.to_lowercase().contains("spark") || name.to_lowercase().contains("spark")
+        })
+        .map(|(_, bucket)| NamedLimit {
+            name: "Spark".to_owned(),
+            primary: bucket.primary.map(into_window),
+            secondary: bucket.secondary.map(into_window),
+        })
+        .collect();
+    additional_limits.truncate(1);
     let usage = QuotaUsage {
         primary: snapshot.primary.map(into_window),
         secondary: snapshot.secondary.map(into_window),
-        scoped_weekly: Vec::new(),
-        spend: None,
         rate_limit_reset_credits: parsed.rate_limit_reset_credits,
+        plan: snapshot.plan_type.as_deref().and_then(plan_name),
+        credits: snapshot.credits.and_then(into_credits),
+        additional_limits,
+        ..QuotaUsage::default()
     };
     if usage.primary.is_none()
         && usage.secondary.is_none()
@@ -80,6 +112,40 @@ fn parse_rate_limits(body: &[u8]) -> Result<QuotaUsage, QuotaError> {
         return Err(QuotaError::Unknown);
     }
     Ok(usage)
+}
+
+/// Codex's plan as its apps name it.
+fn plan_name(raw: &str) -> Option<String> {
+    let name = match raw.trim() {
+        "" => return None,
+        "prolite" => "Pro 100",
+        "pro" => "Pro 200",
+        "promax" => "Pro 500",
+        "self_serve_business_prolite" => "Business Premium",
+        other => {
+            let mut chars = other.chars();
+            let first = chars.next()?;
+            return Some(first.to_uppercase().chain(chars).collect());
+        }
+    };
+    Some(name.to_owned())
+}
+
+/// Whole credits left; none reported when the account has none to spend.
+fn into_credits(raw: RawCredits) -> Option<Credits> {
+    let balance = match &raw.balance {
+        Some(Value::String(text)) => text.trim().parse::<f64>().ok(),
+        Some(Value::Number(number)) => number.as_f64(),
+        _ => None,
+    };
+    let balance = if raw.has_credits { balance? } else { 0.0 };
+    if !balance.is_finite() || balance < 0.0 {
+        return None;
+    }
+    Some(Credits {
+        balance: balance.floor(),
+        unlimited: raw.unlimited,
+    })
 }
 
 fn into_window(raw: RateLimitWindow) -> Window {
@@ -175,6 +241,45 @@ mod tests {
         assert_eq!(json["primary"]["utilization"].as_f64(), Some(14.0));
         assert_eq!(json["primary"]["windowDurationMins"], 10080);
         assert!(json["secondary"].is_null());
+    }
+
+    #[test]
+    fn reads_the_plan_credits_and_spark() {
+        let body = br#"{"rateLimits":{"limitId":"codex","primary":{"usedPercent":12,"windowDurationMins":10080,"resetsAt":1792665025},"secondary":null,"credits":{"hasCredits":true,"unlimited":false,"balance":"62500.0000000000"},"planType":"prolite"},"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":12,"windowDurationMins":10080},"credits":{"hasCredits":true,"unlimited":false,"balance":"62500.0000000000"},"planType":"prolite"},"codex_spark":{"limitId":"codex_spark","limitName":"GPT-5.6 Spark","primary":{"usedPercent":30,"windowDurationMins":300},"secondary":{"usedPercent":8,"windowDurationMins":10080}}}}"#;
+        let usage = parse_rate_limits(body).unwrap();
+        assert_eq!(usage.plan.as_deref(), Some("Pro 100"));
+        assert_eq!(
+            usage.credits.as_ref().map(|credits| credits.balance),
+            Some(62500.0)
+        );
+        assert_eq!(usage.additional_limits.len(), 1);
+        assert_eq!(usage.additional_limits[0].name, "Spark");
+        assert_eq!(
+            usage.additional_limits[0]
+                .secondary
+                .as_ref()
+                .and_then(|window| window.utilization),
+            Some(8.0)
+        );
+    }
+
+    #[test]
+    fn plans_read_as_codex_names_them() {
+        assert_eq!(plan_name("pro").as_deref(), Some("Pro 200"));
+        assert_eq!(plan_name("promax").as_deref(), Some("Pro 500"));
+        assert_eq!(plan_name("plus").as_deref(), Some("Plus"));
+        assert_eq!(plan_name("team").as_deref(), Some("Team"));
+        assert_eq!(plan_name(""), None);
+    }
+
+    #[test]
+    fn an_account_without_credits_has_none_left() {
+        let credits = into_credits(RawCredits {
+            has_credits: false,
+            unlimited: false,
+            balance: None,
+        });
+        assert_eq!(credits.map(|credits| credits.balance), Some(0.0));
     }
 
     #[test]

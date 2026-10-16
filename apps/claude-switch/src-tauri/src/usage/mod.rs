@@ -17,7 +17,7 @@ pub struct ProfileUsage {
     pub fetched_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuotaUsage {
     pub primary: Option<Window>,
@@ -33,6 +33,32 @@ pub struct QuotaUsage {
     pub spend: Option<Spend>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rate_limit_reset_credits: Option<RateLimitResetCredits>,
+    /// The plan as the app reports it with the quota (Codex: `Pro 100`).
+    /// Claude's is read from the stored sign-in instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plan: Option<String>,
+    /// Codex credits the account can spend beyond its plan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credits: Option<Credits>,
+    /// Limits with windows of their own beside the main one (Codex's Spark).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_limits: Vec<NamedLimit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Credits {
+    /// Whole credits left.
+    pub balance: f64,
+    pub unlimited: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NamedLimit {
+    pub name: String,
+    pub primary: Option<Window>,
+    pub secondary: Option<Window>,
 }
 
 /// Money spent against a plan's usage-credit allowance. Amounts are in the
@@ -318,7 +344,7 @@ mod tests {
             secondary: None,
             scoped_weekly: Vec::new(),
             spend: None,
-            rate_limit_reset_credits: None,
+            ..QuotaUsage::default()
         }
     }
 

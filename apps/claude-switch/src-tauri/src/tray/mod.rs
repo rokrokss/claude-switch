@@ -379,7 +379,10 @@ async fn refresh(app: &AppHandle) -> bool {
             .as_ref()
             .map(|usage| metrics::from_usage(target.app, usage))
             .unwrap_or_default();
-        let plan = commands::profile_plan(&target.id)
+        let plan = usage
+            .as_ref()
+            .and_then(|usage| usage.quota.as_ref()?.plan.clone())
+            .or_else(|| commands::profile_plan(&target.id))
             .or_else(|| last.and_then(|entry| entry.plan.clone()));
         entries.push(TrayEntry {
             id: target.id,

@@ -328,7 +328,7 @@ fn parse_body(body: &[u8]) -> Result<QuotaUsage, QuotaError> {
         secondary: windows.secondary,
         scoped_weekly: windows.scoped_weekly,
         spend: parsed.spend.and_then(into_spend),
-        rate_limit_reset_credits: None,
+        ..QuotaUsage::default()
     };
     if usage.primary.is_none()
         && usage.secondary.is_none()

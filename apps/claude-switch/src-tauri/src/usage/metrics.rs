@@ -21,6 +21,11 @@ pub mod id {
     pub const EXTRA: &str = "extra";
     /// Rate-limit resets the account can use.
     pub const RESETS: &str = "resets";
+    /// Codex credits left to spend beyond the plan.
+    pub const CREDITS: &str = "credits";
+    /// Codex Spark's own session and weekly windows.
+    pub const SPARK: &str = "spark";
+    pub const SPARK_WEEKLY: &str = "spark.weekly";
     // Spend and history from the local logs; reported once those are read.
     #[allow(dead_code)]
     pub const TODAY: &str = "today";
@@ -39,6 +44,9 @@ pub mod id {
 
 /// The metrics starred for the menu bar when the user hasn't chosen any.
 pub const DEFAULT_STARS: [&str; 2] = [id::SESSION, id::WEEKLY];
+
+/// What a Codex credit is worth, in US dollars.
+const DOLLARS_PER_CREDIT: f64 = 0.04;
 
 const HOUR_SECS: i64 = 60 * 60;
 const WEEK_SECS: i64 = 7 * 24 * HOUR_SECS;
@@ -113,7 +121,9 @@ pub fn from_usage(app: AppKind, usage: &ProfileUsage) -> Vec<Metric> {
         AppKind::Claude => claude_windows(quota),
         AppKind::Codex => codex_windows(quota),
     };
+    metrics.extend(additional_windows(quota));
     metrics.extend(extra(quota));
+    metrics.extend(credits(quota));
     metrics.extend(resets(quota));
     metrics
 }
@@ -196,6 +206,62 @@ fn codex_windows(quota: &QuotaUsage) -> Vec<Metric> {
         metrics.extend(percent_meter(metric_id, label, Some(window), period, false));
     }
     metrics
+}
+
+/// Spark's windows, named after their length like the main ones.
+fn additional_windows(quota: &QuotaUsage) -> Vec<Metric> {
+    let Some(spark) = quota.additional_limits.first() else {
+        return Vec::new();
+    };
+    let period = |window: Option<&Window>| {
+        window
+            .and_then(|window| window.window_duration_mins)
+            .map(|minutes| minutes * 60)
+    };
+    let mut metrics = Vec::new();
+    metrics.extend(percent_meter(
+        id::SPARK,
+        &spark.name,
+        spark.primary.as_ref(),
+        period(spark.primary.as_ref()),
+        false,
+    ));
+    metrics.extend(percent_meter(
+        id::SPARK_WEEKLY,
+        &format!("{} weekly", spark.name),
+        spark.secondary.as_ref(),
+        period(spark.secondary.as_ref()),
+        false,
+    ));
+    metrics
+}
+
+/// Codex credits: what they're worth, and how many.
+fn credits(quota: &QuotaUsage) -> Option<Metric> {
+    let credits = quota.credits.as_ref()?;
+    if credits.unlimited {
+        return None;
+    }
+    Some(Metric {
+        id: id::CREDITS.to_owned(),
+        label: "Credits".to_owned(),
+        value: MetricValue::Values {
+            values: vec![
+                Reading {
+                    amount: credits.balance * DOLLARS_PER_CREDIT,
+                    unit: Unit::Money {
+                        currency: "USD".to_owned(),
+                    },
+                },
+                Reading {
+                    amount: credits.balance,
+                    unit: Unit::Count,
+                },
+            ],
+            expires_at: Vec::new(),
+        },
+        state: None,
+    })
 }
 
 fn percent_meter(
@@ -309,7 +375,7 @@ mod tests {
             secondary,
             scoped_weekly: Vec::new(),
             spend: None,
-            rate_limit_reset_credits: None,
+            ..QuotaUsage::default()
         }
     }
 
@@ -480,6 +546,41 @@ mod tests {
         assert_eq!(values[0].amount, 2.0);
         assert_eq!(expires_at.len(), 2);
         assert!(expires_at[0] < expires_at[1]);
+    }
+
+    #[test]
+    fn codex_reports_spark_and_credits() {
+        let mut q = quota(Some(window(Some(12.0), None, Some(10080))), None);
+        q.additional_limits = vec![crate::usage::NamedLimit {
+            name: "Spark".into(),
+            primary: Some(window(Some(30.0), None, Some(300))),
+            secondary: Some(window(Some(8.0), None, Some(10080))),
+        }];
+        q.credits = Some(crate::usage::Credits {
+            balance: 796.0,
+            unlimited: false,
+        });
+        let metrics = from_usage(AppKind::Codex, &usage(q));
+        assert_eq!(
+            ids(&metrics),
+            ["weekly", "spark", "spark.weekly", "credits"]
+        );
+        assert_eq!(metrics[2].label, "Spark weekly");
+        let MetricValue::Values { values, .. } = &metrics[3].value else {
+            panic!("credits are readings");
+        };
+        assert!((values[0].amount - 31.84).abs() < 1e-9);
+        assert_eq!(values[1].amount, 796.0);
+    }
+
+    #[test]
+    fn unlimited_credits_are_not_counted() {
+        let mut q = quota(None, None);
+        q.credits = Some(crate::usage::Credits {
+            balance: 0.0,
+            unlimited: true,
+        });
+        assert!(from_usage(AppKind::Codex, &usage(q)).is_empty());
     }
 
     #[test]
