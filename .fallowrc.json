@@ -1,5 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  // The README and social images' stylesheet, loaded by the HTML in docs/brand that render.sh renders.
+  "entry": ["docs/brand/base.css"],
   "ignoreExports": [
     // shadcn primitives: kept identical to `shadcn add` output, so unused sub-parts are expected.
     { "file": "apps/claude-switch/src/design/ui/**", "exports": ["*"] }
