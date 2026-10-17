@@ -135,7 +135,7 @@ pub fn newest_by_device(documents: Vec<HistoryDocument>) -> Vec<HistoryDocument>
         }
     }
     let mut documents: Vec<HistoryDocument> = newest.into_values().collect();
-    documents.sort_by(|left, right| right.updated_at.cmp(&left.updated_at));
+    documents.sort_by_key(|document| std::cmp::Reverse(document.updated_at));
     documents
 }
 

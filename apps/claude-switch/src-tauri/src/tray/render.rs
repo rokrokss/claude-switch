@@ -428,7 +428,7 @@ mod tests {
         assert_eq!(one.height, 36);
         assert_eq!(one.rgba.len(), (one.width * one.height * 4) as usize);
         assert!(two.width > one.width + (GROUP_GAP * SCALE) as u32);
-        assert!(one.rgba.chunks_exact(4).any(|pixel| pixel[3] > 0));
+        assert!(one.rgba.as_chunks::<4>().0.iter().any(|pixel| pixel[3] > 0));
     }
 
     #[test]
@@ -453,7 +453,12 @@ mod tests {
     fn bars_and_the_concealed_mark_are_eighteen_points_tall() {
         let drawn = bars(&[0.2, 0.9]).unwrap();
         assert_eq!((drawn.width, drawn.height), (36, 36));
-        assert!(drawn.rgba.chunks_exact(4).any(|pixel| pixel[3] == 255));
+        assert!(drawn
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .any(|pixel| pixel[3] == 255));
         assert!(bars(&[]).is_none());
         let concealed = concealed().unwrap();
         assert_eq!(concealed.height, 36);
@@ -484,7 +489,7 @@ mod tests {
         })
         .unwrap();
         let mut bytes = format!("{} {}\n", drawn.width, drawn.height).into_bytes();
-        bytes.extend(drawn.rgba.chunks_exact(4).map(|pixel| pixel[3]));
+        bytes.extend(drawn.rgba.as_chunks::<4>().0.iter().map(|pixel| pixel[3]));
         std::fs::write(path, bytes).unwrap();
     }
 }
