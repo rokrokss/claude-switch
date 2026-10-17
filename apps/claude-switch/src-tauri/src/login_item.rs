@@ -15,8 +15,7 @@ pub enum LoginItem {
     Off,
     /// Turned on, but waiting for the user to allow it in System Settings.
     NeedsApproval,
-    /// This copy can't be a login item (a development build, or an app
-    /// outside a bundle).
+    /// This macOS has no login item API for apps (before macOS 13).
     Unavailable,
 }
 
@@ -57,10 +56,11 @@ mod platform {
         // SAFETY: `status` is an NSInteger property of SMAppService.
         let status: isize = unsafe { msg_send![&*service, status] };
         // SMAppServiceStatus: notRegistered, enabled, requiresApproval, notFound.
+        // The main app reads as notFound until it is first registered, so
+        // that is off too; a copy that can't be one says why when turned on.
         match status {
             1 => LoginItem::On,
             2 => LoginItem::NeedsApproval,
-            3 => LoginItem::Unavailable,
             _ => LoginItem::Off,
         }
     }

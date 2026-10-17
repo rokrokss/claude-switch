@@ -34,7 +34,7 @@ export function MenuBarSection() {
   if (login.status === 'needsApproval') {
     loginNote = 'Allow claude-switch in System Settings → General → Login Items.'
   } else if (login.status === 'unavailable') {
-    loginNote = 'Only claude-switch installed in Applications can open at login.'
+    loginNote = 'This version of macOS can’t open apps at login this way.'
   }
 
   return (
