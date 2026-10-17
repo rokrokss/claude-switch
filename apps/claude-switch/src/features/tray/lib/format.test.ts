@@ -46,6 +46,11 @@ describe('formatDuration', () => {
     expect(formatDuration(4 * minute)).toBe('soon')
     expect(formatDuration(-hour)).toBe('soon')
   })
+
+  it('takes a closer threshold for soon', () => {
+    expect(formatDuration(4 * minute, minute)).toBe('4m')
+    expect(formatDuration(minute, minute)).toBe('soon')
+  })
 })
 
 describe('formatMoment and formatDeadline', () => {

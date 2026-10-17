@@ -294,11 +294,11 @@ describe('TrayPanel', () => {
   it('says when the next update comes, and updates on a click', async () => {
     vi.mocked(useTrayStatus).mockReturnValue({
       refreshing: false,
-      nextRefreshAt: new Date(Date.now() + 9 * 60_000).toISOString(),
+      nextRefreshAt: new Date(Date.now() + 4 * 60_000).toISOString(),
     })
     vi.mocked(useTrayEntries).mockReturnValue([makeEntry()])
     render(<TrayPanel />)
-    const footer = await screen.findByText('claude-switch 2.0.0 · Next update in 9m')
+    const footer = await screen.findByText('2.0.0 · Next update in 4m')
     fireEvent.click(footer)
     expect(refreshUsage).toHaveBeenCalledOnce()
   })
