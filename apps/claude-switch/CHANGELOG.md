@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.1 (2026-10-17)
+
+
+### Fixed
+
+* **tray:** the panel's footer says when the next update comes, instead of always reading "Updating…"
+
 ## 2.1.0 (2026-10-17)
 
 
