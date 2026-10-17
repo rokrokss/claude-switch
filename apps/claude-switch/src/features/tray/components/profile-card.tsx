@@ -17,7 +17,7 @@ import { claimCodexReset, openExternalUrl, openSettings, refreshUsage } from '@/
 import { formatMoment } from '../lib/format'
 import { cardLayout } from '../lib/layout'
 import { copyAsImage, profileShareCard } from '../lib/share-image'
-import { starsFor, toggleStar } from '../lib/stars'
+import { starsFor } from '../lib/stars'
 import { MetricRow } from './metric-row'
 
 /**
@@ -46,7 +46,6 @@ type Props = {
    */
   hidden: boolean
   onSettingsChange: (patch: Partial<Settings>) => void
-  onShownChange: (shown: boolean) => void
   /**
    * Says something briefly at the foot of the panel, e.g. why a star was refused.
    */
@@ -57,16 +56,7 @@ type Props = {
  * A profile's card: its name and plan, its always-visible metrics, and —
  * opened — its on-demand ones and links to its status and usage pages.
  */
-export function ProfileCard({
-  entry,
-  settings,
-  refreshing,
-  now,
-  hidden,
-  onSettingsChange,
-  onShownChange,
-  onNotice,
-}: Props) {
+export function ProfileCard({ entry, settings, refreshing, now, hidden, onSettingsChange, onNotice }: Props) {
   const layout = cardLayout(entry, settings.layout)
   const stars = starsFor(settings.menuBar, entry.id)
   const compact = settings.display.density === 'compact'
@@ -94,17 +84,6 @@ export function ProfileCard({
             : undefined
         }
         onNotice={onNotice}
-        onStarToggle={() => {
-          const result = toggleStar(settings.menuBar, entry.id, slot.id)
-          if ('refused' in result) {
-            onNotice(result.refused)
-            return
-          }
-          onSettingsChange({ menuBar: result.menuBar })
-          if (hidden) {
-            onShownChange(true)
-          }
-        }}
       />
     ))
   }

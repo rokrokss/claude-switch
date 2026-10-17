@@ -19,10 +19,6 @@ type PanelSettings = {
    * Saves the groups given; the backend tells every window.
    */
   update: (patch: Partial<Settings>) => void
-  /**
-   * Shows an entry in the menu bar, or takes it out.
-   */
-  setShownInMenuBar: (id: string, shown: boolean) => void
 }
 
 /**
@@ -66,10 +62,5 @@ export function usePanelSettings(): PanelSettings {
     void updateAppState({ settings: patch })
   }
 
-  function setShownInMenuBar(id: string, shown: boolean) {
-    setHidden((current) => (shown ? current.filter((hidden) => hidden !== id) : [...current, id]))
-    void updateAppState({ menuBar: { id, shown } })
-  }
-
-  return { settings, themeMode, hiddenFromMenuBar, update, setShownInMenuBar }
+  return { settings, themeMode, hiddenFromMenuBar, update }
 }

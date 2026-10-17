@@ -30,7 +30,7 @@ const hintKey = 'claude-switch-tray-hint-dismissed'
 export function TrayPanel() {
   const entries = useTrayEntries()
   const status = useTrayStatus()
-  const { settings, themeMode, hiddenFromMenuBar, update, setShownInMenuBar } = usePanelSettings()
+  const { settings, themeMode, hiddenFromMenuBar, update } = usePanelSettings()
   const [notice, showNotice] = useNotice()
   const party = usePartyMode()
   const updateVersion = useUpdateNotice()
@@ -77,7 +77,6 @@ export function TrayPanel() {
                 now={now}
                 hidden={hiddenFromMenuBar.includes(entry.id)}
                 onSettingsChange={update}
-                onShownChange={(shown) => setShownInMenuBar(entry.id, shown)}
                 onNotice={showNotice}
               />
             ))}

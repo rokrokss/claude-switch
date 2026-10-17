@@ -76,7 +76,6 @@ function makeEntry(overrides: Partial<TrayEntry> = {}): TrayEntry {
 }
 
 const update = vi.fn()
-const setShownInMenuBar = vi.fn()
 
 function withSettings(settings: Settings = defaultSettings) {
   vi.mocked(usePanelSettings).mockReturnValue({
@@ -84,7 +83,6 @@ function withSettings(settings: Settings = defaultSettings) {
     themeMode: 'system',
     hiddenFromMenuBar: [],
     update,
-    setShownInMenuBar,
   })
 }
 
@@ -241,27 +239,6 @@ describe('TrayPanel', () => {
     render(<TrayPanel />)
     expect(screen.getByText('3 available')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Status' })).toBeInTheDocument()
-  })
-
-  it('unstars a metric from its right-click menu', async () => {
-    vi.mocked(useTrayEntries).mockReturnValue([makeEntry()])
-    render(<TrayPanel />)
-    fireEvent.contextMenu(screen.getByText('Session'))
-    fireEvent.click(await screen.findByText('Remove from menu bar'))
-    expect(update).toHaveBeenCalledWith({ menuBar: { ...defaultSettings.menuBar, stars: { work: ['weekly'] } } })
-  })
-
-  it('says why a third star is refused', async () => {
-    vi.mocked(useTrayEntries).mockReturnValue([
-      makeEntry({
-        metrics: [meter('session', 'Session', 18), meter('weekly', 'Weekly', 24), meter('extra', 'Extra', 5)],
-      }),
-    ])
-    render(<TrayPanel />)
-    fireEvent.contextMenu(screen.getByText('Extra'))
-    fireEvent.click(await screen.findByText('Star for menu bar'))
-    expect(await screen.findByRole('status')).toHaveTextContent('Up to 2 stars per profile')
-    expect(update).not.toHaveBeenCalled()
   })
 
   it('uses a Codex reset after a confirmation', async () => {
