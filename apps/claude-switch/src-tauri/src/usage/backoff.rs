@@ -6,7 +6,8 @@
 //!
 //! A hold lasts the endpoint's `Retry-After` (or [`DEFAULT_WAIT`]). A rate
 //! limit straight after another one ran out waits longer each time, by
-//! [`STEP`] doubling, up to [`MAX_WAIT`]; an answer with usage forgets them.
+//! [`STEP`] doubling, up to [`MAX_WAIT`] or the `Retry-After` when that is
+//! longer; an answer with usage forgets them.
 //!
 //! `<app data>/usage-backoff.json`, beside the menu bar's cache.
 
@@ -30,7 +31,8 @@ pub const DEFAULT_WAIT: Duration = Duration::from_secs(5 * 60);
 /// What a second rate limit in a row adds to the wait, doubling with each
 /// after it.
 const STEP: Duration = Duration::from_secs(5 * 60);
-/// The longest hold, however many rate limits in a row.
+/// The longest hold, however many rate limits in a row, unless the endpoint
+/// names a longer one.
 const MAX_WAIT: Duration = Duration::from_secs(3 * 60 * 60);
 /// A hold that ran out longer ago than this no longer counts toward the next.
 const FORGET_AFTER: TimeDelta = TimeDelta::days(1);
@@ -98,10 +100,8 @@ pub fn next(previous: Option<&Hold>, retry_after: Option<Duration>, now: DateTim
         0 | 1 => Duration::ZERO,
         _ => STEP.saturating_mul(2u32.saturating_pow(strikes - 2)),
     };
-    let wait = retry_after
-        .unwrap_or(DEFAULT_WAIT)
-        .saturating_add(extra)
-        .min(MAX_WAIT);
+    let named = retry_after.unwrap_or(DEFAULT_WAIT);
+    let wait = named.saturating_add(extra).min(MAX_WAIT.max(named));
     Hold {
         until: now + TimeDelta::from_std(wait).unwrap_or(TimeDelta::zero()),
         strikes,
@@ -211,6 +211,17 @@ mod tests {
             last = Some(hold);
         }
         assert_eq!(waits, [60, 65, 70, 80, 100, 140, 180]);
+    }
+
+    #[test]
+    fn a_wait_named_longer_than_the_longest_hold_is_kept() {
+        let now = at("2026-10-17T12:00:00Z");
+        let previous = Hold {
+            until: now,
+            strikes: 6,
+        };
+        let hold = next(Some(&previous), Some(5 * HOUR), now);
+        assert_eq!(hold.until, at("2026-10-17T17:00:00Z"));
     }
 
     #[test]
