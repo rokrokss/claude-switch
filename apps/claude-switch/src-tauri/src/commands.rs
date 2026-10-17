@@ -623,7 +623,7 @@ pub(crate) async fn profile_usage(
                 CLAUDE_DEAD_CREDS.get_or_init(usage::dead_credentials::DeadCredentialRegistry::new);
             let provider = ClaudeQuotaProvider::new(user_agent, cache, dead_credentials)
                 .map_err(|_| AppError::Io(std::io::Error::other("could not build HTTP client")))?;
-            Ok(unless_held(profile_id, async {
+            Ok(unless_held(profile_id, Some(&config_dir), async {
                 let renewed =
                     usage::build_with_renewal(&config_dir, &provider, dead_credentials).await;
                 let unrenewed = matches!(renewed.quota_error, Some(QuotaError::Unauthorized));
@@ -694,7 +694,7 @@ pub(crate) async fn stored_profile_usage(profile_id: &str) -> AppResult<ProfileU
                 CLAUDE_DEAD_CREDS.get_or_init(usage::dead_credentials::DeadCredentialRegistry::new);
             let provider = ClaudeQuotaProvider::new(user_agent, cache, dead_credentials)
                 .map_err(|_| AppError::Io(std::io::Error::other("could not build HTTP client")))?;
-            Ok(unless_held(profile_id, usage::build(&config_dir, &provider)).await)
+            Ok(unless_held(profile_id, None, usage::build(&config_dir, &provider)).await)
         }
         AppKind::Codex => Ok(usage::build(&config_dir, &CodexQuotaProvider).await),
     }
@@ -709,14 +709,20 @@ fn rate_limit_remaining(profile_id: &str) -> Option<std::time::Duration> {
 
 /// Claude profile `profile_id`'s usage from `ask`, unless a rate limit holds
 /// the profile back ([`usage::backoff`], shared with the command line): then
-/// it reads as rate limited, and nothing is asked. A rate limit the endpoint
-/// just gave sets the next hold; an answer with usage lifts it.
+/// nothing is asked, and it reads as rate limited, or, given its config home
+/// `probe_dir`, with Session and Weekly read around the endpoint
+/// ([`held_usage`]). A rate limit the endpoint just gave sets the next hold;
+/// an answer with usage lifts it.
 async fn unless_held(
     profile_id: &str,
+    probe_dir: Option<&std::path::Path>,
     ask: impl std::future::Future<Output = ProfileUsage>,
 ) -> ProfileUsage {
     let now = chrono::Utc::now();
     if usage::backoff::until(&usage::backoff::load(), profile_id, now).is_some() {
+        if let Some(held) = held_usage(profile_id, probe_dir).await {
+            return held;
+        }
         return ProfileUsage {
             quota: None,
             quota_error: Some(QuotaError::RateLimited),
@@ -748,7 +754,49 @@ async fn unless_held(
             &format!("could not save when to ask again: {}", err.message()),
         );
     }
+    if matches!(
+        (&answer.quota, answer.quota_error),
+        (None, Some(QuotaError::RateLimited))
+    ) {
+        if let Some(held) = held_usage(profile_id, probe_dir).await {
+            return held;
+        }
+    }
     answer
+}
+
+/// What held Claude profile `profile_id` reads as with Session and Weekly
+/// probed through `claude -p` on its config home `probe_dir`
+/// ([`usage::probe`]) over its last figures; those figures as they are while
+/// they're younger than a probe's interval. None without `probe_dir`, or
+/// with nothing to show but the rate limit.
+async fn held_usage(profile_id: &str, probe_dir: Option<&std::path::Path>) -> Option<ProfileUsage> {
+    let probe_dir = probe_dir?;
+    let last = crate::tray::cache::load()
+        .into_iter()
+        .find(|entry| entry.id == profile_id)
+        .and_then(|entry| entry.usage)
+        .filter(|usage| usage.quota.is_some());
+    let recent = last.as_ref().is_some_and(|usage| {
+        chrono::DateTime::parse_from_rfc3339(&usage.fetched_at).is_ok_and(|at| {
+            (chrono::Utc::now() - at.with_timezone(&chrono::Utc))
+                .to_std()
+                .is_ok_and(|age| age < usage::probe::EVERY)
+        })
+    });
+    if recent {
+        return last;
+    }
+    let reading = usage::probe::read(profile_id, probe_dir).await?;
+    let read_at = reading.read_at;
+    Some(ProfileUsage {
+        quota: Some(usage::probe::over(
+            last.and_then(|usage| usage.quota),
+            reading,
+        )),
+        quota_error: None,
+        fetched_at: read_at.to_rfc3339(),
+    })
 }
 
 /// The plan profile `profile_id` is signed in under, as its app names it
