@@ -1,6 +1,6 @@
 [package]
 name = "claude-switch"
-version = "2.0.1"
+version = "2.0.2"
 description = "Run several Claude accounts on one Mac, each with its own Desktop launcher, CLI wrapper and Dock tile."
 authors = ["Hyungrok Kim"]
 repository = "https://github.com/rokrokss/claude-switch"

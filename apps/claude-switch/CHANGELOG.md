@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.2 (2026-10-17)
+
+
+### Fixed
+
+* **settings:** Open at login can be turned on in a copy that has never been a login item, instead of reading as unavailable
+
 ## 2.0.1 (2026-10-17)
 
 
