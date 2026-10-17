@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.1.0 (2026-10-17)
+
+
+### Added
+
+* **usage:** a Claude profile the usage endpoint keeps rate limiting still shows a fresh session and weekly, read through Claude Code at most every 15 minutes while it waits
+
+### Fixed
+
+* **usage:** a rate limit that asks for a wait longer than an hour is waited out in full, instead of being asked again early
+* **usage:** a ChatGPT profile whose usage can't be read says why in the log, such as codex missing from PATH
+
 ## 2.0.2 (2026-10-17)
 
 
