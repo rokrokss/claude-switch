@@ -23,11 +23,11 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* shizue's faint dot grid on the cream canvas (../shizue site/index.html). */
+/* shizue's faint dot grid on the canvas (../shizue site/index.html). */
 body {
   font-size: 15px;
   line-height: 1.6;
-  background-image: radial-gradient(rgba(16, 48, 43, 0.08) 1.2px, transparent 1.3px);
+  background-image: radial-gradient(color-mix(in oklab, var(--color-ink) 8%, transparent) 1.2px, transparent 1.3px);
   background-size: 22px 22px;
 }
 :root[data-theme="dark"] body {
