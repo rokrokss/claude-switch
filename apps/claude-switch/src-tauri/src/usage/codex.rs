@@ -192,7 +192,8 @@ async fn read_rate_limits(codex_home: &Path) -> Result<String, QuotaError> {
 }
 
 /// The `account/rateLimits/read` result, as raw JSON text, read from the
-/// app-server `start` gives, all within `budget`.
+/// app-server `start` gives, all within `budget`. A failed call is logged,
+/// since the usage card only shows what kind of failure it was.
 async fn read_rate_limits_from(
     start: impl Future<Output = Result<CodexRpc, CodexRpcError>>,
     budget: Duration,
@@ -203,7 +204,10 @@ async fn read_rate_limits_from(
     };
     match tokio::time::timeout(budget, read).await {
         Ok(Ok(result)) => Ok(result.to_string()),
-        Ok(Err(error)) => Err(quota_error(&error)),
+        Ok(Err(error)) => {
+            crate::logging::warn("usage", &format!("codex app-server read failed: {error}"));
+            Err(quota_error(&error))
+        }
         Err(_) => Err(QuotaError::Network),
     }
 }
