@@ -13,10 +13,10 @@ const soonMs = 5 * minuteMs
 
 /**
  * A time left, rounded up to the minute: `2d 4h`, `3h 25m`, `12m`, or `soon`
- * within five minutes.
+ * within `soon` (five minutes unless given).
  */
-export function formatDuration(ms: number): string {
-  if (ms <= soonMs) {
+export function formatDuration(ms: number, soon = soonMs): string {
+  if (ms <= soon) {
     return 'soon'
   }
   const minutes = Math.ceil(ms / minuteMs)

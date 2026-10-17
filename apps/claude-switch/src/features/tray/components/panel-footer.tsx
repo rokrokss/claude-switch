@@ -17,6 +17,11 @@ import { getAppMetadata, openAbout, openExternalUrl, openSettings, quitApp, refr
 import { formatDuration } from '../lib/format'
 
 const issuesUrl = 'https://github.com/rokrokss/claude-switch/issues/new'
+/**
+ * Updates come every five minutes, so the meters' five-minute "soon" would
+ * be all the footer ever said.
+ */
+const updateSoonMs = 60_000
 
 /**
  * The panel's last line: the version and when the next update comes (a
@@ -24,7 +29,7 @@ const issuesUrl = 'https://github.com/rokrokss/claude-switch/issues/new'
  */
 export function PanelFooter({ status, now }: { status: TrayStatus; now: number }) {
   const version = useVersion()
-  const next = status.nextRefreshAt ? formatDuration(Date.parse(status.nextRefreshAt) - now) : null
+  const next = status.nextRefreshAt ? formatDuration(Date.parse(status.nextRefreshAt) - now, updateSoonMs) : null
   let schedule = ''
   if (status.refreshing) {
     schedule = 'Updating…'
@@ -43,7 +48,7 @@ export function PanelFooter({ status, now }: { status: TrayStatus; now: number }
           void refreshUsage()
         }}
       >
-        claude-switch {version}
+        {version}
         {schedule ? ` · ${schedule}` : ''}
       </button>
       <DropdownMenu>
