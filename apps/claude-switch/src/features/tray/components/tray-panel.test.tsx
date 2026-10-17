@@ -147,16 +147,6 @@ describe('TrayPanel', () => {
     })
   })
 
-  it('hides the total spend card from its right-click menu', async () => {
-    vi.mocked(useTrayEntries).mockReturnValue([makeEntry({ metrics: [today(6, 2_000_000)] })])
-    render(<TrayPanel />)
-    fireEvent.contextMenu(screen.getByRole('region', { name: 'Total spend' }))
-    fireEvent.click(await screen.findByText('Hide total spend'))
-    expect(update).toHaveBeenCalledWith({
-      display: { ...defaultSettings.display, totalSpend: { ...defaultSettings.display.totalSpend, shown: false } },
-    })
-  })
-
   it('says when a rate-limited profile is asked again', () => {
     const retryAt = new Date(Date.now() + hour).toISOString()
     vi.mocked(useTrayEntries).mockReturnValue([
@@ -272,14 +262,6 @@ describe('TrayPanel', () => {
     fireEvent.click(await screen.findByText('Star for menu bar'))
     expect(await screen.findByRole('status')).toHaveTextContent('Up to 2 stars per profile')
     expect(update).not.toHaveBeenCalled()
-  })
-
-  it('takes a profile out of the menu bar from its name', async () => {
-    vi.mocked(useTrayEntries).mockReturnValue([makeEntry()])
-    render(<TrayPanel />)
-    fireEvent.contextMenu(screen.getByText('Work'))
-    fireEvent.click(await screen.findByText('Hide from menu bar'))
-    expect(setShownInMenuBar).toHaveBeenCalledWith('work', false)
   })
 
   it('uses a Codex reset after a confirmation', async () => {

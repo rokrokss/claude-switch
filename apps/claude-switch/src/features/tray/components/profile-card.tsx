@@ -5,13 +5,7 @@ import type { Placed } from '../lib/layout'
 import { AlertTriangle, ChevronDown, LoaderCircle } from 'lucide-react'
 
 import { cn } from '@/design'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/design/ui/context-menu'
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/design/ui/context-menu'
 import { BrandMark } from '@/features/profiles/components/brand-mark'
 import {
   formatUpdatedAgo,
@@ -131,10 +125,6 @@ export function ProfileCard({
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-52 text-[12px]">
-          <ContextMenuItem onSelect={() => onShownChange(hidden)}>
-            {hidden ? 'Show in menu bar' : 'Hide from menu bar'}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
           <ContextMenuItem onSelect={() => void refreshUsage()}>Update now</ContextMenuItem>
           <ContextMenuItem onSelect={() => copyAsImage(profileShareCard(entry, settings, now), onNotice)}>
             Copy as image

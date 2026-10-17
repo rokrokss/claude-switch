@@ -37,6 +37,7 @@ const DEFAULT_STATE = {
   migrationDismissedAt: null,
   pathBannerDismissedAt: null,
   themeMode: 'system' as const,
+  hiddenFromMenuBar: [],
   settings: defaultSettings,
 }
 
@@ -169,6 +170,18 @@ describe('SettingsView', () => {
       expect(mockInvoke).toHaveBeenLastCalledWith('update_app_state', {
         patch: { settings: { layout: defaultSettings.layout, menuBar: defaultSettings.menuBar } },
       }),
+    )
+  })
+
+  it('takes a profile out of the menu bar', async () => {
+    primeInitialLoads()
+    renderSettings(<SettingsView onClose={vi.fn()} onOpenMigration={vi.fn()} onOpenAbout={vi.fn()} />)
+    const user = userEvent.setup()
+    const shown = await screen.findByRole('switch', { name: 'Show Work in the menu bar' })
+    expect(shown).toHaveAttribute('aria-checked', 'true')
+    await user.click(shown)
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith('update_app_state', { patch: { menuBar: { id: 'p1', shown: false } } }),
     )
   })
 

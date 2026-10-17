@@ -15,11 +15,12 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Star, Undo2 } from 'lucide-react'
 
-import { Button, cn, Segmented } from '@/design'
+import { Button, cn, Segmented, Switch } from '@/design'
 import { BrandMark } from '@/features/profiles/components/brand-mark'
 import { canStar, starsFor, toggleStar } from '@/features/tray/lib/stars'
 import { useAppState } from '@/lib/app-state/use-app-state'
 import { getTrayUsage, hapticTick } from '@/lib/commands'
+import { extractErrorMessage } from '@/lib/extract-error-message'
 
 import { customizeRows, layoutOf, moveTo, reorder, withoutLayout } from '../lib/customize'
 import { SettingsSection } from './settings-card'
@@ -44,8 +45,9 @@ const groups: ReadonlyArray<{ place: Place; title: string }> = [
 ]
 
 /**
- * What each profile's card in the menu bar panel shows, in what order, and
- * which two of its metrics the menu bar itself shows.
+ * What each profile's card in the menu bar panel shows, in what order,
+ * whether the menu bar itself shows the profile, and which two of its
+ * metrics.
  */
 export function CustomizeSection() {
   const appState = useAppState()
@@ -88,7 +90,15 @@ export function CustomizeSection() {
       {entries === null ? <Note>Loading the profiles…</Note> : null}
       {entries?.length === 0 ? <Note>No profile reports usage yet.</Note> : null}
       {entries?.map((entry) => (
-        <ProfileCustomizer key={entry.id} entry={entry} layout={layout} menuBar={menuBar} onSave={save} />
+        <ProfileCustomizer
+          key={entry.id}
+          entry={entry}
+          layout={layout}
+          menuBar={menuBar}
+          shown={!appState.state.hiddenFromMenuBar.includes(entry.id)}
+          onSave={save}
+          onShownChange={(shown) => appState.update({ menuBar: { id: entry.id, shown } })}
+        />
       ))}
     </SettingsSection>
   )
@@ -100,10 +110,15 @@ function Note({ children }: { children: string }) {
 
 type CustomizerProps = Customization & {
   entry: TrayEntry
+  /**
+   * Whether the menu bar shows the profile; the panel shows it either way.
+   */
+  shown: boolean
   onSave: (next: Customization) => void
+  onShownChange: (shown: boolean) => Promise<unknown>
 }
 
-function ProfileCustomizer({ entry, layout, menuBar, onSave }: CustomizerProps) {
+function ProfileCustomizer({ entry, layout, menuBar, shown, onSave, onShownChange }: CustomizerProps) {
   const rows = customizeRows(entry, layout)
   const stars = starsFor(menuBar, entry.id)
   const [notice, setNotice] = useState<string | null>(null)
@@ -134,9 +149,21 @@ function ProfileCustomizer({ entry, layout, menuBar, onSave }: CustomizerProps) 
           <BrandMark app={entry.app} size={14} />
           <span className="truncate text-[13px] font-semibold text-ink">{entry.name}</span>
         </div>
-        <Button size="sm" variant="ghost" onClick={reset}>
-          Reset
-        </Button>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="flex items-center gap-2 text-[12px] text-muted-strong">
+            Menu bar
+            <Switch
+              aria-label={`Show ${entry.name} in the menu bar`}
+              checked={shown}
+              onChange={(next) => {
+                onShownChange(next).catch((caught: unknown) => setNotice(extractErrorMessage(caught)))
+              }}
+            />
+          </span>
+          <Button size="sm" variant="ghost" onClick={reset}>
+            Reset
+          </Button>
+        </div>
       </div>
       {notice ? (
         <p role="status" className="mb-2 text-[11.5px] text-amber">
