@@ -282,7 +282,15 @@ Claude: the undocumented quota endpoint may have changed shape. Codex: the `code
 **Does it send my data anywhere?**
 No. There is no analytics, telemetry or remote logging. Its network requests are the usage lookups above, made with each profile's own credentials; the update check, which reads `latest.json` from this repository's latest release and downloads the update only when you install it; and, about once an hour, three public price lists it estimates local spend with: LiteLLM's (from raw.githubusercontent.com), models.dev's, and claude-switch's own (from claude-switch.shizue.net). The price list requests carry no usage data: what your sessions cost is worked out on your Mac from their logs. The usage lookups and the price lists go through your [proxy](#proxy) if you set one.
 
-Nothing listens for connections unless you turn on the [local API](#local-api). It's off by default, and when on it serves usage figures, never credentials, to this Mac only.
+Nothing listens for connections unless you turn on the [local API](#local-api). It's off by default, and when on it serves usage figures, never credentials, to this Mac only. Nothing goes to iCloud unless you turn on sync; see the next question.
+
+**What does "Sync usage across Macs" put in iCloud?**
+The switch is in Settings → Sync and is off by default. When on, each Mac writes one file to claude-switch's private iCloud container. It doesn't show in iCloud Drive. Each Mac then reads the other Macs' files, so a profile's Today, Yesterday, Last 30 days and Usage trend include what the same account used on your other Macs signed in to the same iCloud account. A file holds:
+
+- a random id for the Mac (kept in the login Keychain, so a reinstall keeps writing the same file) and its name;
+- for each signed-in account, the last 30 days of tokens and estimated cost by day and by model, plus the names of models no price list knows.
+
+Accounts are named by a one-way hash of the Claude account and organization ids, or of the ChatGPT workspace id and email. Histories add up only for the same account, and a profile whose account can't be told is left out. No email, credentials, prompts, session logs, limits or quota figures go into the file. Turning sync off deletes this Mac's file and goes back to this Mac's own figures. Only builds signed for iCloud can sync; others say so in Settings.
 
 **Can I run it next to another build of this app?**
 Not on the same data directory. A build that doesn't know `signedClone` drops the field when it saves, and that profile falls back to the stock launcher (its data is safe).

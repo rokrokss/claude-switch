@@ -21,6 +21,7 @@ function renderSettings(ui: ReactElement) {
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('@tauri-apps/api/app', () => ({ getVersion: vi.fn().mockResolvedValue('0.1.0') }))
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => undefined) }))
 
 const mockInvoke = vi.mocked(invoke)
 
@@ -134,6 +135,7 @@ function primeInitialLoads({
     tray_usage: () => trayEntries,
     command_line: () => ({ path: '~/.local/bin/claude-switch', state: 'notInstalled' }),
     codex_fallback_models: () => [{ id: 'gpt-5.5', title: 'GPT 5.5' }],
+    icloud_sync: () => ({ on: false, syncing: false, problem: null, unreadable: [], devices: [] }),
     refresh_usage: () => undefined,
   }
   mockInvoke.mockImplementation(async (command: string, args?: unknown) => {

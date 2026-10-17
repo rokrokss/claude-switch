@@ -10,6 +10,7 @@ import type {
   ExistingInstallInfo,
   ExistingInstallSizes,
   FallbackModel,
+  ICloudSync,
   ImportExistingInput,
   LaunchResult,
   LoginItem,
@@ -226,6 +227,13 @@ export function openMainWindow(): Promise<void> {
  */
 export function getTrayStatus(): Promise<TrayStatus> {
   return invoke<TrayStatus>('tray_status')
+}
+
+/**
+ * iCloud sync of the usage history: whether it works, and the Macs in it.
+ */
+export function getICloudSync(): Promise<ICloudSync> {
+  return invoke<ICloudSync>('icloud_sync')
 }
 
 /**

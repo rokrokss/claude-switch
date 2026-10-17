@@ -102,6 +102,15 @@ objc2-foundation = { version = "0.3", features = [
     "NSString",
     "NSURL",
     "NSUserDefaults",
+    # iCloud sync of the usage history (usage::sync).
+    "block2",
+    "NSFileCoordinator",
+    "NSFileManager",
+    "NSMetadata",
+    "NSMetadataAttributes",
+    "NSNotification",
+    "NSOperation",
+    "NSPredicate",
 ] }
 # Post notifications as claude-switch, and hear about clicks on them.
 block2 = "0.6"

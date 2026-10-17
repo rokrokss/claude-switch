@@ -10,6 +10,7 @@ pub(crate) mod quota;
 pub(crate) mod refresh;
 pub(crate) mod resets;
 pub(crate) mod spend;
+pub(crate) mod sync;
 
 use serde::{Deserialize, Serialize};
 

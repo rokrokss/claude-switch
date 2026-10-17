@@ -41,7 +41,7 @@ use crate::app_state::AppState;
 use crate::error::AppResult;
 use crate::settings::MenuBarStyle;
 use crate::usage::metrics::{self, Metric};
-use crate::usage::{backoff, spend};
+use crate::usage::{backoff, spend, sync};
 use crate::usage::{ProfileUsage, QuotaError};
 use crate::{app_state, commands, logging, migration, notifications, profiles};
 
@@ -616,8 +616,13 @@ async fn fetch_all(app: &AppHandle) -> bool {
     }
     let histories = history.within(HISTORY_WAIT).await;
     let now = Local::now();
+    let combined = histories.as_ref().map(|histories| {
+        sync::local_changed(app, histories.clone());
+        let ids: Vec<&str> = entries.iter().map(|entry| entry.id.as_str()).collect();
+        sync::combined(histories, &ids, now.date_naive())
+    });
     for entry in &mut entries {
-        let spent = match &histories {
+        let spent = match &combined {
             Some(histories) => spend::metrics_for(histories, &entry.id, &now),
             // Until the read finishes, what the last one found.
             None => previous
@@ -632,6 +637,7 @@ async fn fetch_all(app: &AppHandle) -> bool {
         let handle = app.clone();
         tauri::async_runtime::spawn(async move {
             if let Some(histories) = history.finished().await {
+                sync::local_changed(&handle, histories.clone());
                 show_history(&handle, &histories).await;
             }
         });
@@ -686,15 +692,16 @@ fn spend_metrics(metrics: &[Metric]) -> Vec<Metric> {
         .collect()
 }
 
-/// Shows a read of the local logs that finished after its refresh did.
-async fn show_history(app: &AppHandle, histories: &spend::Histories) {
+/// Shows a read of the local logs that finished after its refresh did, or
+/// the last one again with what iCloud sync now adds to it.
+pub(crate) async fn show_history(app: &AppHandle, histories: &spend::Histories) {
     let state = app.state::<TrayState>();
     let _refreshing = state.refreshing.lock().await;
     let now = Local::now();
-    let entries: Vec<TrayEntry> = state
-        .entries
-        .lock()
-        .unwrap()
+    let previous = state.entries.lock().unwrap().clone();
+    let ids: Vec<&str> = previous.iter().map(|entry| entry.id.as_str()).collect();
+    let histories = sync::combined(histories, &ids, now.date_naive());
+    let entries: Vec<TrayEntry> = previous
         .iter()
         .map(|entry| {
             let mut metrics: Vec<Metric> = entry
@@ -703,7 +710,7 @@ async fn show_history(app: &AppHandle, histories: &spend::Histories) {
                 .filter(|metric| !spend::is_spend_metric(&metric.id))
                 .cloned()
                 .collect();
-            metrics.extend(spend::metrics_for(histories, &entry.id, &now));
+            metrics.extend(spend::metrics_for(&histories, &entry.id, &now));
             TrayEntry {
                 metrics,
                 ..entry.clone()
@@ -739,13 +746,15 @@ fn for_panel(entries: &[TrayEntry]) -> Vec<TrayEntry> {
 }
 
 /// The user changed what the item or the panel shows: redraws the one and
-/// tells the other, fetching nothing. Starts or stops the local API too.
+/// tells the other, fetching nothing. Starts or stops the local API and
+/// iCloud sync too.
 pub fn settings_changed(app: &AppHandle, state: &AppState) {
     let _ = app.emit_to(PANEL_WINDOW, SETTINGS_EVENT, &state.settings);
     logging::set_level(state.settings.advanced.log_level);
     apply_shortcut(app, state.settings.menu_bar.shortcut.as_deref());
     redraw(app);
     crate::local_api::apply(app, state.settings.integrations.local_api);
+    sync::apply(app, state.settings.sync.icloud);
 }
 
 /// Registers `shortcut` (e.g. `CommandOrControl+Shift+U`) to open the panel

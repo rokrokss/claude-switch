@@ -6,6 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Duration, NaiveDate, NaiveTime, TimeZone};
+use serde::{Deserialize, Serialize};
 
 /// Days counted before today: the window is today and the 30 before it.
 pub const PREVIOUS_DAYS: i64 = 30;
@@ -97,13 +98,14 @@ pub fn day_of<Tz: TimeZone>(zone: &Tz, millis: i64) -> Option<NaiveDate> {
     DateTime::from_timestamp_millis(millis).map(|at| at.with_timezone(zone).date_naive())
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ModelUsage {
     pub tokens: u64,
     pub cost: f64,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct DayUsage {
     pub tokens: u64,
     pub cost: f64,
@@ -113,7 +115,11 @@ pub struct DayUsage {
 /// Only priced usage is counted: a model no list can price is left out of
 /// every figure, as tokens beside dollars that ignore some of them would
 /// mislead, and named in `unknown_models` instead.
-#[derive(Debug, Clone, Default, PartialEq)]
+///
+/// Serialized as is into the file iCloud sync keeps per Mac
+/// ([`crate::usage::sync::document`]).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
 pub struct UsageHistory {
     pub days: BTreeMap<NaiveDate, DayUsage>,
     /// Models used each day that no list could price, whether left out or
