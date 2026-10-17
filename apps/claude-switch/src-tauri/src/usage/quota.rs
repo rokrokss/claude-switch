@@ -23,9 +23,10 @@ const QUOTA_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 /// Cooldown applied to a 429 that carries no usable `Retry-After`: the
 /// shared back-off's.
 const DEFAULT_RATE_LIMIT_COOLDOWN: Duration = super::backoff::DEFAULT_WAIT;
-/// Upper bound on an honoured `Retry-After`. This endpoint hands out up to
-/// ~1h windows; cap there so a bogus header can't lock the card out longer.
-const MAX_RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(60 * 60);
+/// Upper bound on an honoured `Retry-After`, so a bogus header can't lock the
+/// card out for days. Generous: asking again before the endpoint's own window
+/// ends may be what extends it.
+const MAX_RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(24 * 60 * 60);
 /// Hard cap on response body size. The real response is well under 1 KiB.
 const MAX_BODY_BYTES: usize = 1024 * 1024;
 
@@ -84,12 +85,20 @@ impl UsageClient for ReqwestUsageClient {
             .await
             .map_err(|_| QuotaError::Network)?;
         let status = response.status().as_u16();
-        let retry_after = parse_retry_after(
-            response
-                .headers()
-                .get(reqwest::header::RETRY_AFTER)
-                .and_then(|value| value.to_str().ok()),
-        );
+        let retry_after_header = response
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|value| value.to_str().ok());
+        if status == 429 {
+            crate::logging::warn(
+                "usage",
+                &format!(
+                    "usage endpoint answered 429, Retry-After: {}",
+                    retry_after_header.unwrap_or("none")
+                ),
+            );
+        }
+        let retry_after = parse_retry_after(retry_after_header);
 
         // Pre-flight cap: if the server advertises a body larger than
         // we're willing to read, refuse before buffering a single byte.
@@ -1178,6 +1187,28 @@ mod tests {
         let remaining = cache.rate_limit_remaining(dir.path()).unwrap();
         assert!(remaining <= Duration::from_secs(1800));
         assert!(remaining > Duration::from_secs(1790));
+
+        // A Retry-After past an hour is kept, up to a day.
+        let long = dir_with_named_token("sk-long");
+        let client = CountingClient {
+            calls: std::sync::Mutex::new(0),
+            status: 429,
+            body: b"".to_vec(),
+            retry_after: Some(Duration::from_secs(2 * 60 * 60)),
+        };
+        let _ = fetch_quota_cached(long.path(), &client, &cache, &registry).await;
+        let remaining = cache.rate_limit_remaining(long.path()).unwrap();
+        assert!(remaining > Duration::from_secs(2 * 60 * 60 - 10));
+        let bogus = dir_with_named_token("sk-bogus");
+        let client = CountingClient {
+            calls: std::sync::Mutex::new(0),
+            status: 429,
+            body: b"".to_vec(),
+            retry_after: Some(Duration::from_secs(30 * 24 * 60 * 60)),
+        };
+        let _ = fetch_quota_cached(bogus.path(), &client, &cache, &registry).await;
+        let remaining = cache.rate_limit_remaining(bogus.path()).unwrap();
+        assert!(remaining <= MAX_RATE_LIMIT_COOLDOWN);
 
         // A success is no rate limit.
         let ok = dir_with_named_token("sk-ok");

@@ -5,6 +5,7 @@ pub(crate) mod dead_credentials;
 pub(crate) mod metrics;
 pub(crate) mod oauth;
 pub(crate) mod pace;
+pub(crate) mod probe;
 pub(crate) mod proxy;
 pub(crate) mod quota;
 pub(crate) mod refresh;
