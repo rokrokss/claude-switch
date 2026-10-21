@@ -2,7 +2,7 @@
   <img src="docs/assets/banner.png" alt="claude-switch: every Claude account, its own Dock tile" width="100%" />
   <h1>claude-switch</h1>
   <p>Run several Claude accounts on one Mac, side by side.</p>
-  <p><b>Claude Desktop and Claude Code for each account, each with its own Dock tile. ChatGPT and Codex too.</b></p>
+  <p><b>Claude Desktop and Claude Code for each account, each with its own Dock tile. ChatGPT and Codex too, and Gemini CLI and Antigravity in the terminal.</b></p>
 
   <p>
     <a style="font-size: 28px" href="https://github.com/rokrokss/claude-switch/releases/latest">
@@ -22,7 +22,7 @@
 
 <br/>
 
-Run several Claude accounts on one Mac, side by side: Claude Desktop and Claude Code, each account in its own profile, each profile with its own Dock tile. ChatGPT and Codex accounts work the same way. Coding sessions can move from one account to another.
+Run several Claude accounts on one Mac, side by side: Claude Desktop and Claude Code, each account in its own profile, each profile with its own Dock tile. ChatGPT and Codex accounts work the same way, and Gemini CLI and Antigravity (`agy`) accounts get a CLI profile each. Coding sessions can move from one account to another.
 
 Claude profiles can run from a **signed clone**: a copy of Claude.app that keeps Anthropic's signature, so sign-in, permissions, passkeys and Cowork behave as they do in the original, badged in the profile's color so you can tell the profiles apart.
 
@@ -38,11 +38,11 @@ Claude profiles can run from a **signed clone**: a copy of Claude.app that keeps
 
 ## ✨ What you get
 
-- **A profile per account.** Each one gets a desktop launcher, `/Applications/Claude (<Name>).app`, and a CLI command, `claude-<slug>`. Both open with that account's login, history and settings, isolated from the others.
+- **A profile per account.** Each one gets a desktop launcher, `/Applications/Claude (<Name>).app`, and a CLI command, `claude-<slug>`. Both open with that account's login, history and settings, isolated from the others. Gemini and Antigravity profiles are their CLI command alone: `gemini-<slug>` and `agy-<slug>`.
 - **Its own Dock tile.** A Claude profile can run from a signed clone wearing the profile's color, from a re-signed copy with its own icon and name, or simply from the stock app.
-- **Usage at a glance.** Each profile shows its current quota, the 5-hour and weekly windows, on its page and in the menu bar.
+- **Usage at a glance.** Each profile shows its current quota, the 5-hour and weekly windows, on its page and in the menu bar. Antigravity profiles show each model group's too, such as Claude and GPT models.
 - **Sessions that move.** List a profile's Claude Code and Codex sessions, archive them, or move one to another account and carry on there.
-- **Your existing setup, imported.** Already using Claude Desktop or Claude Code? Bring it into your first profile.
+- **Your existing setup, imported.** Already using Claude Desktop, Claude Code, ChatGPT, Gemini CLI or Antigravity? Bring it into your first profile.
 
 ## 🧬 The signed clone mode
 
@@ -164,7 +164,7 @@ Settings → Command line → **Install** puts a `claude-switch` command in `~/.
 ```sh
 claude-switch usage            # every profile
 claude-switch usage work       # one profile, by its id, slug or name
-claude-switch usage codex      # every ChatGPT profile (`claude` for every Claude one)
+claude-switch usage codex      # every ChatGPT profile (`claude`, `antigravity` for the others)
 claude-switch usage --force    # fetch again, however recent the figures
 ```
 
@@ -197,7 +197,7 @@ Exit status:
 }
 ```
 
-Profiles are keyed by id; a stock install is `default:claude` or `default:codex`. The resources are:
+Profiles are keyed by id; a stock install is `default:claude`, `default:codex` or `default:antigravity`. The resources are:
 
 - `session` and `weekly`.
 - `weekly.<model>`, e.g. `weekly.fable`.
@@ -213,7 +213,7 @@ The local API is off by default. Turn it on in Settings → Command line → **L
 | Route | Returns |
 | --- | --- |
 | `GET /v1/limits` | What `claude-switch usage` prints, for every profile |
-| `GET /v1/limits/:id` | The same for one profile (its exact id) or one app (`claude`, `codex`) |
+| `GET /v1/limits/:id` | The same for one profile (its exact id) or one app (`claude`, `codex`, `antigravity`) |
 | `GET /v1/usage` | Every profile as the menu bar's panel shows it, metrics and pacing included. This shape may grow |
 | `GET /v1/usage/:id` | The same, for one profile or app; always an array |
 
