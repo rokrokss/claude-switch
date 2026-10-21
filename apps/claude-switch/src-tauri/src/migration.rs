@@ -59,7 +59,25 @@ pub fn detect_for(kind: AppKind) -> AppResult<ExistingInstall> {
     if !app.has_desktop() {
         install.gui_path = None;
     }
+    // A config dir holding only another app's entries is that app's install.
+    if !has_own_entries(&code, app.cli_import_leaves) {
+        install.cli_path = None;
+    }
     Ok(install)
+}
+
+/// Whether `dir` has an entry not named in `leave`. True for an unreadable
+/// one, as there is no telling.
+fn has_own_entries(dir: &Path, leave: &[&str]) -> bool {
+    if leave.is_empty() {
+        return true;
+    }
+    let Ok(entries) = fs::read_dir(dir) else {
+        return true;
+    };
+    entries
+        .flatten()
+        .any(|entry| !leave.iter().any(|left| entry.file_name() == *left))
 }
 
 /// Sizes-only side-table for [`detect`]. Walks each tree once; returns
@@ -153,7 +171,7 @@ pub fn import(params: ImportParams) -> AppResult<ImportOutcome> {
     let mut copied_cli = false;
     if params.include_gui {
         if let Some(source) = params.gui_source.as_ref() {
-            if let Err(err) = copy_dir_recursive(source, &gui_data) {
+            if let Err(err) = copy_dir_recursive(source, &gui_data, &[]) {
                 let _ = fs::remove_dir_all(&params.profile_dir);
                 return Err(err);
             }
@@ -162,7 +180,7 @@ pub fn import(params: ImportParams) -> AppResult<ImportOutcome> {
     }
     if params.include_cli {
         if let Some(source) = params.cli_source.as_ref() {
-            if let Err(err) = copy_dir_recursive(source, &cli_home) {
+            if let Err(err) = copy_dir_recursive(source, &cli_home, app_spec.cli_import_leaves) {
                 let _ = fs::remove_dir_all(&params.profile_dir);
                 return Err(err);
             }
@@ -192,7 +210,7 @@ pub fn import(params: ImportParams) -> AppResult<ImportOutcome> {
     if copied_cli {
         let source = params.cli_source.as_ref().unwrap();
         let dest = params.backup_dir.join(app_spec.cli_stock_config_dir_name);
-        if let Err(err) = fs::rename(source, &dest) {
+        if let Err(err) = move_to_backup(source, &dest, app_spec.cli_import_leaves) {
             rollback(&params, &moved_gui, &None);
             return Err(AppError::Io(err));
         }
@@ -237,7 +255,51 @@ fn rollback(params: &ImportParams, moved_gui: &Option<PathBuf>, moved_cli: &Opti
     let _ = fs::remove_dir_all(&params.profile_dir);
 }
 
-fn copy_dir_recursive(from: &Path, to: &Path) -> AppResult<()> {
+/// Move the stock config dir `source` to `dest` in the backup, but for the
+/// entries named in `leave`, which stay in `source` (see
+/// [`crate::app_kind::AppSpec::cli_import_leaves`]); `source` goes too once
+/// nothing is left in it. Entries already moved go back if one can't be.
+fn move_to_backup(source: &Path, dest: &Path, leave: &[&str]) -> std::io::Result<()> {
+    if leave.is_empty() {
+        return fs::rename(source, dest);
+    }
+    fs::create_dir_all(dest)?;
+    let mut moved = Vec::new();
+    for entry in fs::read_dir(source)? {
+        let name = entry?.file_name();
+        if leave.iter().any(|left| name == *left) {
+            continue;
+        }
+        if let Err(err) = fs::rename(source.join(&name), dest.join(&name)) {
+            for name in moved {
+                let _ = fs::rename(dest.join(&name), source.join(&name));
+            }
+            return Err(err);
+        }
+        moved.push(name);
+    }
+    // Fails, harmlessly, while another app's entries are still in it.
+    let _ = fs::remove_dir(source);
+    Ok(())
+}
+
+/// Put a config dir moved into the backup at `backup` back at `original`:
+/// whole when nothing is there, else entry by entry, beside what an import
+/// left there (see [`move_to_backup`]).
+pub fn restore_from_backup(backup: &Path, original: &Path) -> std::io::Result<()> {
+    if !original.exists() {
+        return fs::rename(backup, original);
+    }
+    for entry in fs::read_dir(backup)? {
+        let name = entry?.file_name();
+        fs::rename(backup.join(&name), original.join(&name))?;
+    }
+    fs::remove_dir(backup)
+}
+
+/// Copy the tree at `from` to `to`, but for the top-level entries named in
+/// `leave`.
+fn copy_dir_recursive(from: &Path, to: &Path, leave: &[&str]) -> AppResult<()> {
     if !from.exists() {
         return Err(AppError::NotFound(format!(
             "source does not exist: {}",
@@ -245,15 +307,19 @@ fn copy_dir_recursive(from: &Path, to: &Path) -> AppResult<()> {
         )));
     }
     let root = normalize_lexically(from);
-    copy_tree(from, to, &root)
+    copy_tree(from, to, &root, leave)
 }
 
 /// `root` is the top of the tree being copied, carried through the recursion so
-/// each symlink can be judged against it — see [`rebase_link_target`].
-fn copy_tree(from: &Path, to: &Path, root: &Path) -> AppResult<()> {
+/// each symlink can be judged against it — see [`rebase_link_target`]. `leave`
+/// names entries of `from` itself not to copy.
+fn copy_tree(from: &Path, to: &Path, root: &Path, leave: &[&str]) -> AppResult<()> {
     fs::create_dir_all(to)?;
     for entry in fs::read_dir(from)? {
         let entry = entry?;
+        if leave.iter().any(|left| entry.file_name() == *left) {
+            continue;
+        }
         let source_path = entry.path();
         let dest_path = to.join(entry.file_name());
         // `file_type` comes from the directory entry, so a symlink to a
@@ -261,7 +327,7 @@ fn copy_tree(from: &Path, to: &Path, root: &Path) -> AppResult<()> {
         // descended into.
         let file_type = entry.file_type()?;
         if file_type.is_dir() {
-            copy_tree(&source_path, &dest_path, root)?;
+            copy_tree(&source_path, &dest_path, root, &[])?;
         } else if file_type.is_symlink() {
             // For symlinks, copy the link itself rather than resolving.
             let target = fs::read_link(&source_path)?;
@@ -623,6 +689,63 @@ mod tests {
             .is_file());
     }
 
+    /// Antigravity keeps its data in `~/.gemini` too. A Gemini import takes
+    /// Gemini CLI's files and leaves Antigravity's where Antigravity reads
+    /// them, uncopied.
+    #[test]
+    fn a_gemini_import_leaves_antigravity_in_place() {
+        let scratch = tempdir().unwrap();
+        let cli = make_source(scratch.path(), ".gemini", &[("oauth_creds.json", "{}")]);
+        fs::create_dir_all(cli.join("antigravity").join("brain")).unwrap();
+        fs::create_dir_all(cli.join("antigravity-cli")).unwrap();
+        fs::write(cli.join("config"), "").unwrap();
+        let params = ImportParams {
+            app: crate::app_kind::AppKind::Gemini,
+            ..fixture_params(scratch.path(), None, Some(cli.clone()))
+        };
+
+        import(params).unwrap();
+
+        let profile = scratch.path().join("profile/cli-config/.gemini");
+        assert!(profile.join("oauth_creds.json").is_file());
+        assert!(!profile.join("antigravity").exists());
+        assert!(!profile.join("antigravity-cli").exists());
+        assert!(!profile.join("config").exists());
+        assert!(scratch
+            .path()
+            .join("backup-12345/.gemini/oauth_creds.json")
+            .is_file());
+        assert!(!cli.join("oauth_creds.json").exists());
+        assert!(cli.join("antigravity").join("brain").is_dir());
+        assert!(cli.join("antigravity-cli").is_dir());
+        assert!(cli.join("config").is_file());
+    }
+
+    #[test]
+    fn a_config_dir_of_only_another_apps_entries_has_none_of_its_own() {
+        let scratch = tempdir().unwrap();
+        let gemini = make_source(scratch.path(), ".gemini", &[]);
+        fs::create_dir_all(gemini.join("antigravity")).unwrap();
+        let leaves = crate::app_kind::GEMINI.cli_import_leaves;
+        assert!(!has_own_entries(&gemini, leaves));
+        fs::write(gemini.join("settings.json"), "{}").unwrap();
+        assert!(has_own_entries(&gemini, leaves));
+        assert!(has_own_entries(&gemini, &[]));
+    }
+
+    #[test]
+    fn restoring_a_backup_puts_it_back_beside_what_the_import_left() {
+        let scratch = tempdir().unwrap();
+        let original = make_source(scratch.path(), ".gemini", &[("config", "")]);
+        let backup = make_source(scratch.path(), "backup", &[("oauth_creds.json", "{}")]);
+
+        restore_from_backup(&backup, &original).unwrap();
+
+        assert!(original.join("oauth_creds.json").is_file());
+        assert!(original.join("config").is_file());
+        assert!(!backup.exists());
+    }
+
     /// Gemini reads `<GEMINI_CLI_HOME>/.gemini`, so the stock `~/.gemini` goes
     /// to the profile's `cli-config/.gemini`, not its `cli-config`.
     #[test]
@@ -741,7 +864,7 @@ mod tests {
         fs::write(source.join("nested/deep/bottom.txt"), "bottom").unwrap();
 
         let dest = scratch.path().join("dest");
-        copy_dir_recursive(&source, &dest).unwrap();
+        copy_dir_recursive(&source, &dest, &[]).unwrap();
 
         assert_eq!(fs::read_to_string(dest.join("top.txt")).unwrap(), "top");
         assert_eq!(
@@ -773,7 +896,7 @@ mod tests {
         .unwrap();
 
         let dest = scratch.path().join("cli-config");
-        copy_dir_recursive(&claude, &dest).unwrap();
+        copy_dir_recursive(&claude, &dest, &[]).unwrap();
 
         let copied = dest.join("skills/grilling");
         assert!(
@@ -797,7 +920,7 @@ mod tests {
         std::os::unix::fs::symlink("real.md", source.join("skills/alias.md")).unwrap();
 
         let dest = scratch.path().join("dest");
-        copy_dir_recursive(&source, &dest).unwrap();
+        copy_dir_recursive(&source, &dest, &[]).unwrap();
 
         let copied = dest.join("skills/alias.md");
         assert_eq!(
@@ -819,7 +942,7 @@ mod tests {
         std::os::unix::fs::symlink(outside.join("rule.md"), source.join("rules/rule.md")).unwrap();
 
         let dest = scratch.path().join("dest");
-        copy_dir_recursive(&source, &dest).unwrap();
+        copy_dir_recursive(&source, &dest, &[]).unwrap();
 
         let copied = dest.join("rules/rule.md");
         assert_eq!(fs::read_link(&copied).unwrap(), outside.join("rule.md"));
@@ -839,7 +962,7 @@ mod tests {
             .unwrap();
 
         let dest = scratch.path().join("dest");
-        copy_dir_recursive(&source, &dest).unwrap();
+        copy_dir_recursive(&source, &dest, &[]).unwrap();
         // Import moves the original aside once copied; the copy must stand alone.
         fs::rename(&source, scratch.path().join("backup")).unwrap();
 

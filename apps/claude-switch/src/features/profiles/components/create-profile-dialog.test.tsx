@@ -17,6 +17,7 @@ const ONLY_CLAUDE_INSTALLED: Dependencies = {
     claude: { guiInstalled: true, cliInstalled: true },
     codex: { guiInstalled: false, cliInstalled: false },
     gemini: { guiInstalled: false, cliInstalled: false },
+    antigravity: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -26,6 +27,7 @@ const BOTH_INSTALLED: Dependencies = {
     claude: { guiInstalled: true, cliInstalled: true },
     codex: { guiInstalled: true, cliInstalled: true },
     gemini: { guiInstalled: false, cliInstalled: false },
+    antigravity: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -35,6 +37,7 @@ const onlyCodexInstalled: Dependencies = {
     claude: { guiInstalled: false, cliInstalled: false },
     codex: { guiInstalled: true, cliInstalled: true },
     gemini: { guiInstalled: false, cliInstalled: false },
+    antigravity: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -185,6 +188,7 @@ describe('CreateProfileDialog — dependency awareness', () => {
         claude: { guiInstalled: false, cliInstalled: true },
         codex: { guiInstalled: false, cliInstalled: false },
         gemini: { guiInstalled: false, cliInstalled: false },
+        antigravity: { guiInstalled: false, cliInstalled: false },
       },
       localBinOnPath: true,
     })
@@ -197,6 +201,7 @@ describe('CreateProfileDialog — dependency awareness', () => {
         claude: { guiInstalled: false, cliInstalled: false },
         codex: { guiInstalled: false, cliInstalled: false },
         gemini: { guiInstalled: false, cliInstalled: true },
+        antigravity: { guiInstalled: false, cliInstalled: false },
       },
       localBinOnPath: true,
     })
@@ -221,6 +226,7 @@ describe('CreateProfileDialog — dependency awareness', () => {
         claude: { guiInstalled: true, cliInstalled: false },
         codex: { guiInstalled: false, cliInstalled: false },
         gemini: { guiInstalled: false, cliInstalled: false },
+        antigravity: { guiInstalled: false, cliInstalled: false },
       },
       localBinOnPath: true,
     })
@@ -233,6 +239,7 @@ describe('CreateProfileDialog — dependency awareness', () => {
         claude: { guiInstalled: false, cliInstalled: false },
         codex: { guiInstalled: false, cliInstalled: false },
         gemini: { guiInstalled: false, cliInstalled: false },
+        antigravity: { guiInstalled: false, cliInstalled: false },
       },
       localBinOnPath: true,
     })
@@ -253,6 +260,7 @@ describe('CreateProfileDialog — dependency awareness', () => {
               claude: { guiInstalled: false, cliInstalled: true },
               codex: { guiInstalled: false, cliInstalled: false },
               gemini: { guiInstalled: false, cliInstalled: false },
+              antigravity: { guiInstalled: false, cliInstalled: false },
             },
             localBinOnPath: true,
           }}
@@ -288,6 +296,7 @@ describe('CreateProfileDialog — app-type picker behaviour', () => {
               claude: { guiInstalled: false, cliInstalled: false },
               codex: { guiInstalled: true, cliInstalled: false },
               gemini: { guiInstalled: false, cliInstalled: false },
+              antigravity: { guiInstalled: false, cliInstalled: false },
             },
             localBinOnPath: true,
           }}
@@ -335,6 +344,7 @@ describe('CreateProfileDialog — app-type picker behaviour', () => {
               claude: { guiInstalled: false, cliInstalled: false },
               codex: { guiInstalled: false, cliInstalled: true },
               gemini: { guiInstalled: false, cliInstalled: false },
+              antigravity: { guiInstalled: false, cliInstalled: false },
             },
             localBinOnPath: true,
           }}

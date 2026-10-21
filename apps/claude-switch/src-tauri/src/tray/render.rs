@@ -36,6 +36,9 @@ const LINE_GAP: f64 = 2.0;
 
 const CLAUDE_MARK: &[u8] = include_bytes!("../../icons/tray/claude.png");
 const OPENAI_MARK: &[u8] = include_bytes!("../../icons/tray/openai.png");
+/// Gemini's sparkle, which Antigravity profiles are marked with too: no mark
+/// of Antigravity's own is published under a licence that allows it.
+const GEMINI_MARK: &[u8] = include_bytes!("../../icons/tray/gemini.png");
 
 /// claude-switch's own mark, shown while no profile has usage to show: the
 /// outline of the app icon's pixel art, a cell per character.
@@ -307,8 +310,7 @@ fn lay_out(group: &Group) -> Option<Laid> {
     let bytes = match group.app {
         AppKind::Claude => CLAUDE_MARK,
         AppKind::Codex => OPENAI_MARK,
-        // Has no usage, so never has a group in the menu bar.
-        AppKind::Gemini => return None,
+        AppKind::Gemini | AppKind::Antigravity => GEMINI_MARK,
     };
     let mark = NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes))?;
     let (size, weight) = if group.values.len() == 1 {

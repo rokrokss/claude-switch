@@ -285,8 +285,23 @@ export type QuotaUsage = {
    * `label`. Empty for apps that have none.
    */
   scopedWeekly: Array<UsageWindow>
+  /**
+   * Limits with windows of their own beside the main ones: Antigravity's
+   * model groups other than Gemini's. Absent when there are none.
+   */
+  additionalLimits?: Array<NamedLimit>
   rateLimitResetCredits?: RateLimitResetCredits
   spend?: Spend
+}
+
+/**
+ * A limit with a short window and a week of its own, e.g. Antigravity's
+ * "Claude and GPT models". Either window is null when it isn't reported.
+ */
+export type NamedLimit = {
+  name: string
+  primary: UsageWindow | null
+  secondary: UsageWindow | null
 }
 
 export type QuotaError =

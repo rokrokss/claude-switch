@@ -26,6 +26,11 @@ pub mod id {
     /// Codex Spark's own session and weekly windows.
     pub const SPARK: &str = "spark";
     pub const SPARK_WEEKLY: &str = "spark.weekly";
+    /// An Antigravity model group's own windows: `group.<name>` for its 5
+    /// hours and `group.<name>.weekly`, e.g. `group.claude-and-gpt-models`.
+    pub fn group(name: &str) -> String {
+        format!("group.{}", crate::slug::slugify(name))
+    }
     // Spend and history from the local logs.
     pub const TODAY: &str = "today";
     pub const YESTERDAY: &str = "yesterday";
@@ -160,10 +165,18 @@ pub fn from_usage(app: AppKind, usage: &ProfileUsage) -> Vec<Metric> {
     };
     let mut metrics = match app {
         AppKind::Claude => claude_windows(quota),
-        AppKind::Codex => codex_windows(quota),
+        AppKind::Codex => {
+            let mut metrics = codex_windows(quota);
+            metrics.extend(additional_windows(quota));
+            metrics
+        }
+        AppKind::Antigravity => {
+            let mut metrics = codex_windows(quota);
+            metrics.extend(group_windows(quota));
+            metrics
+        }
         AppKind::Gemini => Vec::new(),
     };
-    metrics.extend(additional_windows(quota));
     metrics.extend(extra(quota));
     metrics.extend(credits(quota));
     metrics.extend(resets(quota));
@@ -251,6 +264,30 @@ fn codex_windows(quota: &QuotaUsage) -> Vec<Metric> {
 }
 
 /// Spark's windows, named after their length like the main ones.
+/// An Antigravity profile's model groups beside Gemini, each with its 5 hours
+/// and its week.
+fn group_windows(quota: &QuotaUsage) -> Vec<Metric> {
+    let mut metrics = Vec::new();
+    for group in &quota.additional_limits {
+        let group_id = id::group(&group.name);
+        metrics.extend(percent_meter(
+            &group_id,
+            &format!("{} · 5h", group.name),
+            group.primary.as_ref(),
+            Some(SESSION_SECS),
+            false,
+        ));
+        metrics.extend(percent_meter(
+            &format!("{group_id}.weekly"),
+            &format!("{} · Weekly", group.name),
+            group.secondary.as_ref(),
+            Some(WEEK_SECS),
+            false,
+        ));
+    }
+    metrics
+}
+
 fn additional_windows(quota: &QuotaUsage) -> Vec<Metric> {
     let Some(spark) = quota.additional_limits.first() else {
         return Vec::new();
@@ -395,7 +432,7 @@ fn resets(quota: &QuotaUsage) -> Option<Metric> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::usage::{RateLimitResetCredits, ResetCredit, Spend};
+    use crate::usage::{NamedLimit, RateLimitResetCredits, ResetCredit, Spend};
 
     fn window(utilization: Option<f32>, resets_at: Option<&str>, minutes: Option<i64>) -> Window {
         Window {
@@ -426,6 +463,43 @@ mod tests {
 
     fn ids(metrics: &[Metric]) -> Vec<&str> {
         metrics.iter().map(|metric| metric.id.as_str()).collect()
+    }
+
+    #[test]
+    fn antigravity_reports_gemini_then_each_other_group() {
+        let mut q = quota(
+            Some(window(Some(75.0), Some("2026-10-22T03:10:00Z"), Some(300))),
+            Some(window(
+                Some(14.0),
+                Some("2026-10-24T18:40:27Z"),
+                Some(10080),
+            )),
+        );
+        q.additional_limits = vec![
+            NamedLimit {
+                name: "Claude and GPT models".into(),
+                primary: None,
+                secondary: Some(window(Some(0.0), None, Some(10080))),
+            },
+            NamedLimit {
+                name: "Gemini 4 Argon".into(),
+                primary: None,
+                secondary: Some(window(Some(50.0), None, Some(10080))),
+            },
+        ];
+        let metrics = from_usage(AppKind::Antigravity, &usage(q));
+        assert_eq!(
+            ids(&metrics),
+            [
+                "session",
+                "weekly",
+                "group.claude-and-gpt-models.weekly",
+                "group.gemini-4-argon.weekly"
+            ]
+        );
+        assert_eq!(metrics[2].label, "Claude and GPT models · Weekly");
+        // Not Codex's Spark rows, which read the first additional limit.
+        assert!(!ids(&metrics).contains(&id::SPARK_WEEKLY));
     }
 
     #[test]

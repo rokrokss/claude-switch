@@ -349,6 +349,7 @@ function WhatWillHappenCard({ app }: { app: AppId }) {
             </>
           )}
           ) are <strong className="text-ink">moved to a 7-day backup</strong>. Delete it from Settings any time.
+          {app === 'gemini' ? " Antigravity's folders in it stay where they are." : null}
         </li>
         <li>
           From now on, use <code className="font-mono text-mono text-ink">{spec.cliWrapperPrefix}-&lt;name&gt;</code>{' '}
@@ -361,6 +362,12 @@ function WhatWillHappenCard({ app }: { app: AppId }) {
             <>
               Credentials live in <code className="font-mono text-mono">auth.json</code> under{' '}
               <code className="font-mono text-mono">{spec.cliConfigEnv}</code> — isolated per profile, no Keychain.
+            </>
+          ) : app === 'antigravity' ? (
+            <>
+              The stock sign-in stays in the macOS Keychain; a profile keeps its own in{' '}
+              <code className="font-mono text-mono">.gemini/antigravity-cli/antigravity-oauth-token</code> under the{' '}
+              <code className="font-mono text-mono">{spec.cliConfigEnv}</code> its wrapper gives agy.
             </>
           ) : app === 'gemini' ? (
             <>

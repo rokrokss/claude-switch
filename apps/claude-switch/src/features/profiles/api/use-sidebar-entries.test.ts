@@ -13,8 +13,9 @@ function byApp(
   claude: ExistingInstallInfo,
   codex: ExistingInstallInfo,
   gemini: ExistingInstallInfo = existing(),
+  antigravity: ExistingInstallInfo = existing(),
 ): Record<AppId, ExistingInstallInfo> {
-  return { claude, codex, gemini }
+  return { claude, codex, gemini, antigravity }
 }
 
 describe('makeDefaultEntries', () => {

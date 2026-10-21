@@ -43,8 +43,9 @@ rest are fetched now. A lapsed sign-in is never renewed here: open
 claude-switch, or run the profile's own command, to renew it.
 
 Arguments:
-  profile        A profile's id, slug or name, or `claude` or `codex` for
-                 every profile of that app. Every profile when left out.
+  profile        A profile's id, slug or name, or `claude`, `codex` or
+                 `antigravity` for every profile of that app. Every profile
+                 when left out.
 
 Options:
   --force        Fetch every profile asked for, however recent its figures

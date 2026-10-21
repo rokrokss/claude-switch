@@ -43,12 +43,14 @@ export function useMigrationLauncher(): MigrationLauncher {
   const claudeMigration = useMigration('claude')
   const codexMigration = useMigration('codex')
   const geminiMigration = useMigration('gemini')
+  const antigravityMigration = useMigration('antigravity')
   const [app, setApp] = useState<AppId | null>(null)
 
   const migrationByApp: Record<AppId, ReturnType<typeof useMigration>> = {
     claude: claudeMigration,
     codex: codexMigration,
     gemini: geminiMigration,
+    antigravity: antigravityMigration,
   }
 
   // Apps with a detected stock install — drives every "Detect and import"
@@ -57,6 +59,7 @@ export function useMigrationLauncher(): MigrationLauncher {
     claude: claudeMigration.existing,
     codex: codexMigration.existing,
     gemini: geminiMigration.existing,
+    antigravity: antigravityMigration.existing,
   })
 
   async function open(target: AppId) {

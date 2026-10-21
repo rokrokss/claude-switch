@@ -36,6 +36,7 @@ const quickLinks: Record<AppId, Array<{ label: string; url: string }>> = {
   ],
   // Gemini has no usage, so no card in the menu bar.
   gemini: [],
+  antigravity: [],
 }
 
 type Props = {

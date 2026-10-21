@@ -19,6 +19,7 @@ const allInstalled = {
     claude: { guiInstalled: true, cliInstalled: true },
     codex: { guiInstalled: false, cliInstalled: false },
     gemini: { guiInstalled: false, cliInstalled: false },
+    antigravity: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -28,6 +29,7 @@ const noneInstalled = {
     claude: { guiInstalled: false, cliInstalled: false },
     codex: { guiInstalled: false, cliInstalled: false },
     gemini: { guiInstalled: false, cliInstalled: false },
+    antigravity: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: false,
 }

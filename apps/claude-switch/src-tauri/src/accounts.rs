@@ -3,7 +3,8 @@
 //! Read from what the CLI already keeps on disk, never from the network: for
 //! Claude, the `oauthAccount` block of `.claude.json`; for Codex, the claims
 //! of the ID token in `auth.json`; for Gemini, the active account in
-//! `google_accounts.json`. Each is written by the app itself when it signs
+//! `google_accounts.json`; for Antigravity, the ID token in the sign-in file
+//! a profile's `agy` keeps. Each is written by the app itself when it signs
 //! in, so a profile that has never been signed in simply has none.
 //!
 //! Only what names the account is taken (email, person, organization, plan).
@@ -107,6 +108,16 @@ pub fn read(id: &str) -> AppResult<AccountStatus> {
         AppKind::Gemini => {
             AccountStatus::from_account(gemini_account(&config_dir), AccountStatus::SignedOut)
         }
+        // The stock agy keeps its sign-in in the Keychain, which isn't read:
+        // without a file, there is no telling.
+        AppKind::Antigravity => AccountStatus::from_account(
+            antigravity_account(&config_dir),
+            if stock.is_some() {
+                AccountStatus::Unknown
+            } else {
+                AccountStatus::SignedOut
+            },
+        ),
     })
 }
 
@@ -405,6 +416,34 @@ fn account_from_google_accounts(document: &Value) -> Option<ProfileAccount> {
     })
 }
 
+/// The Google account the `agy` with config at `config_dir` is signed in as,
+/// from the ID token in its sign-in file. The tokens are not read out.
+fn antigravity_account(config_dir: &Path) -> Option<ProfileAccount> {
+    let document = read_json(&config_dir.join(crate::usage::antigravity::TOKEN_FILE))?;
+    account_from_antigravity_token(&document)
+}
+
+/// Pure: the account named by a parsed agy sign-in file,
+/// `{"token": {…}, "auth_method": "consumer", "id_token": "<JWT>"}`.
+fn account_from_antigravity_token(document: &Value) -> Option<ProfileAccount> {
+    let claims = jwt_claims(document.get("id_token")?.as_str()?)?;
+    let text = |key: &str| {
+        claims
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+    };
+    let email = text("email")?;
+    Some(ProfileAccount {
+        key: Some(format!("antigravity|{email}").to_lowercase()),
+        email: Some(email),
+        name: text("name"),
+        ..ProfileAccount::default()
+    })
+}
+
 fn read_json(path: &Path) -> Option<Value> {
     serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
 }
@@ -413,6 +452,26 @@ fn read_json(path: &Path) -> Option<Value> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn reads_the_antigravity_account_from_the_id_token() {
+        // {"email":"ada@example.com","name":"Ada"} as a JWT payload.
+        let document = json!({
+            "token": {"access_token": "a", "refresh_token": "r", "expiry": "2026-10-22T00:00:00Z"},
+            "auth_method": "consumer",
+            "id_token": "e30.eyJlbWFpbCI6ImFkYUBleGFtcGxlLmNvbSIsIm5hbWUiOiJBZGEifQ.sig",
+        });
+        assert_eq!(
+            account_from_antigravity_token(&document),
+            Some(ProfileAccount {
+                email: Some("ada@example.com".into()),
+                name: Some("Ada".into()),
+                key: Some("antigravity|ada@example.com".into()),
+                ..ProfileAccount::default()
+            })
+        );
+        assert_eq!(account_from_antigravity_token(&json!({"token": {}})), None);
+    }
 
     #[test]
     fn reads_the_active_gemini_account() {

@@ -75,6 +75,37 @@ pub fn link_shared_surfaces(
         .collect()
 }
 
+/// Link every entry of the real `home` but those named in `except` into
+/// `profile_home`, the home an app whose config env var is `HOME` runs on
+/// (see [`AppSpec::cli_home_links_except`]). Never clobbers, as
+/// [`link_shared_surfaces`]; an entry made in the real home later is linked on
+/// the next regeneration. Never returns `Err`, for the same reason.
+pub fn link_home_entries(
+    home: &Path,
+    profile_home: &Path,
+    except: &[&str],
+) -> Vec<(String, LinkOutcome)> {
+    let Ok(entries) = fs::read_dir(home) else {
+        return Vec::new();
+    };
+    if fs::create_dir_all(profile_home).is_err() {
+        return Vec::new();
+    }
+    let mut names: Vec<String> = entries
+        .flatten()
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| !except.contains(&name.as_str()))
+        .collect();
+    names.sort();
+    names
+        .into_iter()
+        .map(|name| {
+            let outcome = link_one(home, profile_home, &name);
+            (name, outcome)
+        })
+        .collect()
+}
+
 fn link_one(stock_config: &Path, cli_config: &Path, surface: &str) -> LinkOutcome {
     let source = stock_config.join(surface);
     // `exists` follows symlinks, so a dangling link in the stock dir counts as
@@ -112,7 +143,7 @@ fn link_one(stock_config: &Path, cli_config: &Path, surface: &str) -> LinkOutcom
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app_kind::{CLAUDE, CODEX, GEMINI};
+    use crate::app_kind::{ANTIGRAVITY, CLAUDE, CODEX, GEMINI};
     use std::path::PathBuf;
     use tempfile::tempdir;
 
@@ -287,7 +318,7 @@ mod tests {
             "history",
             "tmp",
         ];
-        for spec in [&CLAUDE, &CODEX, &GEMINI] {
+        for spec in [&CLAUDE, &CODEX, &GEMINI, &ANTIGRAVITY] {
             for surface in spec.shared_surfaces {
                 let name = Path::new(surface).file_name().unwrap().to_str().unwrap();
                 assert!(
@@ -353,6 +384,36 @@ mod tests {
         assert!(CLAUDE.shared_surfaces.contains(&"skills"));
         assert!(CODEX.shared_surfaces.contains(&"skills"));
         assert!(GEMINI.shared_surfaces.contains(&".gemini/skills"));
+    }
+
+    #[test]
+    fn links_the_real_home_into_a_profile_home_but_what_it_keeps_its_own() {
+        let home = tempdir().unwrap();
+        fs::create_dir_all(home.path().join(".ssh")).unwrap();
+        fs::write(home.path().join(".gitconfig"), "[user]").unwrap();
+        fs::create_dir_all(home.path().join(".gemini")).unwrap();
+        let profile = tempdir().unwrap();
+        fs::create_dir_all(profile.path().join(".config")).unwrap();
+        fs::create_dir_all(home.path().join(".config")).unwrap();
+
+        let results = link_home_entries(home.path(), profile.path(), &[".gemini"]);
+
+        let outcome = |name: &str| {
+            results
+                .iter()
+                .find(|(linked, _)| linked == name)
+                .map(|(_, outcome)| outcome.clone())
+        };
+        assert_eq!(outcome(".ssh"), Some(LinkOutcome::Linked));
+        assert_eq!(outcome(".gitconfig"), Some(LinkOutcome::Linked));
+        // The profile's own, and what it already has, are left alone.
+        assert_eq!(outcome(".gemini"), None);
+        assert_eq!(outcome(".config"), Some(LinkOutcome::Occupied));
+        assert!(!profile.path().join(".gemini").exists());
+        assert_eq!(
+            fs::read_link(profile.path().join(".ssh")).unwrap(),
+            home.path().join(".ssh")
+        );
     }
 
     #[test]

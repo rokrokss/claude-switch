@@ -15,6 +15,7 @@ import {
   codexWindowLabel,
   displayPacePercent,
   displayPercent,
+  groupMeterRows,
   Meters,
   meterFillPercent,
   meterTone,
@@ -792,6 +793,39 @@ describe('Meters', () => {
     expect(screen.getByRole('progressbar', { name: 'Usage credits' })).toHaveAttribute('aria-valuenow', '10')
   })
 
+  it("renders Antigravity's Gemini windows, then each other model group's", () => {
+    render(
+      <Meters
+        app="antigravity"
+        quota={{
+          primary: { utilization: 75, resetsAt: null, windowDurationMins: 300 },
+          secondary: { utilization: 14, resetsAt: null, windowDurationMins: 10080 },
+          scopedWeekly: [],
+          additionalLimits: [
+            {
+              name: 'Claude and GPT models',
+              primary: null,
+              secondary: { utilization: 0, resetsAt: null, windowDurationMins: 10080 },
+            },
+            {
+              name: 'Gemini 4 Argon',
+              primary: null,
+              secondary: { utilization: 50, resetsAt: null, windowDurationMins: 10080 },
+            },
+          ],
+        }}
+      />,
+    )
+    expect(screen.getAllByRole('progressbar')).toHaveLength(4)
+    expect(screen.getByRole('progressbar', { name: 'Gemini · 5-hour' })).toHaveAttribute('aria-valuenow', '75')
+    expect(screen.getByRole('progressbar', { name: 'Gemini · Weekly' })).toHaveAttribute('aria-valuenow', '14')
+    expect(screen.getByRole('progressbar', { name: 'Claude and GPT models · Weekly' })).toHaveAttribute(
+      'aria-valuenow',
+      '0',
+    )
+    expect(screen.getByRole('progressbar', { name: 'Gemini 4 Argon · Weekly' })).toHaveAttribute('aria-valuenow', '50')
+  })
+
   it('renders the primary and weekly placeholders for a null quota, with no scoped weekly or credits', () => {
     render(<Meters app="claude" quota={null} />)
     const bars = screen.getAllByRole('progressbar')
@@ -847,6 +881,24 @@ describe('codexMeterRows', () => {
     })
     expect(rows.map((row) => row.slot)).toEqual(['primary', 'secondary'])
     expect(rows[1]).toMatchObject({ label: 'Weekly', showDailySegments: true })
+  })
+})
+
+describe('groupMeterRows', () => {
+  it("lists each group's 5 hours before its week, and skips a window it didn't report", () => {
+    const week = { utilization: 20, resetsAt: null, windowDurationMins: 10080 }
+    const fiveHours = { utilization: 40, resetsAt: null, windowDurationMins: 300 }
+    expect(
+      groupMeterRows([
+        { name: 'Claude and GPT models', primary: fiveHours, secondary: week },
+        { name: 'Gemini 4 Argon', primary: null, secondary: week },
+      ]).map((row) => [row.label, row.shortLabel, row.weekly]),
+    ).toEqual([
+      ['Claude and GPT models · 5-hour', '5h', false],
+      ['Claude and GPT models · Weekly', 'W', true],
+      ['Gemini 4 Argon · Weekly', 'W', true],
+    ])
+    expect(groupMeterRows(undefined)).toEqual([])
   })
 })
 

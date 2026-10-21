@@ -150,7 +150,7 @@ struct Candidate<'a> {
 }
 
 /// Pure: the ids of the `candidates` that `token` names, in their order.
-/// An app (`claude`, `codex`) names every profile of it; anything else names
+/// An app (`claude`, `codex`, `antigravity`) names every profile of it; anything else names
 /// the profiles whose id, slug or name it is. Case doesn't matter.
 fn matching<'a>(candidates: &[Candidate<'a>], token: &str) -> Vec<&'a str> {
     let token = token.trim().to_lowercase();

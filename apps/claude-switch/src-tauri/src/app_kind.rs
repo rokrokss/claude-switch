@@ -1,5 +1,5 @@
 //! Per-app registry: the single source of truth describing each managed app
-//! (Claude, ChatGPT, Gemini) and every Claude-specific seam generalised behind it.
+//! (Claude, ChatGPT, Gemini, Antigravity) and every Claude-specific seam generalised behind it.
 //!
 //! Every path, launcher, and launch incantation that used to hardcode
 //! "Claude" reads from the `AppSpec` returned by [`spec`]. Adding a new app
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 /// Which managed application a profile (or synthetic default entry) belongs to.
 ///
-/// Serialises lowercase (`"claude"`, `"codex"`, `"gemini"`) to match the TypeScript
+/// Serialises lowercase (`"claude"`, `"codex"`, `"gemini"`, `"antigravity"`) to match the TypeScript
 /// `AppId` union and the `default:<app>` synthetic-id convention. Defaults to
 /// [`AppKind::Claude`] so `profiles.json` documents predating the field
 /// deserialise as Claude.
@@ -20,6 +20,7 @@ pub enum AppKind {
     Claude,
     Codex,
     Gemini,
+    Antigravity,
 }
 
 /// One possible on-disk identity for this app's stock GUI bundle.
@@ -91,6 +92,20 @@ pub struct AppSpec {
     pub cli_config_subdir: Option<&'static str>,
     /// Stock CLI config directory name under `$HOME`, e.g. `".claude"`.
     pub cli_stock_config_dir_name: &'static str,
+    /// Entries of the stock config dir that belong to another app, which
+    /// importing the stock install copies nothing of and leaves where they
+    /// are. Google's Antigravity keeps its data in `~/.gemini` beside Gemini
+    /// CLI's, and moving it into a Gemini profile would take it from
+    /// Antigravity.
+    pub cli_import_leaves: &'static [&'static str],
+    /// Further variables the CLI wrapper exports beside
+    /// [`cli_config_env`](AppSpec::cli_config_env), and usage reads set too.
+    pub cli_extra_env: &'static [(&'static str, &'static str)],
+    /// Set for an app whose [`cli_config_env`](AppSpec::cli_config_env) is
+    /// `HOME` itself: every entry of the real home but these is linked into
+    /// the profile's, so what the CLI runs (git, ssh, toolchains) finds the
+    /// user's usual setup. The entries named stay the profile's own.
+    pub cli_home_links_except: Option<&'static [&'static str]>,
     /// Whether this app exposes account usage/quota stats.
     pub has_usage: bool,
     /// Config-dir entries a profile *inherits* from the stock install
@@ -137,6 +152,9 @@ pub const CLAUDE: AppSpec = AppSpec {
     cli_config_env: "CLAUDE_CONFIG_DIR",
     cli_config_subdir: None,
     cli_stock_config_dir_name: ".claude",
+    cli_import_leaves: &[],
+    cli_extra_env: &[],
+    cli_home_links_except: None,
     has_usage: true,
     shared_surfaces: &[
         "CLAUDE.md",
@@ -178,6 +196,9 @@ pub const CODEX: AppSpec = AppSpec {
     cli_config_env: "CODEX_HOME",
     cli_config_subdir: None,
     cli_stock_config_dir_name: ".codex",
+    cli_import_leaves: &[],
+    cli_extra_env: &[],
+    cli_home_links_except: None,
     has_usage: true,
     shared_surfaces: &["AGENTS.md", "rules", "skills"],
     supports_signed_clone: false,
@@ -201,6 +222,17 @@ pub const GEMINI: AppSpec = AppSpec {
     cli_config_env: "GEMINI_CLI_HOME",
     cli_config_subdir: Some(".gemini"),
     cli_stock_config_dir_name: ".gemini",
+    // Antigravity's: its desktop app's and IDE's data, its CLI's, and its
+    // global customizations (`config/`, MCP servers and hooks).
+    cli_import_leaves: &[
+        "antigravity",
+        "antigravity-backup",
+        "antigravity-cli",
+        "antigravity-ide",
+        "config",
+    ],
+    cli_extra_env: &[],
+    cli_home_links_except: None,
     has_usage: false,
     // `.agents` because Gemini reads the cross-tool `~/.agents/skills` from
     // under `GEMINI_CLI_HOME` too. Left out: `settings.json` (hooks, MCP
@@ -216,12 +248,47 @@ pub const GEMINI: AppSpec = AppSpec {
     supports_signed_clone: false,
 };
 
+/// Google's Antigravity CLI, `agy`: where Google moved its individual plans
+/// (free, AI Pro, AI Ultra) when it ended their Gemini CLI sign-in.
+pub const ANTIGRAVITY: AppSpec = AppSpec {
+    display_name: "Antigravity",
+    cli_display_name: "Antigravity",
+    // CLI only: a profile is its `agy-<slug>` wrapper. The GUI fields below
+    // are never used.
+    gui_bundle_candidates: &[],
+    gui_support_dir_name: "Antigravity",
+    launcher_prefix: "Antigravity",
+    legacy_launcher_prefixes: &[],
+    cli_binary: "agy",
+    cli_wrapper_prefix: "agy",
+    // agy has no config-home variable. It keeps its state in
+    // `~/.gemini/antigravity-cli` and its sign-in in one Keychain item
+    // (`gemini`/`antigravity`) every account would share, so the wrapper gives
+    // it a home of its own, and has it keep the sign-in in that home's
+    // `.gemini/antigravity-cli/antigravity-oauth-token` instead: agy uses the
+    // file rather than the Keychain when `SSH_TTY` is set (as CodexBar's
+    // per-account usage reads rely on).
+    cli_config_env: "HOME",
+    cli_config_subdir: Some(".gemini/antigravity-cli"),
+    cli_stock_config_dir_name: ".gemini/antigravity-cli",
+    cli_import_leaves: &[],
+    cli_extra_env: &[("SSH_TTY", "claude-switch")],
+    // The profile's `.gemini` is its own: agy's state and sign-in, and
+    // Antigravity's MCP servers and hooks (`.gemini/config`).
+    cli_home_links_except: Some(&[".gemini"]),
+    has_usage: true,
+    // Antigravity's global rules.
+    shared_surfaces: &[".gemini/GEMINI.md"],
+    supports_signed_clone: false,
+};
+
 /// Borrow the static [`AppSpec`] for a kind.
 pub fn spec(kind: AppKind) -> &'static AppSpec {
     match kind {
         AppKind::Claude => &CLAUDE,
         AppKind::Codex => &CODEX,
         AppKind::Gemini => &GEMINI,
+        AppKind::Antigravity => &ANTIGRAVITY,
     }
 }
 
@@ -244,15 +311,17 @@ impl AppKind {
             AppKind::Claude => "claude",
             AppKind::Codex => "codex",
             AppKind::Gemini => "gemini",
+            AppKind::Antigravity => "antigravity",
         }
     }
 
-    /// Parse a lowercase app token (`"claude"`/`"codex"`/`"gemini"`).
+    /// Parse a lowercase app token (`"claude"`/`"codex"`/`"gemini"`/`"antigravity"`).
     pub fn from_token(token: &str) -> Option<AppKind> {
         match token {
             "claude" => Some(AppKind::Claude),
             "codex" => Some(AppKind::Codex),
             "gemini" => Some(AppKind::Gemini),
+            "antigravity" => Some(AppKind::Antigravity),
             _ => None,
         }
     }
@@ -318,8 +387,29 @@ mod tests {
     }
 
     #[test]
+    fn antigravity_spec_gives_agy_a_home_of_its_own() {
+        let antigravity = spec(AppKind::Antigravity);
+        assert!(!antigravity.has_desktop());
+        assert_eq!(antigravity.cli_binary, "agy");
+        assert_eq!(antigravity.cli_wrapper_prefix, "agy");
+        assert_eq!(antigravity.cli_config_env, "HOME");
+        assert_eq!(
+            antigravity.cli_config_subdir,
+            Some(".gemini/antigravity-cli")
+        );
+        assert_eq!(antigravity.cli_extra_env, &[("SSH_TTY", "claude-switch")]);
+        assert_eq!(antigravity.cli_home_links_except, Some(&[".gemini"][..]));
+        assert!(antigravity.has_usage);
+    }
+
+    #[test]
     fn default_id_round_trips() {
-        for kind in [AppKind::Claude, AppKind::Codex, AppKind::Gemini] {
+        for kind in [
+            AppKind::Claude,
+            AppKind::Codex,
+            AppKind::Gemini,
+            AppKind::Antigravity,
+        ] {
             assert_eq!(AppKind::from_default_id(&default_id(kind)), Some(kind));
         }
     }

@@ -42,6 +42,13 @@ const defaults: Record<AppId, Array<[string, 'alwaysVisible' | 'onDemand']>> = {
   ],
   // Gemini has no usage, so no metrics.
   gemini: [],
+  // `group.*` stands for each model group beside Gemini's (Claude and GPT, …).
+  antigravity: [
+    ['session', 'alwaysVisible'],
+    ['weekly', 'alwaysVisible'],
+    ['group.*', 'alwaysVisible'],
+    ['trend', 'alwaysVisible'],
+  ],
 }
 
 /**

@@ -30,6 +30,7 @@ const HEALTHY_DEPS = {
     claude: { guiInstalled: true, cliInstalled: true },
     codex: { guiInstalled: false, cliInstalled: false },
     gemini: { guiInstalled: false, cliInstalled: false },
+    antigravity: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }

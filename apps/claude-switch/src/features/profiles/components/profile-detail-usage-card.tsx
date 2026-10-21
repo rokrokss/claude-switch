@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { AppId } from '@/lib/app-registry'
-import type { ProfileUsage, QuotaError, RateLimitResetCredits, Spend, UsageWindow } from '@/lib/types'
+import type { NamedLimit, ProfileUsage, QuotaError, RateLimitResetCredits, Spend, UsageWindow } from '@/lib/types'
 
 import { Component, createContext, useContext, useEffect, useState } from 'react'
 
@@ -506,22 +506,13 @@ export function Meters({ app, quota }: { app: AppId; quota: ProfileUsage['quota'
       </div>
     )
   }
-  const usageCopy = appSpecs[app].usage
-  const scopedWeekly = visibleScopedWeekly(usageCopy?.hasScopedWeekly, quota?.scopedWeekly)
+  if (app === 'antigravity') {
+    return <AntigravityMeters quota={quota} />
+  }
+  const scopedWeekly = visibleScopedWeekly(appSpecs[app].usage?.hasScopedWeekly, quota?.scopedWeekly)
   return (
     <div className="flex flex-col gap-2">
-      <Meter
-        label={usageCopy?.primaryLabel ?? '5-hour window'}
-        shortLabel={usageCopy?.primaryShortLabel ?? '5h'}
-        meterWindow={quota?.primary ?? null}
-      />
-      <Meter
-        showDailySegments
-        paceWindowMins={10080}
-        label={usageCopy?.secondaryLabel ?? 'Weekly'}
-        shortLabel={usageCopy?.secondaryShortLabel ?? 'W'}
-        meterWindow={quota?.secondary ?? null}
-      />
+      <MainMeters app={app} quota={quota} />
       {scopedWeekly.map((window, index) => (
         <Meter
           showDailySegments
@@ -535,6 +526,97 @@ export function Meters({ app, quota }: { app: AppId; quota: ProfileUsage['quota'
         />
       ))}
       <SpendMeter spend={quota?.spend} />
+    </div>
+  )
+}
+
+/** The main meters' labels for an app with no usage copy. */
+const fallbackLabels = {
+  primaryLabel: '5-hour window',
+  primaryShortLabel: '5h',
+  secondaryLabel: 'Weekly',
+  secondaryShortLabel: 'W',
+}
+
+/**
+ * The 5-hour and weekly meters every app but Codex leads with, labelled by
+ * the app's usage copy.
+ */
+function MainMeters({ app, quota }: { app: AppId; quota: ProfileUsage['quota'] }) {
+  const labels = appSpecs[app].usage ?? fallbackLabels
+  return (
+    <>
+      <Meter label={labels.primaryLabel} shortLabel={labels.primaryShortLabel} meterWindow={quota?.primary ?? null} />
+      <Meter
+        showDailySegments
+        paceWindowMins={10080}
+        label={labels.secondaryLabel}
+        shortLabel={labels.secondaryShortLabel}
+        meterWindow={quota?.secondary ?? null}
+      />
+    </>
+  )
+}
+
+export type GroupMeterRow = {
+  key: string
+  label: string
+  shortLabel: string
+  meterWindow: UsageWindow
+  /**
+   * Whether the row is the group's week rather than its 5 hours.
+   */
+  weekly: boolean
+}
+
+/**
+ * Pure: a row for each window each named limit reports, its 5 hours before
+ * its week, named as the server names the group. A window it didn't report
+ * has no row.
+ */
+export function groupMeterRows(limits: Array<NamedLimit> | undefined): Array<GroupMeterRow> {
+  const rows: Array<GroupMeterRow> = []
+  for (const limit of limits ?? []) {
+    if (limit.primary) {
+      rows.push({
+        key: `${limit.name}-5h`,
+        label: `${limit.name} · 5-hour`,
+        shortLabel: '5h',
+        meterWindow: limit.primary,
+        weekly: false,
+      })
+    }
+    if (limit.secondary) {
+      rows.push({
+        key: `${limit.name}-w`,
+        label: `${limit.name} · Weekly`,
+        shortLabel: 'W',
+        meterWindow: limit.secondary,
+        weekly: true,
+      })
+    }
+  }
+  return rows
+}
+
+/**
+ * Antigravity's limits: Gemini's 5 hours and week, then each other model
+ * group's (Claude and GPT, …).
+ */
+function AntigravityMeters({ quota }: { quota: ProfileUsage['quota'] }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <MainMeters app="antigravity" quota={quota} />
+      {groupMeterRows(quota?.additionalLimits).map((row) => (
+        <Meter
+          key={row.key}
+          showDailySegments={row.weekly}
+          paceWindowMins={row.weekly ? 10080 : undefined}
+          label={row.label}
+          shortLabel={row.shortLabel}
+          meterWindow={row.meterWindow}
+        />
+      ))}
     </div>
   )
 }

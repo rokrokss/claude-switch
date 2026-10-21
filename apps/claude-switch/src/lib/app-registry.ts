@@ -6,7 +6,7 @@
  * `appSpecs[appId]` so adding an app is config, not new components.
  */
 
-export type AppId = 'claude' | 'codex' | 'gemini'
+export type AppId = 'claude' | 'codex' | 'gemini' | 'antigravity'
 
 export type AppSurfaceSpec = {
   label: string
@@ -222,9 +222,46 @@ const gemini: AppSpec = {
   guiStockSupportDir: null,
 }
 
-export const appSpecs: Record<AppId, AppSpec> = { claude, codex, gemini }
+// Google's Antigravity CLI, where Google moved its individual plans when it
+// ended their Gemini CLI sign-in.
+const antigravity: AppSpec = {
+  id: 'antigravity',
+  displayName: 'Antigravity',
+  cliDisplayName: 'Antigravity',
+  hasUsage: true,
+  hasSessions: false,
+  // A profile is its agy wrapper alone.
+  gui: null,
+  cli: {
+    label: 'Antigravity CLI wrapper',
+    description: 'Exposes agy-{slug} in ~/.local/bin, running agy with this profile as its home and sign-in.',
+    installUrl: 'https://antigravity.google/download',
+  },
+  dockIcon: { defaultOn: false, cost: null },
+  signedClone: false,
+  usage: {
+    noCredentials: 'Run `{command}` once and sign in to see usage.',
+    unauthorized: 'Sign-in needs renewing — run `{command}` once, then retry.',
+    rateLimited: 'Rate limited by Google. Try again in a few minutes.',
+    networkError: "Couldn't read Antigravity usage — make sure agy 1.1.11 or later is installed and signed in.",
+    primaryLabel: 'Gemini · 5-hour',
+    primaryShortLabel: '5h',
+    secondaryLabel: 'Gemini · Weekly',
+    secondaryShortLabel: 'W',
+    hasScopedWeekly: false,
+  },
+  accentVar: '--color-gemini',
+  guiBundleName: null,
+  cliBinary: 'agy',
+  cliWrapperPrefix: 'agy',
+  cliConfigEnv: 'HOME',
+  cliStockConfigDir: '~/.gemini/antigravity-cli',
+  guiStockSupportDir: null,
+}
 
-export const appIds: ReadonlyArray<AppId> = ['claude', 'codex', 'gemini']
+export const appSpecs: Record<AppId, AppSpec> = { claude, codex, gemini, antigravity }
+
+export const appIds: ReadonlyArray<AppId> = ['claude', 'codex', 'gemini', 'antigravity']
 
 /**
  * The per-profile CLI command for a managed profile, e.g. `claude-work`

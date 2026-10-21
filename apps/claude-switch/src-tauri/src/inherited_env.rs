@@ -36,6 +36,7 @@ pub fn not_passed_on<K: AsRef<OsStr>>(keys: impl IntoIterator<Item = K>) -> Vec<
         .into_iter()
         .map(|key| key.as_ref().to_owned())
         .collect();
+    // Not Antigravity's: its config home is `HOME` itself.
     let mut dropped: Vec<OsString> = [AppKind::Claude, AppKind::Codex, AppKind::Gemini]
         .into_iter()
         .map(|kind| OsString::from(kind.spec().cli_config_env))
