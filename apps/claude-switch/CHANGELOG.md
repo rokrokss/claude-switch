@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.3.0 (2026-10-22)
+
+
+### Added
+
+* **profiles:** Antigravity profiles: an `agy-<slug>` command runs Google's Antigravity CLI with the profile as its home and a sign-in of its own, and with the rest of your home and your global rules (`~/.gemini/GEMINI.md`) as they are. CLI only. Google moved its individual plans (free, AI Pro, AI Ultra) from Gemini CLI to Antigravity on June 18
+* **usage:** Antigravity usage on the profile and in the menu bar: Gemini's 5-hour and weekly limits, and each other model group's (Claude and GPT models, …), read through `agy -p /usage`, which starts no model turn
+
+### Fixed
+
+* **migration:** importing `~/.gemini` as a Gemini profile leaves Antigravity's folders in it (`antigravity*`, `config`) where they are, instead of moving them into the profile and the backup
+
 ## 2.2.0 (2026-10-21)
 
 
