@@ -87,6 +87,9 @@ More: [design](docs/signed-clone-design.md) · [verification guide](docs/signed-
 |-----|------------------|-------------|-----------------------|
 | **Claude** (Desktop + Claude Code) | `Claude (<Name>).app` | `claude-<slug>`, sets `CLAUDE_CONFIG_DIR` | A macOS Keychain entry derived from the profile's config dir |
 | **ChatGPT** (Desktop) + **Codex** (CLI) | `ChatGPT (<Name>).app` | `codex-<slug>`, sets `CODEX_HOME` | `auth.json` inside the profile's `CODEX_HOME` |
+| **Gemini** (CLI) | None: Gemini.app is a sandboxed app with no user-data dir to point at a profile | `gemini-<slug>`, sets `GEMINI_CLI_HOME` | `.gemini/oauth_creds.json` inside the profile's `GEMINI_CLI_HOME` |
+
+Gemini profiles are CLI only, and have no usage, spend or session list yet. Gemini CLI keeps its sign-in in that file unless `GEMINI_FORCE_ENCRYPTED_FILE_STORAGE=true` is set, which moves it to one Keychain item every Gemini profile shares.
 
 ## 📦 Install
 
@@ -107,10 +110,10 @@ The `--config` override skips the signed update archive, which needs the release
 
 ## 🕹️ Using it
 
-Create a profile from the sidebar: choose an app (Claude or ChatGPT), give it a name, pick a color, and choose the surfaces you want.
+Create a profile from the sidebar: choose an app (Claude, ChatGPT or Gemini), give it a name, pick a color, and choose the surfaces you want.
 
 - **Desktop app.** A `Claude (<Name>).app` or `ChatGPT (<Name>).app` launcher lands in `/Applications`. Spotlight, Launchpad, the Finder and ⌘-Tab see it as an app of its own, badged with the profile's color.
-- **CLI.** A `claude-<slug>` or `codex-<slug>` command appears in `~/.local/bin`. Run it in any terminal to start the CLI with that profile's config and login.
+- **CLI.** A `claude-<slug>`, `codex-<slug>` or `gemini-<slug>` command appears in `~/.local/bin`. Run it in any terminal to start the CLI with that profile's config and login.
 
 Switch profiles from the sidebar: ⌘1…⌘9 jump to a slot, ⌘F filters the list, ⌘K opens the command palette, ⌘N creates a profile and ⌘, opens Settings.
 
@@ -118,15 +121,17 @@ Deleting a profile removes its launcher and CLI wrapper; its data goes to the Tr
 
 ### What profiles share
 
-Profiles separate your **account**, not your way of working. Skills, subagents, slash commands and your global instructions describe how you work, so a new profile inherits them from your main install (`~/.claude` or `~/.codex`):
+Profiles separate your **account**, not your way of working. Skills, subagents, slash commands and your global instructions describe how you work, so a new profile inherits them from your main install (`~/.claude`, `~/.codex` or `~/.gemini`):
 
 | Inherited from your main install | Kept separate per profile |
 |----------------------------------|---------------------------|
 | `skills/`, `agents/`, `commands/`, `rules/`, `workflows/`, `output-styles/` | Account and credentials (Keychain entry or `auth.json`) |
-| `CLAUDE.md` for Claude, `AGENTS.md` for Codex | `settings.json`, including `hooks` and `permissions` |
+| `CLAUDE.md` for Claude, `AGENTS.md` for Codex, `GEMINI.md` for Gemini | `settings.json`, including `hooks` and `permissions` |
 | | `plugins/`, MCP servers, session and project history |
 
 Anything executable or credentialed stays isolated: a hook added for one account can't fire in another, and a permissive allowlist can't leak into a work profile.
+
+Gemini reads its config from `.gemini` inside `GEMINI_CLI_HOME`, so a Gemini profile's links sit in `cli-config/.gemini/` (Gemini's `policies/` and `extensions/` stay separate too). Because Gemini also reads `~/.agents/skills` from under `GEMINI_CLI_HOME`, a Gemini profile links `cli-config/.agents` back to `~/.agents` as well.
 
 The inherited entries are symlinks, created only over an empty path. To give a profile its own copy, replace the link with a real directory:
 
@@ -240,13 +245,13 @@ A session open in a terminal can't be moved or archived until it is closed. If t
 
 ### Importing an existing install
 
-On first launch, or later from Settings → Data → "Detect and import…" (⌘I), the app can adopt your existing `~/.claude` and `~/Library/Application Support/Claude` (or `~/.codex` and `~/Library/Application Support/Codex`) as your first profile. It:
+On first launch, or later from Settings → Data → "Detect and import…" (⌘I), the app can adopt your existing `~/.claude` and `~/Library/Application Support/Claude` (or `~/.codex` and `~/Library/Application Support/Codex`, or `~/.gemini`) as your first profile. It:
 
 1. copies your data into the new profile,
 2. moves the originals into `~/Library/Application Support/claude-switch/migration-backup-<timestamp>/`,
 3. creates the profile's launcher and CLI wrapper.
 
-Afterwards use `claude-<slug>` (or `codex-<slug>`) for that account. Claude profiles ask you to sign in once, since the Keychain entry follows the config dir.
+Afterwards use `claude-<slug>` (or `codex-<slug>`, `gemini-<slug>`) for that account. Claude profiles ask you to sign in once, since the Keychain entry follows the config dir.
 
 Backups are kept for 7 days. To undo an import before then, delete the profile and move the originals back:
 
@@ -299,4 +304,4 @@ Not on the same data directory. A build that doesn't know `signedClone` drops th
 
 MIT — see [LICENSE](LICENSE).
 
-claude-switch is not affiliated with or endorsed by Anthropic or OpenAI. "Claude" and the Claude icon are Anthropic's, and "ChatGPT" and "Codex" are OpenAI's. The icons shown here are what the app draws from the Claude.app installed on the Mac.
+claude-switch is not affiliated with or endorsed by Anthropic, OpenAI or Google. "Claude" and the Claude icon are Anthropic's, "ChatGPT" and "Codex" are OpenAI's, and "Gemini" and the Gemini icon are Google's. The icons shown here are what the app draws from the Claude.app installed on the Mac.

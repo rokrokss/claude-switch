@@ -79,8 +79,8 @@ export function AboutDialog({ open, onClose, onOpenWhatsNew }: Props) {
         ) : null}
       </dl>
       <p className="mt-5 border-t border-border-soft pt-4 text-[11.5px] text-muted-strong">
-        Not affiliated with Anthropic or OpenAI. Claude and Claude.app are trademarks of Anthropic, PBC. Codex and
-        ChatGPT are trademarks of OpenAI.
+        Not affiliated with Anthropic, OpenAI or Google. Claude and Claude.app are trademarks of Anthropic, PBC. Codex
+        and ChatGPT are trademarks of OpenAI. Gemini is a trademark of Google LLC.
       </p>
     </Dialog>
   )

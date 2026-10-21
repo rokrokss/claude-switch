@@ -42,11 +42,13 @@ export type MigrationLauncher = {
 export function useMigrationLauncher(): MigrationLauncher {
   const claudeMigration = useMigration('claude')
   const codexMigration = useMigration('codex')
+  const geminiMigration = useMigration('gemini')
   const [app, setApp] = useState<AppId | null>(null)
 
   const migrationByApp: Record<AppId, ReturnType<typeof useMigration>> = {
     claude: claudeMigration,
     codex: codexMigration,
+    gemini: geminiMigration,
   }
 
   // Apps with a detected stock install — drives every "Detect and import"
@@ -54,6 +56,7 @@ export function useMigrationLauncher(): MigrationLauncher {
   const importableApps = importableAppsFrom({
     claude: claudeMigration.existing,
     codex: codexMigration.existing,
+    gemini: geminiMigration.existing,
   })
 
   async function open(target: AppId) {

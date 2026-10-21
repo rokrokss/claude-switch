@@ -1,5 +1,5 @@
 //! Per-app registry: the single source of truth describing each managed app
-//! (Claude, ChatGPT) and every Claude-specific seam generalised behind it.
+//! (Claude, ChatGPT, Gemini) and every Claude-specific seam generalised behind it.
 //!
 //! Every path, launcher, and launch incantation that used to hardcode
 //! "Claude" reads from the `AppSpec` returned by [`spec`]. Adding a new app
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 /// Which managed application a profile (or synthetic default entry) belongs to.
 ///
-/// Serialises lowercase (`"claude"`, `"codex"`) to match the TypeScript
+/// Serialises lowercase (`"claude"`, `"codex"`, `"gemini"`) to match the TypeScript
 /// `AppId` union and the `default:<app>` synthetic-id convention. Defaults to
 /// [`AppKind::Claude`] so `profiles.json` documents predating the field
 /// deserialise as Claude.
@@ -19,6 +19,7 @@ pub enum AppKind {
     #[default]
     Claude,
     Codex,
+    Gemini,
 }
 
 /// One possible on-disk identity for this app's stock GUI bundle.
@@ -80,13 +81,23 @@ pub struct AppSpec {
     /// one session history, and one set of hooks, permissions, plugins and MCP
     /// servers across accounts.
     pub cli_config_env: &'static str,
+    /// Directory, inside the one [`cli_config_env`] points at, that the CLI
+    /// keeps its config in — `None` when the variable names the config dir
+    /// itself, as `CLAUDE_CONFIG_DIR` and `CODEX_HOME` do. Gemini's
+    /// `GEMINI_CLI_HOME` stands in for `$HOME`, so a profile's Gemini config
+    /// lives in `cli-config/.gemini`, as the stock one lives in `~/.gemini`.
+    ///
+    /// [`cli_config_env`]: AppSpec::cli_config_env
+    pub cli_config_subdir: Option<&'static str>,
     /// Stock CLI config directory name under `$HOME`, e.g. `".claude"`.
     pub cli_stock_config_dir_name: &'static str,
     /// Whether this app exposes account usage/quota stats.
     pub has_usage: bool,
     /// Config-dir entries a profile *inherits* from the stock install
     /// (`~/.claude`, `~/.codex`) instead of isolating, by way of a symlink
-    /// created in the profile's `cli-config` dir.
+    /// created in the profile's `cli-config` dir. Named from the directory
+    /// [`cli_config_env`] points at, so for an app with a
+    /// [`cli_config_subdir`] they are named from `$HOME` (`.gemini/skills`).
     ///
     /// The isolation boundary is identity, not craft: profiles exist to
     /// separate account, auth, quota and history. These entries are inert
@@ -102,6 +113,7 @@ pub struct AppSpec {
     /// credentials or session history.
     ///
     /// [`cli_config_env`]: AppSpec::cli_config_env
+    /// [`cli_config_subdir`]: AppSpec::cli_config_subdir
     pub shared_surfaces: &'static [&'static str],
     /// Whether a profile of this app can run its desktop app from a signed
     /// clone: an APFS copy of the vendor bundle that keeps the vendor's
@@ -123,6 +135,7 @@ pub const CLAUDE: AppSpec = AppSpec {
     cli_binary: "claude",
     cli_wrapper_prefix: "claude",
     cli_config_env: "CLAUDE_CONFIG_DIR",
+    cli_config_subdir: None,
     cli_stock_config_dir_name: ".claude",
     has_usage: true,
     shared_surfaces: &[
@@ -163,9 +176,43 @@ pub const CODEX: AppSpec = AppSpec {
     cli_binary: "codex",
     cli_wrapper_prefix: "codex",
     cli_config_env: "CODEX_HOME",
+    cli_config_subdir: None,
     cli_stock_config_dir_name: ".codex",
     has_usage: true,
     shared_surfaces: &["AGENTS.md", "rules", "skills"],
+    supports_signed_clone: false,
+};
+
+pub const GEMINI: AppSpec = AppSpec {
+    display_name: "Gemini",
+    cli_display_name: "Gemini",
+    // CLI only. Google's Gemini.app is a sandboxed native app with no
+    // `--user-data-dir` to point at a profile's data, so there is no desktop
+    // launcher to build. The GUI fields below are never used.
+    gui_bundle_candidates: &[],
+    gui_support_dir_name: "Gemini",
+    launcher_prefix: "Gemini",
+    legacy_launcher_prefixes: &[],
+    cli_binary: "gemini",
+    cli_wrapper_prefix: "gemini",
+    // Gemini CLI keeps its sign-in in `<GEMINI_CLI_HOME>/.gemini/oauth_creds.json`
+    // (unless `GEMINI_FORCE_ENCRYPTED_FILE_STORAGE` moves it to one Keychain
+    // item every profile would share), so the variable isolates the account.
+    cli_config_env: "GEMINI_CLI_HOME",
+    cli_config_subdir: Some(".gemini"),
+    cli_stock_config_dir_name: ".gemini",
+    has_usage: false,
+    // `.agents` because Gemini reads the cross-tool `~/.agents/skills` from
+    // under `GEMINI_CLI_HOME` too. Left out: `settings.json` (hooks, MCP
+    // servers, the sign-in method), `policies/` (tool allowlists) and
+    // `extensions/` (installed code), as for Claude.
+    shared_surfaces: &[
+        ".agents",
+        ".gemini/GEMINI.md",
+        ".gemini/agents",
+        ".gemini/commands",
+        ".gemini/skills",
+    ],
     supports_signed_clone: false,
 };
 
@@ -174,6 +221,14 @@ pub fn spec(kind: AppKind) -> &'static AppSpec {
     match kind {
         AppKind::Claude => &CLAUDE,
         AppKind::Codex => &CODEX,
+        AppKind::Gemini => &GEMINI,
+    }
+}
+
+impl AppSpec {
+    /// Whether a profile of this app can have a desktop launcher.
+    pub fn has_desktop(&self) -> bool {
+        !self.gui_bundle_candidates.is_empty()
     }
 }
 
@@ -188,14 +243,16 @@ impl AppKind {
         match self {
             AppKind::Claude => "claude",
             AppKind::Codex => "codex",
+            AppKind::Gemini => "gemini",
         }
     }
 
-    /// Parse a lowercase app token (`"claude"`/`"codex"`).
+    /// Parse a lowercase app token (`"claude"`/`"codex"`/`"gemini"`).
     pub fn from_token(token: &str) -> Option<AppKind> {
         match token {
             "claude" => Some(AppKind::Claude),
             "codex" => Some(AppKind::Codex),
+            "gemini" => Some(AppKind::Gemini),
             _ => None,
         }
     }
@@ -248,8 +305,21 @@ mod tests {
     }
 
     #[test]
+    fn gemini_spec_is_cli_only_with_a_home_stand_in() {
+        let gemini = spec(AppKind::Gemini);
+        assert!(!gemini.has_desktop());
+        assert!(spec(AppKind::Claude).has_desktop());
+        assert_eq!(gemini.cli_binary, "gemini");
+        assert_eq!(gemini.cli_config_env, "GEMINI_CLI_HOME");
+        assert_eq!(gemini.cli_config_subdir, Some(".gemini"));
+        assert_eq!(gemini.cli_stock_config_dir_name, ".gemini");
+        assert!(!gemini.has_usage);
+        assert!(!gemini.supports_signed_clone);
+    }
+
+    #[test]
     fn default_id_round_trips() {
-        for kind in [AppKind::Claude, AppKind::Codex] {
+        for kind in [AppKind::Claude, AppKind::Codex, AppKind::Gemini] {
             assert_eq!(AppKind::from_default_id(&default_id(kind)), Some(kind));
         }
     }
@@ -257,7 +327,7 @@ mod tests {
     #[test]
     fn from_default_id_rejects_non_default_and_unknown() {
         assert_eq!(AppKind::from_default_id("some-managed-uuid"), None);
-        assert_eq!(AppKind::from_default_id("default:gemini"), None);
+        assert_eq!(AppKind::from_default_id("default:grok"), None);
         assert_eq!(AppKind::from_default_id("claude"), None);
     }
 

@@ -10,7 +10,7 @@ export function WelcomeDialog({ open, onContinue }: Props) {
     <Dialog
       open={open}
       title="Welcome to claude-switch"
-      description="Run multiple isolated Claude and ChatGPT accounts on one Mac — desktop apps and CLIs, side by side."
+      description="Run multiple isolated Claude, ChatGPT and Gemini accounts on one Mac — desktop apps and CLIs, side by side."
       onClose={onContinue}
       onSubmit={onContinue}
       foot={

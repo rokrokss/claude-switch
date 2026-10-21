@@ -96,6 +96,13 @@ fn link_one(stock_config: &Path, cli_config: &Path, surface: &str) -> LinkOutcom
         return LinkOutcome::Occupied;
     }
 
+    // A surface inside the config subdir (`.gemini/skills`) needs that dir
+    // first, which a new profile hasn't got until the CLI first runs.
+    if let Some(parent) = destination.parent() {
+        if let Err(err) = fs::create_dir_all(parent) {
+            return LinkOutcome::Failed(err.to_string());
+        }
+    }
     match std::os::unix::fs::symlink(&source, &destination) {
         Ok(()) => LinkOutcome::Linked,
         Err(err) => LinkOutcome::Failed(err.to_string()),
@@ -105,7 +112,7 @@ fn link_one(stock_config: &Path, cli_config: &Path, surface: &str) -> LinkOutcom
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app_kind::{CLAUDE, CODEX};
+    use crate::app_kind::{CLAUDE, CODEX, GEMINI};
     use std::path::PathBuf;
     use tempfile::tempdir;
 
@@ -270,11 +277,21 @@ mod tests {
             "history.jsonl",
             "projects",
             "sessions",
+            // Gemini, whose surfaces are named from `$HOME`: its whole config
+            // dir, sign-in, accounts, tool policies and installed extensions.
+            ".gemini",
+            "oauth_creds.json",
+            "google_accounts.json",
+            "policies",
+            "extensions",
+            "history",
+            "tmp",
         ];
-        for spec in [&CLAUDE, &CODEX] {
+        for spec in [&CLAUDE, &CODEX, &GEMINI] {
             for surface in spec.shared_surfaces {
+                let name = Path::new(surface).file_name().unwrap().to_str().unwrap();
                 assert!(
-                    !forbidden.contains(surface),
+                    !forbidden.contains(&name),
                     "{} must stay isolated per profile",
                     surface
                 );
@@ -335,6 +352,29 @@ mod tests {
     fn each_app_shares_its_own_skills_surface() {
         assert!(CLAUDE.shared_surfaces.contains(&"skills"));
         assert!(CODEX.shared_surfaces.contains(&"skills"));
+        assert!(GEMINI.shared_surfaces.contains(&".gemini/skills"));
+    }
+
+    #[test]
+    fn links_a_surface_inside_a_config_subdir_the_profile_has_not_made_yet() {
+        let stock = tempdir().unwrap();
+        fs::create_dir_all(stock.path().join(".gemini").join("commands")).unwrap();
+        let profile = tempdir().unwrap();
+        let spec = AppSpec {
+            shared_surfaces: &[".gemini/commands"],
+            ..GEMINI
+        };
+
+        let results = link_shared_surfaces(stock.path(), profile.path(), &spec);
+
+        assert_eq!(
+            outcome_for(&results, ".gemini/commands"),
+            LinkOutcome::Linked
+        );
+        assert_eq!(
+            fs::read_link(profile.path().join(".gemini").join("commands")).unwrap(),
+            stock.path().join(".gemini").join("commands")
+        );
     }
 
     /// Each app reads user-scope instructions from *one* filename, and they
@@ -350,5 +390,7 @@ mod tests {
 
         assert!(CODEX.shared_surfaces.contains(&"AGENTS.md"));
         assert!(!CODEX.shared_surfaces.contains(&"CLAUDE.md"));
+
+        assert!(GEMINI.shared_surfaces.contains(&".gemini/GEMINI.md"));
     }
 }

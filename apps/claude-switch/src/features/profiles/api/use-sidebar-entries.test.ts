@@ -9,8 +9,12 @@ function existing(overrides: Partial<ExistingInstallInfo> = {}): ExistingInstall
   return { guiPath: null, cliPath: null, guiSizeBytes: null, cliSizeBytes: null, ...overrides }
 }
 
-function byApp(claude: ExistingInstallInfo, codex: ExistingInstallInfo): Record<AppId, ExistingInstallInfo> {
-  return { claude, codex }
+function byApp(
+  claude: ExistingInstallInfo,
+  codex: ExistingInstallInfo,
+  gemini: ExistingInstallInfo = existing(),
+): Record<AppId, ExistingInstallInfo> {
+  return { claude, codex, gemini }
 }
 
 describe('makeDefaultEntries', () => {

@@ -18,11 +18,13 @@ export function useSidebarEntries(): Array<SidebarEntry> {
   const { profiles } = useProfiles()
   const claudeMigration = useMigration('claude')
   const codexMigration = useMigration('codex')
+  const geminiMigration = useMigration('gemini')
   const { state: appState } = useAppState()
 
   const existingByApp: Record<AppId, ExistingInstallInfo> = {
     claude: claudeMigration.existing,
     codex: codexMigration.existing,
+    gemini: geminiMigration.existing,
   }
 
   const defaults = makeDefaultEntries(existingByApp, appState.defaultProfileNames)

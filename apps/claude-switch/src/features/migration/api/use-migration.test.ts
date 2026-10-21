@@ -81,8 +81,12 @@ describe('importableAppsFrom', () => {
   function existing(overrides: Partial<ExistingInstallInfo> = {}): ExistingInstallInfo {
     return { guiPath: null, cliPath: null, guiSizeBytes: null, cliSizeBytes: null, ...overrides }
   }
-  function byApp(claude: ExistingInstallInfo, codex: ExistingInstallInfo): Record<AppId, ExistingInstallInfo> {
-    return { claude, codex }
+  function byApp(
+    claude: ExistingInstallInfo,
+    codex: ExistingInstallInfo,
+    gemini: ExistingInstallInfo = existing(),
+  ): Record<AppId, ExistingInstallInfo> {
+    return { claude, codex, gemini }
   }
 
   it('lists apps with a detected gui or cli install, claude before codex', () => {

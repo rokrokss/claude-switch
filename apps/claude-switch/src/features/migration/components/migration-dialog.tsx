@@ -342,9 +342,13 @@ function WhatWillHappenCard({ app }: { app: AppId }) {
           dir.
         </li>
         <li>
-          The originals (<code className="font-mono text-mono">{spec.cliStockConfigDir}</code>,{' '}
-          <code className="font-mono text-mono">{spec.guiStockSupportDir}</code>) are{' '}
-          <strong className="text-ink">moved to a 7-day backup</strong>. Delete it from Settings any time.
+          The originals (<code className="font-mono text-mono">{spec.cliStockConfigDir}</code>
+          {spec.guiStockSupportDir === null ? null : (
+            <>
+              , <code className="font-mono text-mono">{spec.guiStockSupportDir}</code>
+            </>
+          )}
+          ) are <strong className="text-ink">moved to a 7-day backup</strong>. Delete it from Settings any time.
         </li>
         <li>
           From now on, use <code className="font-mono text-mono text-ink">{spec.cliWrapperPrefix}-&lt;name&gt;</code>{' '}
@@ -356,6 +360,11 @@ function WhatWillHappenCard({ app }: { app: AppId }) {
           {app === 'codex' ? (
             <>
               Credentials live in <code className="font-mono text-mono">auth.json</code> under{' '}
+              <code className="font-mono text-mono">{spec.cliConfigEnv}</code> — isolated per profile, no Keychain.
+            </>
+          ) : app === 'gemini' ? (
+            <>
+              Credentials live in <code className="font-mono text-mono">.gemini/oauth_creds.json</code> under{' '}
               <code className="font-mono text-mono">{spec.cliConfigEnv}</code> — isolated per profile, no Keychain.
             </>
           ) : (

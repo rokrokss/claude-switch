@@ -7,6 +7,8 @@ import type { AppId, Session, SessionAction } from '@/lib/types'
 const openSessionReasons: Record<AppId, string> = {
   claude: 'Close it in the terminal first',
   codex: 'Codex has it open — close it first',
+  // Gemini sessions aren't listed.
+  gemini: 'Close it in the terminal first',
 }
 
 /**

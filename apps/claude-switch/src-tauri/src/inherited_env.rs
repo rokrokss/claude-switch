@@ -4,7 +4,8 @@
 //! What claude-switch starts is handed claude-switch' own environment, and that can
 //! carry things meant for something else:
 //!
-//! - an app's config-home variable (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`), when
+//! - an app's config-home variable (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
+//!   `GEMINI_CLI_HOME`), when
 //!   claude-switch was started from a shell running under some profile. The app
 //!   would then run on that profile's config: the stock one, which is given
 //!   none of its own, always, and a launcher that sets none of its own too.
@@ -35,7 +36,7 @@ pub fn not_passed_on<K: AsRef<OsStr>>(keys: impl IntoIterator<Item = K>) -> Vec<
         .into_iter()
         .map(|key| key.as_ref().to_owned())
         .collect();
-    let mut dropped: Vec<OsString> = [AppKind::Claude, AppKind::Codex]
+    let mut dropped: Vec<OsString> = [AppKind::Claude, AppKind::Codex, AppKind::Gemini]
         .into_iter()
         .map(|kind| OsString::from(kind.spec().cli_config_env))
         .collect();
@@ -78,14 +79,17 @@ mod tests {
             "ANTHROPIC_BASE_URL",
         ]);
 
-        assert_eq!(dropped, names(&["CLAUDE_CONFIG_DIR", "CODEX_HOME"]));
+        assert_eq!(
+            dropped,
+            names(&["CLAUDE_CONFIG_DIR", "CODEX_HOME", "GEMINI_CLI_HOME"])
+        );
     }
 
     #[test]
     fn the_config_homes_are_held_back_even_when_not_set() {
         assert_eq!(
             not_passed_on(Vec::<&str>::new()),
-            names(&["CLAUDE_CONFIG_DIR", "CODEX_HOME"])
+            names(&["CLAUDE_CONFIG_DIR", "CODEX_HOME", "GEMINI_CLI_HOME"])
         );
     }
 
@@ -106,6 +110,7 @@ mod tests {
             names(&[
                 "CLAUDE_CONFIG_DIR",
                 "CODEX_HOME",
+                "GEMINI_CLI_HOME",
                 "CLAUDECODE",
                 "CLAUDE_CODE_SESSION_ID",
                 "CLAUDE_PID",
@@ -120,7 +125,12 @@ mod tests {
 
         assert_eq!(
             dropped,
-            names(&["CLAUDE_CONFIG_DIR", "CODEX_HOME", "CLAUDECODE"])
+            names(&[
+                "CLAUDE_CONFIG_DIR",
+                "CODEX_HOME",
+                "GEMINI_CLI_HOME",
+                "CLAUDECODE"
+            ])
         );
     }
 }

@@ -12,6 +12,11 @@ type Props = {
    * wrapper for a managed profile, the bare binary for a stock install.
    */
   command: string
+  /**
+   * Whether the profile's app has a desktop app at all. Without one (Gemini)
+   * the panel is the Terminal row alone.
+   */
+  hasDesktop: boolean
   guiEnabled: boolean
   cliEnabled: boolean
   /**
@@ -90,6 +95,7 @@ const busyClasses =
  */
 export function ProfileDetailSurfacesPanel({
   command,
+  hasDesktop,
   guiEnabled,
   cliEnabled,
   shortcutsEnabled,
@@ -141,19 +147,14 @@ export function ProfileDetailSurfacesPanel({
   return (
     <>
       <div className="glass overflow-hidden rounded-[10px] border">
-        <SurfaceRow
+        <DesktopRow
+          hasDesktop={hasDesktop}
           enabled={guiEnabled}
-          glyph={<Monitor aria-hidden className="h-3.5 w-3.5" strokeWidth={1.85} />}
-          title="Desktop app"
+          opening={opening}
           description={guiDescription}
-          control={
-            <OpenDesktopButton
-              opening={opening}
-              onOpen={() => {
-                void launch()
-              }}
-            />
-          }
+          onOpen={() => {
+            void launch()
+          }}
         />
         <SurfaceRow
           enabled={cliEnabled}
@@ -227,6 +228,44 @@ function useCopiedFlash() {
   }
 
   return { copied, flashCopied }
+}
+
+type DesktopRowProps = {
+  /**
+   * Whether the profile's app has a desktop app. The row is left out when not.
+   */
+  hasDesktop: boolean
+  enabled: boolean
+  /**
+   * Whether a desktop launch is under way.
+   */
+  opening: boolean
+  /**
+   * Undefined while the paths behind the description are still resolving.
+   */
+  description?: string
+  /**
+   * Launches the desktop app.
+   */
+  onOpen: () => void
+}
+
+/**
+ * The Desktop app row, for an app that has one.
+ */
+function DesktopRow({ hasDesktop, enabled, opening, description, onOpen }: DesktopRowProps) {
+  if (!hasDesktop) {
+    return null
+  }
+  return (
+    <SurfaceRow
+      enabled={enabled}
+      glyph={<Monitor aria-hidden className="h-3.5 w-3.5" strokeWidth={1.85} />}
+      title="Desktop app"
+      description={description}
+      control={<OpenDesktopButton opening={opening} onOpen={onOpen} />}
+    />
+  )
 }
 
 type OpenDesktopButtonProps = {

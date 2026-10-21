@@ -20,7 +20,7 @@
  * holds WCAG AA (4.5:1) on the surfaces it sits on, status colours included,
  * so the light meter fills that share them run a little deeper than pastel.
  * The profile palette, the chart series and the Claude orange / ChatGPT
- * violet stay: they identify apps, profiles and series.
+ * violet / Gemini blue stay: they identify apps, profiles and series.
  */
 
 @theme {
@@ -63,6 +63,7 @@
   --color-orange: #d97757;
   --color-orange-deep: #bf6240;
   --color-chatgpt: #6b6bd6;
+  --color-gemini: #3f7fe0;
   --color-green: #2a7a52;
   --color-red: #b5382f;
   --color-amber: #a85400;
@@ -218,6 +219,7 @@
   --color-orange: #e8916b;
   --color-orange-deep: #d97757;
   --color-chatgpt: #8d8df0;
+  --color-gemini: #7fa9f2;
   --color-green: #7ba876;
   --color-red: #f0877b;
   --color-amber: #d4a96b;

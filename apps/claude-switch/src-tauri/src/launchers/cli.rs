@@ -72,7 +72,8 @@ pub fn generate(profile: &Profile) -> AppResult<PathBuf> {
 
 /// Test-friendly variant of `generate` that takes the bin dir, the per-profile
 /// cli-config dir and the stock config dir explicitly so unit tests can use
-/// tempdirs.
+/// tempdirs. `stock_config` is the stock config dir itself (`~/.gemini`), even
+/// for an app whose config env var stands in for `$HOME`.
 pub fn generate_at(
     profile: &Profile,
     bin_dir: &Path,
@@ -103,7 +104,15 @@ pub fn generate_at(
     // inherits none of the stock skills still launches correctly, so a linking
     // failure must not fail wrapper generation. Re-runs on every regeneration,
     // which is how existing profiles pick the links up.
-    link_shared_surfaces(stock_config, cli_config, spec);
+    //
+    // Surfaces are named from what the env var points at: for an app with a
+    // config subdir, a stand-in for `$HOME`, the stock one of which is the
+    // stock config dir's parent.
+    let stock_root = match spec.cli_config_subdir {
+        Some(_) => stock_config.parent().unwrap_or(stock_config),
+        None => stock_config,
+    };
+    link_shared_surfaces(stock_root, cli_config, spec);
 
     Ok(wrapper_path)
 }
@@ -209,6 +218,42 @@ mod tests {
         let script = wrapper_script(&profile, &PathBuf::from("/Users/u/cfg"));
         assert!(script.contains(r#"export CODEX_HOME="/Users/u/cfg""#));
         assert!(script.trim_end().ends_with(r#"exec codex "$@""#));
+    }
+
+    #[test]
+    fn gemini_wrapper_exports_gemini_cli_home_and_execs_gemini() {
+        let mut profile = fixture();
+        profile.app = crate::app_kind::AppKind::Gemini;
+        let script = wrapper_script(&profile, &PathBuf::from("/Users/u/cfg"));
+        assert!(script.contains(r#"export GEMINI_CLI_HOME="/Users/u/cfg""#));
+        assert!(script.trim_end().ends_with(r#"exec gemini "$@""#));
+    }
+
+    /// `GEMINI_CLI_HOME` stands in for `$HOME`, so the stock surfaces come from
+    /// the stock config dir's parent and land under the profile's own
+    /// `.gemini`, next to the cross-tool `.agents` Gemini also reads there.
+    #[test]
+    fn gemini_generate_at_links_surfaces_from_the_stock_home() {
+        let bin = tempdir().unwrap();
+        let cfg = tempdir().unwrap();
+        let home = tempdir().unwrap();
+        let stock = home.path().join(".gemini");
+        fs::create_dir_all(stock.join("skills")).unwrap();
+        fs::create_dir_all(home.path().join(".agents").join("skills")).unwrap();
+        let mut profile = fixture();
+        profile.app = crate::app_kind::AppKind::Gemini;
+
+        let path = generate_at(&profile, bin.path(), cfg.path(), &stock).unwrap();
+
+        assert!(path.ends_with("gemini-personal"));
+        assert_eq!(
+            fs::read_link(cfg.path().join(".gemini").join("skills")).unwrap(),
+            stock.join("skills")
+        );
+        assert_eq!(
+            fs::read_link(cfg.path().join(".agents")).unwrap(),
+            home.path().join(".agents")
+        );
     }
 
     #[test]

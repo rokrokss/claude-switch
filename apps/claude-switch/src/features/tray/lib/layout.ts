@@ -40,6 +40,8 @@ const defaults: Record<AppId, Array<[string, 'alwaysVisible' | 'onDemand']>> = {
     ['last30', 'onDemand'],
     ['resets', 'onDemand'],
   ],
+  // Gemini has no usage, so no metrics.
+  gemini: [],
 }
 
 /**

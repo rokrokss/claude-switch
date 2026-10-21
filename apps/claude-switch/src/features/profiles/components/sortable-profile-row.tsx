@@ -11,6 +11,7 @@ type Props = {
   name: string
   swatch: ReactNode
   surfaces: Surfaces
+  hasDesktop: boolean
   selected: boolean
   sortableId: string
   glyph?: ReactNode
@@ -48,6 +49,7 @@ export function SortableProfileRow({
   name,
   swatch,
   surfaces,
+  hasDesktop,
   selected,
   sortableId,
   glyph,
@@ -75,6 +77,7 @@ export function SortableProfileRow({
         name={name}
         swatch={swatch}
         surfaces={surfaces}
+        hasDesktop={hasDesktop}
         selected={selected}
         glyph={glyph}
         shortcutIndex={shortcutIndex}

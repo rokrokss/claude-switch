@@ -60,8 +60,8 @@ function NoProfilesYet({ onCreate }: NoProfilesYetProps) {
         Create your first profile.
       </h1>
       <p className="m-0 mb-5 max-w-[380px] text-[13.5px] leading-[1.55] tracking-[-0.003em] text-muted">
-        Each profile is one isolated Claude or ChatGPT account, with its own Desktop launcher and CLI wrapper. Logins,
-        history, and chats stay isolated.
+        Each profile is one isolated Claude, ChatGPT or Gemini account, with its own Desktop launcher and CLI wrapper.
+        Logins, history, and chats stay isolated.
       </p>
       <Button
         variant="primary"

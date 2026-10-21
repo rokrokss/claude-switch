@@ -50,6 +50,7 @@ const DEPS: Dependencies = {
   apps: {
     claude: { guiInstalled: true, cliInstalled: true },
     codex: { guiInstalled: false, cliInstalled: false },
+    gemini: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }

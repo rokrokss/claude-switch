@@ -6,7 +6,7 @@
  * `appSpecs[appId]` so adding an app is config, not new components.
  */
 
-export type AppId = 'claude' | 'codex'
+export type AppId = 'claude' | 'codex' | 'gemini'
 
 export type AppSurfaceSpec = {
   label: string
@@ -66,7 +66,16 @@ export type AppSpec = {
    */
   cliDisplayName: string
   hasUsage: boolean
-  gui: AppSurfaceSpec
+  /**
+   * Whether the app's sessions are listed, moved and archived. Mirrors the
+   * apps `src-tauri/src/sessions` handles.
+   */
+  hasSessions: boolean
+  /**
+   * The desktop launcher, or null for an app with no desktop app a profile
+   * can launch (Gemini, which is CLI only).
+   */
+  gui: AppSurfaceSpec | null
   cli: AppSurfaceSpec
   /**
    * What giving a profile of this app its own Dock icon means for it.
@@ -85,8 +94,8 @@ export type AppSpec = {
   // (`src-tauri/src/app_kind.rs`). Values MUST match the `CLAUDE`/`CODEX`
   // consts there. UI copy (surface cards, migration dialog, delete dialog,
   // command palette) reads these instead of hardcoding "claude".
-  /** Stock GUI bundle name under `/Applications`, e.g. `"Claude.app"`. */
-  guiBundleName: string
+  /** Stock GUI bundle name under `/Applications`, e.g. `"Claude.app"`. Null without a desktop app. */
+  guiBundleName: string | null
   /** Real CLI binary the wrapper execs, e.g. `"claude"`. */
   cliBinary: string
   /** Prefix for generated CLI wrappers: `"<prefix>-<slug>"`. */
@@ -95,8 +104,8 @@ export type AppSpec = {
   cliConfigEnv: string
   /** Stock CLI config directory under `$HOME`, e.g. `"~/.claude"`. */
   cliStockConfigDir: string
-  /** Stock GUI support dir under `~/Library/Application Support`. */
-  guiStockSupportDir: string
+  /** Stock GUI support dir under `~/Library/Application Support`. Null without a desktop app. */
+  guiStockSupportDir: string | null
 }
 
 const claude: AppSpec = {
@@ -104,6 +113,7 @@ const claude: AppSpec = {
   displayName: 'Claude',
   cliDisplayName: 'Claude',
   hasUsage: true,
+  hasSessions: true,
   gui: {
     label: 'Desktop App launcher',
     description: 'Creates /Applications/Claude (Name).app with an isolated user-data directory.',
@@ -151,6 +161,7 @@ const codex: AppSpec = {
   displayName: 'ChatGPT',
   cliDisplayName: 'Codex',
   hasUsage: true,
+  hasSessions: true,
   gui: {
     label: 'Desktop App launcher',
     description: 'Creates /Applications/ChatGPT (Name).app with an isolated user-data directory.',
@@ -185,9 +196,35 @@ const codex: AppSpec = {
   guiStockSupportDir: '~/Library/Application Support/Codex',
 }
 
-export const appSpecs: Record<AppId, AppSpec> = { claude, codex }
+const gemini: AppSpec = {
+  id: 'gemini',
+  displayName: 'Gemini',
+  cliDisplayName: 'Gemini',
+  hasUsage: false,
+  hasSessions: false,
+  // Gemini.app is a sandboxed native app with no user-data dir to point at a
+  // profile, so a Gemini profile is its CLI wrapper alone.
+  gui: null,
+  cli: {
+    label: 'Gemini CLI wrapper',
+    description: 'Exposes gemini-{slug} in ~/.local/bin, pointed at this profile (GEMINI_CLI_HOME).',
+    installUrl: 'https://github.com/google-gemini/gemini-cli',
+  },
+  dockIcon: { defaultOn: false, cost: null },
+  signedClone: false,
+  usage: null,
+  accentVar: '--color-gemini',
+  guiBundleName: null,
+  cliBinary: 'gemini',
+  cliWrapperPrefix: 'gemini',
+  cliConfigEnv: 'GEMINI_CLI_HOME',
+  cliStockConfigDir: '~/.gemini',
+  guiStockSupportDir: null,
+}
 
-export const appIds: ReadonlyArray<AppId> = ['claude', 'codex']
+export const appSpecs: Record<AppId, AppSpec> = { claude, codex, gemini }
+
+export const appIds: ReadonlyArray<AppId> = ['claude', 'codex', 'gemini']
 
 /**
  * The per-profile CLI command for a managed profile, e.g. `claude-work`
