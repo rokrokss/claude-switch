@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.0 (2026-10-21)
+
+
+### Added
+
+* **profiles:** Gemini profiles: a `gemini-<slug>` command in `~/.local/bin` runs Gemini CLI with the profile's own sign-in, settings and history (`GEMINI_CLI_HOME`), and inherits your skills, agents, commands and `GEMINI.md` from `~/.gemini` and `~/.agents`. CLI only, since Gemini.app can't run per profile; usage, spend and sessions aren't shown for Gemini yet
+* **profiles:** an existing `~/.gemini` shows as Gemini's default entry and can be imported as a profile
+
 ## 2.1.1 (2026-10-17)
 
 
