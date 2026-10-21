@@ -4,7 +4,7 @@ import ProfilePill from './profile-pill.astro'
 <section aria-labelledby="how-it-works-heading" class="mx-auto max-w-[680px] px-4 pt-12 pb-4 sm:px-14">
   <h2 id="how-it-works-heading" class="m-0 mb-[18px] font-display text-[26px] font-extrabold tracking-[-0.03em]">How it works</h2>
   <p class="m-0 mb-4 text-[15.5px] leading-[1.65] text-ink-soft">
-    You create a profile in claude-switch for each account — choose Claude or ChatGPT, give it a name like
+    You create a profile in claude-switch for each account — choose Claude, ChatGPT, Gemini or Antigravity, give it a name like
     <ProfilePill name="Personal" color="var(--color-profile-orange)" />,
     <ProfilePill name="Work" color="var(--color-profile-steel)" />, or
     <ProfilePill name="Acme Co." color="var(--color-profile-sage)" />
@@ -14,7 +14,8 @@ import ProfilePill from './profile-pill.astro'
     and a CLI command
     (<code class="rounded bg-cream-2 px-1.5 py-px font-mono text-[0.88em]">claude-personal</code>
     or <code class="rounded bg-cream-2 px-1.5 py-px font-mono text-[0.88em]">codex-work</code>),
-    both named after the profile.
+    both named after the profile. Gemini and Antigravity profiles are the command alone
+    (<code class="rounded bg-cream-2 px-1.5 py-px font-mono text-[0.88em]">gemini-work</code> or <code class="rounded bg-cream-2 px-1.5 py-px font-mono text-[0.88em]">agy-work</code>).
   </p>
   <p class="m-0 text-[15.5px] leading-[1.65] text-ink-soft">
     Open them from Spotlight, the Dock, or your terminal. They never share state — each one keeps its own login, history, and settings. Delete a profile and both artifacts go away.
