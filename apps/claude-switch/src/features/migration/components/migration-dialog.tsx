@@ -349,6 +349,7 @@ function WhatWillHappenCard({ app }: { app: AppId }) {
             </>
           )}
           ) are <strong className="text-ink">moved to a 7-day backup</strong>. Delete it from Settings any time.
+          {app === 'gemini' ? " Antigravity's folders in it stay where they are." : null}
         </li>
         <li>
           From now on, use <code className="font-mono text-mono text-ink">{spec.cliWrapperPrefix}-&lt;name&gt;</code>{' '}

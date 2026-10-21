@@ -479,7 +479,7 @@ fn rollback_import(
         let backup_cli = backup.join(app_spec.cli_stock_config_dir_name);
         let original = stock_cli_config_dir(app_spec).ok();
         if let (true, Some(target)) = (backup_cli.exists(), original) {
-            let _ = std::fs::rename(&backup_cli, &target);
+            let _ = migration::restore_from_backup(&backup_cli, &target);
         }
     }
     let _ = std::fs::remove_dir_all(backup);

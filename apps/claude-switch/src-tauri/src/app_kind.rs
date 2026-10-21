@@ -91,6 +91,12 @@ pub struct AppSpec {
     pub cli_config_subdir: Option<&'static str>,
     /// Stock CLI config directory name under `$HOME`, e.g. `".claude"`.
     pub cli_stock_config_dir_name: &'static str,
+    /// Entries of the stock config dir that belong to another app, which
+    /// importing the stock install copies nothing of and leaves where they
+    /// are. Google's Antigravity keeps its data in `~/.gemini` beside Gemini
+    /// CLI's, and moving it into a Gemini profile would take it from
+    /// Antigravity.
+    pub cli_import_leaves: &'static [&'static str],
     /// Whether this app exposes account usage/quota stats.
     pub has_usage: bool,
     /// Config-dir entries a profile *inherits* from the stock install
@@ -137,6 +143,7 @@ pub const CLAUDE: AppSpec = AppSpec {
     cli_config_env: "CLAUDE_CONFIG_DIR",
     cli_config_subdir: None,
     cli_stock_config_dir_name: ".claude",
+    cli_import_leaves: &[],
     has_usage: true,
     shared_surfaces: &[
         "CLAUDE.md",
@@ -178,6 +185,7 @@ pub const CODEX: AppSpec = AppSpec {
     cli_config_env: "CODEX_HOME",
     cli_config_subdir: None,
     cli_stock_config_dir_name: ".codex",
+    cli_import_leaves: &[],
     has_usage: true,
     shared_surfaces: &["AGENTS.md", "rules", "skills"],
     supports_signed_clone: false,
@@ -201,6 +209,15 @@ pub const GEMINI: AppSpec = AppSpec {
     cli_config_env: "GEMINI_CLI_HOME",
     cli_config_subdir: Some(".gemini"),
     cli_stock_config_dir_name: ".gemini",
+    // Antigravity's: its desktop app's and IDE's data, its CLI's, and its
+    // global customizations (`config/`, MCP servers and hooks).
+    cli_import_leaves: &[
+        "antigravity",
+        "antigravity-backup",
+        "antigravity-cli",
+        "antigravity-ide",
+        "config",
+    ],
     has_usage: false,
     // `.agents` because Gemini reads the cross-tool `~/.agents/skills` from
     // under `GEMINI_CLI_HOME` too. Left out: `settings.json` (hooks, MCP
