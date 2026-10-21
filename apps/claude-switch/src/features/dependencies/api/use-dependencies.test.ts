@@ -18,6 +18,7 @@ const allInstalled = {
   apps: {
     claude: { guiInstalled: true, cliInstalled: true },
     codex: { guiInstalled: false, cliInstalled: false },
+    gemini: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -26,6 +27,7 @@ const noneInstalled = {
   apps: {
     claude: { guiInstalled: false, cliInstalled: false },
     codex: { guiInstalled: false, cliInstalled: false },
+    gemini: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: false,
 }

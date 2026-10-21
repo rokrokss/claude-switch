@@ -9,6 +9,7 @@ import { Button, cn } from '@/design'
 import {
   availableSurfaces,
   dockIconDescription,
+  offersDesktop,
   signedCloneAvailable,
   signedCloneDescription,
   surfaceToggle,
@@ -60,7 +61,8 @@ type ProfileSurfaceFieldsProps = {
 /**
  * The two surface toggle cards, with the Dock icon option — and, for an app
  * that has one, the signed clone option — under the desktop one. A card self-disables when its surface is not installed, and says where
- * to get it underneath.
+ * to get it underneath. An app with no desktop app (Gemini) gets the CLI card
+ * alone.
  */
 export function ProfileSurfaceFields({
   app,
@@ -83,28 +85,30 @@ export function ProfileSurfaceFields({
   return (
     <div className="flex flex-col gap-2.5">
       {/* The Dock icon is an option of the desktop launcher, so it shares its card. */}
-      <SurfaceOption toggle={gui} onChange={(next) => onSurfacesChange({ ...surfaces, gui: next })}>
-        <ToggleRow
-          nested
-          checked={distinctDockIcon && desktopLauncher}
-          disabled={!desktopLauncher}
-          title="Distinct Dock icon"
-          description={dockIconDescription(app)}
-          info={{ label: 'About the Dock icon', onClick: onExplainDockIcon }}
-          onChange={onDistinctDockIconChange}
-        />
-        {signedCloneAvailable(app) ? (
+      {offersDesktop(app) ? (
+        <SurfaceOption toggle={gui} onChange={(next) => onSurfacesChange({ ...surfaces, gui: next })}>
           <ToggleRow
             nested
-            checked={signedClone && desktopLauncher}
+            checked={distinctDockIcon && desktopLauncher}
             disabled={!desktopLauncher}
-            title="Signed clone"
-            description={signedCloneDescription(app)}
-            info={{ label: 'About the signed clone', onClick: onExplainSignedClone }}
-            onChange={onSignedCloneChange}
+            title="Distinct Dock icon"
+            description={dockIconDescription(app)}
+            info={{ label: 'About the Dock icon', onClick: onExplainDockIcon }}
+            onChange={onDistinctDockIconChange}
           />
-        ) : null}
-      </SurfaceOption>
+          {signedCloneAvailable(app) ? (
+            <ToggleRow
+              nested
+              checked={signedClone && desktopLauncher}
+              disabled={!desktopLauncher}
+              title="Signed clone"
+              description={signedCloneDescription(app)}
+              info={{ label: 'About the signed clone', onClick: onExplainSignedClone }}
+              onChange={onSignedCloneChange}
+            />
+          ) : null}
+        </SurfaceOption>
+      ) : null}
       <SurfaceOption toggle={cli} onChange={(next) => onSurfacesChange({ ...surfaces, cli: next })} />
     </div>
   )

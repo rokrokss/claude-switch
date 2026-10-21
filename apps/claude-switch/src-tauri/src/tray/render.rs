@@ -307,6 +307,8 @@ fn lay_out(group: &Group) -> Option<Laid> {
     let bytes = match group.app {
         AppKind::Claude => CLAUDE_MARK,
         AppKind::Codex => OPENAI_MARK,
+        // Has no usage, so never has a group in the menu bar.
+        AppKind::Gemini => return None,
     };
     let mark = NSImage::initWithData(NSImage::alloc(), &NSData::with_bytes(bytes))?;
     let (size, weight) = if group.values.len() == 1 {

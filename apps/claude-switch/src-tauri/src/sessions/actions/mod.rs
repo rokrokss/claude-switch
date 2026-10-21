@@ -155,6 +155,7 @@ pub async fn check(
             Ok(checked.check)
         }
         AppKind::Codex => Ok(codex::check(&home, session_id, action).await?.check),
+        AppKind::Gemini => Err(no_gemini_sessions()),
     }
 }
 
@@ -186,7 +187,14 @@ async fn run(
             run_claude(&home, &homes, session_id, action, quit_app, QUIT_TIMEOUT).await
         }
         AppKind::Codex => run_codex(&home, session_id, action, quit_app, QUIT_TIMEOUT).await,
+        AppKind::Gemini => Err(no_gemini_sessions()),
     }
+}
+
+/// Why a session action is refused for a Gemini profile, whose sessions the
+/// app doesn't list.
+fn no_gemini_sessions() -> AppError {
+    AppError::Validation("Gemini sessions can't be managed here".into())
 }
 
 /// [`run`] for a Claude session of `home`, one of `homes`, giving its

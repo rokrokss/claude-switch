@@ -57,7 +57,11 @@ export function DefaultProfileDetail({ entry, onMigrate }: Props) {
   const launch = useGuiLaunch()
   return (
     <PaneLayout
-      aside={<SessionsPanel key={entry.id} profileId={entry.id} app={entry.app} />}
+      aside={
+        appSpecs[entry.app].hasSessions ? (
+          <SessionsPanel key={entry.id} profileId={entry.id} app={entry.app} />
+        ) : undefined
+      }
       header={
         <ProfileDetailHeader
           name={entry.customName ?? displayName}
@@ -148,11 +152,14 @@ function DefaultSurfaces({ entry, launch, paths, onError }: DefaultSurfacesProps
   return (
     <ProfileDetailSurfacesPanel
       command={spec.cliBinary}
+      hasDesktop={spec.gui !== null}
       guiEnabled={entry.surfaces.gui}
       cliEnabled={entry.surfaces.cli}
       shortcutsEnabled={false}
       opening={launch.opening}
-      guiDescription={paths === undefined ? undefined : guiDescription(paths, spec.guiBundleName)}
+      guiDescription={
+        paths === undefined || spec.guiBundleName === null ? undefined : guiDescription(paths, spec.guiBundleName)
+      }
       cliDescription={paths === undefined ? undefined : `Stock ${spec.cliBinary} — no wrapper`}
       onLaunchGui={() =>
         launch.run(async () => {

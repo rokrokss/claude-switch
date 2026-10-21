@@ -31,6 +31,12 @@ static BUILDING: Mutex<()> = Mutex::new(());
 pub fn generate(profile: &Profile, version: &str) -> AppResult<PathBuf> {
     let _building = BUILDING.lock().unwrap_or_else(PoisonError::into_inner);
     let spec = profile.app.spec();
+    if !spec.has_desktop() {
+        return Err(AppError::Validation(format!(
+            "{} profiles have no desktop app to launch",
+            spec.display_name
+        )));
+    }
     let resolved_gui_app = resolve_gui_app(spec)
         .ok_or_else(|| AppError::Validation(format!("{} isn't installed", spec.display_name)))?;
     let bundle = gui_launcher_path(&profile.name, spec);
@@ -395,6 +401,14 @@ mod tests {
             signed_clone: false,
             last_used_at: None,
         }
+    }
+
+    #[test]
+    fn generate_refuses_an_app_without_a_desktop_app() {
+        let mut profile = fixture();
+        profile.app = crate::app_kind::AppKind::Gemini;
+        let err = generate(&profile, "0.1.0").unwrap_err();
+        assert!(matches!(err, AppError::Validation(_)), "{err:?}");
     }
 
     /// Opt-in end-to-end smoke test. Writes to /Applications, so it's gated

@@ -150,6 +150,16 @@ pub fn cli_config_dir(id: &str) -> AppResult<PathBuf> {
     Ok(profile_dir(id)?.join("cli-config"))
 }
 
+/// Where profile `id`'s CLI keeps its config: its `cli-config` dir, or the
+/// directory in it that `spec`'s app reads (see [`AppSpec::cli_config_subdir`]).
+pub fn cli_config_home(id: &str, spec: &AppSpec) -> AppResult<PathBuf> {
+    let dir = cli_config_dir(id)?;
+    Ok(match spec.cli_config_subdir {
+        Some(subdir) => dir.join(subdir),
+        None => dir,
+    })
+}
+
 /// Empty, app-owned directory used as `claude`'s working directory during a
 /// token refresh.
 ///

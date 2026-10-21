@@ -29,6 +29,7 @@ const HEALTHY_DEPS = {
   apps: {
     claude: { guiInstalled: true, cliInstalled: true },
     codex: { guiInstalled: false, cliInstalled: false },
+    gemini: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -123,10 +124,10 @@ function primeInitialLoads({
     list_migration_backups: () => backups,
     load_app_state: () => state,
     detect_shell: () => shell,
-    // `existing` describes the Claude stock install under test; Codex
-    // detects nothing so exactly one Re-import card renders.
+    // `existing` describes the Claude stock install under test; the other
+    // apps detect nothing so exactly one Re-import card renders.
     detect_existing_install: (args) =>
-      (args as { app?: string } | undefined)?.app === 'codex' ? DEFAULT_EXISTING : existing,
+      (args as { app?: string } | undefined)?.app === 'claude' ? existing : DEFAULT_EXISTING,
     get_app_metadata: () => metadata,
     login_item: () => 'off',
     quit_app: () => undefined,
@@ -266,6 +267,9 @@ describe('SettingsView', () => {
     expect(screen.getByText('Claude CLI')).toBeInTheDocument()
     expect(screen.getByText('ChatGPT Desktop')).toBeInTheDocument()
     expect(screen.getByText('Codex CLI')).toBeInTheDocument()
+    // Gemini is CLI only, so it has no desktop app to be missing.
+    expect(screen.getByText('Gemini CLI')).toBeInTheDocument()
+    expect(screen.queryByText('Gemini Desktop')).not.toBeInTheDocument()
     expect(screen.getByText('Shell PATH')).toBeInTheDocument()
   })
 

@@ -181,6 +181,7 @@ function AppSection({
           name={defaultRowName}
           swatch={<OutlinedSwatch size={10} />}
           surfaces={visibleDefault.entry.surfaces}
+          hasDesktop={appSpecs[group.app].gui !== null}
           selected={entryId(visibleDefault) === selectedId}
           glyph={rowGlyph}
           onSelect={() => onSelect(entryId(visibleDefault))}
@@ -204,6 +205,7 @@ function AppSection({
                 name={managedEntry.profile.name}
                 swatch={<ManagedSidebarSwatch color={managedEntry.profile.color} />}
                 surfaces={managedEntry.profile.surfaces}
+                hasDesktop={appSpecs[group.app].gui !== null}
                 selected={managedEntry.profile.id === selectedId}
                 glyph={rowGlyph}
                 shortcutIndex={shortcutIndexOf(managedFlat, managedEntry.profile.id)}
@@ -295,6 +297,7 @@ function ReorderableManagedList({
                 name={managedEntry.profile.name}
                 swatch={<ManagedSidebarSwatch color={managedEntry.profile.color} />}
                 surfaces={managedEntry.profile.surfaces}
+                hasDesktop={appSpecs[group.app].gui !== null}
                 selected={managedEntry.profile.id === selectedId}
                 glyph={glyph}
                 shortcutIndex={shortcutIndexOf(managedFlat, managedEntry.profile.id)}

@@ -45,7 +45,11 @@ export function ProfileDetail({ profile, shortcutsEnabled, onEdit, onDelete }: P
 
   return (
     <PaneLayout
-      aside={<SessionsPanel key={profile.id} profileId={profile.id} app={profile.app} />}
+      aside={
+        appSpecs[profile.app].hasSessions ? (
+          <SessionsPanel key={profile.id} profileId={profile.id} app={profile.app} />
+        ) : undefined
+      }
       header={
         <ProfileDetailHeader
           name={profile.name}
@@ -152,6 +156,7 @@ function ManagedSurfaces({
   return (
     <ProfileDetailSurfacesPanel
       command={command}
+      hasDesktop={appSpecs[profile.app].gui !== null}
       guiEnabled={profile.surfaces.gui}
       cliEnabled={profile.surfaces.cli}
       shortcutsEnabled={shortcutsEnabled}

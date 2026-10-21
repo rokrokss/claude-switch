@@ -62,6 +62,8 @@ const kindLabels: Record<SessionKind, string> = {
 const openStateTitles: Record<AppId, string> = {
   claude: 'Open in a terminal',
   codex: 'Codex has it open',
+  // Gemini sessions aren't listed.
+  gemini: 'Open in a terminal',
 }
 
 /**

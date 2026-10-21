@@ -16,6 +16,7 @@ const ONLY_CLAUDE_INSTALLED: Dependencies = {
   apps: {
     claude: { guiInstalled: true, cliInstalled: true },
     codex: { guiInstalled: false, cliInstalled: false },
+    gemini: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -24,6 +25,7 @@ const BOTH_INSTALLED: Dependencies = {
   apps: {
     claude: { guiInstalled: true, cliInstalled: true },
     codex: { guiInstalled: true, cliInstalled: true },
+    gemini: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -32,6 +34,7 @@ const onlyCodexInstalled: Dependencies = {
   apps: {
     claude: { guiInstalled: false, cliInstalled: false },
     codex: { guiInstalled: true, cliInstalled: true },
+    gemini: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -181,10 +184,35 @@ describe('CreateProfileDialog — dependency awareness', () => {
       apps: {
         claude: { guiInstalled: false, cliInstalled: true },
         codex: { guiInstalled: false, cliInstalled: false },
+        gemini: { guiInstalled: false, cliInstalled: false },
       },
       localBinOnPath: true,
     })
     expect(screen.getByRole('checkbox', { name: /Desktop App launcher/ })).toBeDisabled()
+  })
+
+  it('offers a Gemini profile its CLI wrapper alone, and creates it with that', async () => {
+    const { onCreate, user } = renderWith({
+      apps: {
+        claude: { guiInstalled: false, cliInstalled: false },
+        codex: { guiInstalled: false, cliInstalled: false },
+        gemini: { guiInstalled: false, cliInstalled: true },
+      },
+      localBinOnPath: true,
+    })
+    // Gemini is the only installed app — it is pre-selected.
+    expect(screen.getByRole('checkbox', { name: /Gemini CLI wrapper/ })).toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: /Desktop App launcher/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Gemini Desktop/ })).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Name'), 'Work')
+    await user.click(screen.getByRole('button', { name: /^Create profile/ }))
+
+    await waitFor(() =>
+      expect(onCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ app: 'gemini', name: 'Work', surfaces: { gui: false, cli: true } }),
+      ),
+    )
   })
 
   it('disables the CLI surface when claude CLI is missing', () => {
@@ -192,6 +220,7 @@ describe('CreateProfileDialog — dependency awareness', () => {
       apps: {
         claude: { guiInstalled: true, cliInstalled: false },
         codex: { guiInstalled: false, cliInstalled: false },
+        gemini: { guiInstalled: false, cliInstalled: false },
       },
       localBinOnPath: true,
     })
@@ -203,6 +232,7 @@ describe('CreateProfileDialog — dependency awareness', () => {
       apps: {
         claude: { guiInstalled: false, cliInstalled: false },
         codex: { guiInstalled: false, cliInstalled: false },
+        gemini: { guiInstalled: false, cliInstalled: false },
       },
       localBinOnPath: true,
     })
@@ -222,6 +252,7 @@ describe('CreateProfileDialog — dependency awareness', () => {
             apps: {
               claude: { guiInstalled: false, cliInstalled: true },
               codex: { guiInstalled: false, cliInstalled: false },
+              gemini: { guiInstalled: false, cliInstalled: false },
             },
             localBinOnPath: true,
           }}
@@ -256,6 +287,7 @@ describe('CreateProfileDialog — app-type picker behaviour', () => {
             apps: {
               claude: { guiInstalled: false, cliInstalled: false },
               codex: { guiInstalled: true, cliInstalled: false },
+              gemini: { guiInstalled: false, cliInstalled: false },
             },
             localBinOnPath: true,
           }}
@@ -302,6 +334,7 @@ describe('CreateProfileDialog — app-type picker behaviour', () => {
             apps: {
               claude: { guiInstalled: false, cliInstalled: false },
               codex: { guiInstalled: false, cliInstalled: true },
+              gemini: { guiInstalled: false, cliInstalled: false },
             },
             localBinOnPath: true,
           }}
@@ -312,7 +345,7 @@ describe('CreateProfileDialog — app-type picker behaviour', () => {
     )
     // Codex is the only installed app — it is pre-selected
     const link = screen.getByRole('link', { name: /ChatGPT Desktop/ })
-    expect(link).toHaveAttribute('href', appSpecs.codex.gui.installUrl)
+    expect(link).toHaveAttribute('href', appSpecs.codex.gui?.installUrl)
   })
 })
 

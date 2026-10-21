@@ -11,6 +11,7 @@ import {
   installedAppIds,
   isProfileFormValid,
   newProfileDockIcon,
+  offersDesktop,
   preselectedApp,
   surfaceToggle,
 } from './profile-form'
@@ -19,6 +20,7 @@ const dependencies: Dependencies = {
   apps: {
     claude: { guiInstalled: true, cliInstalled: false },
     codex: { guiInstalled: false, cliInstalled: false },
+    gemini: { guiInstalled: false, cliInstalled: false },
   },
   localBinOnPath: true,
 }
@@ -145,13 +147,32 @@ describe('dockIconDescription', () => {
   })
 })
 
+describe('offersDesktop', () => {
+  it('offers the desktop launcher until an app is chosen, then only for an app with a desktop app', () => {
+    expect(offersDesktop('')).toBe(true)
+    expect(offersDesktop('claude')).toBe(true)
+    expect(offersDesktop('codex')).toBe(true)
+    expect(offersDesktop('gemini')).toBe(false)
+  })
+})
+
 describe('surfaceToggle', () => {
+  it("reads a desktop app Gemini hasn't got as no app yet, with nothing to install", () => {
+    expect(surfaceToggle('gui', 'gemini', false, true)).toEqual({
+      checked: false,
+      disabled: true,
+      title: 'Desktop App launcher',
+      description: '',
+      install: null,
+    })
+  })
+
   it("is checked when chosen and available, with the app's copy", () => {
     expect(surfaceToggle('gui', 'claude', true, true)).toEqual({
       checked: true,
       disabled: false,
-      title: appSpecs.claude.gui.label,
-      description: appSpecs.claude.gui.description,
+      title: appSpecs.claude.gui?.label,
+      description: appSpecs.claude.gui?.description,
       install: null,
     })
   })
@@ -164,7 +185,7 @@ describe('surfaceToggle', () => {
     expect(surfaceToggle('gui', 'codex', false, true)).toMatchObject({
       checked: false,
       disabled: true,
-      install: { href: appSpecs.codex.gui.installUrl, label: `${appSpecs.codex.displayName} Desktop` },
+      install: { href: appSpecs.codex.gui?.installUrl, label: `${appSpecs.codex.displayName} Desktop` },
     })
   })
 

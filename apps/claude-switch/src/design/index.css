@@ -39,6 +39,10 @@
   --app-accent: var(--color-chatgpt);
 }
 
+[data-app="gemini"] {
+  --app-accent: var(--color-gemini);
+}
+
 /* Body background — shizue's faint dot grid on the canvas, under two soft
    color fields: mint at the top right, and a tint that tracks --app-accent at
    the bottom left, so selecting a ChatGPT entry shifts the window toward

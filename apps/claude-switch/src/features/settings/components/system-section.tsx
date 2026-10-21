@@ -49,8 +49,19 @@ function buildAppRows(dependencies: Dependencies): Array<Row> {
   return appIds.flatMap((id) => {
     const spec = appSpecs[id]
     const deps = dependencies.apps[id]
+    // An app with no desktop app (Gemini) has none to be missing.
+    const desktop: Array<Row> =
+      spec.gui === null
+        ? []
+        : [
+            {
+              label: `${spec.displayName} Desktop`,
+              tone: deps.guiInstalled ? 'success' : 'warning',
+              detail: MISSING_DETAIL,
+            },
+          ]
     return [
-      { label: `${spec.displayName} Desktop`, tone: deps.guiInstalled ? 'success' : 'warning', detail: MISSING_DETAIL },
+      ...desktop,
       {
         label: `${spec.cliDisplayName} CLI`,
         tone: deps.cliInstalled ? 'success' : 'warning',

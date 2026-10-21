@@ -34,6 +34,8 @@ const quickLinks: Record<AppId, Array<{ label: string; url: string }>> = {
     { label: 'Status', url: 'https://status.openai.com' },
     { label: 'Usage', url: 'https://chatgpt.com/settings/usage' },
   ],
+  // Gemini has no usage, so no card in the menu bar.
+  gemini: [],
 }
 
 type Props = {

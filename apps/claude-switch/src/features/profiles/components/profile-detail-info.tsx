@@ -46,6 +46,11 @@ export function ProfileDetailInfo({ app, command }: Props) {
             This is your stock {spec.displayName} install — the one you had before claude-switch. It keeps its own
             logins, history, and chats, separate from any profile you create here.
           </p>
+        ) : spec.gui === null ? (
+          <p>
+            The wrapper keeps {spec.cliDisplayName}'s sign-in, history, and settings in this profile's own config
+            directory, so they never mix with your other profiles.
+          </p>
         ) : (
           <p>
             The launcher opens {spec.displayName} against its own user-data directory, so logins, history, and chats
@@ -59,11 +64,15 @@ export function ProfileDetailInfo({ app, command }: Props) {
             <code className="font-mono text-ink-soft">{spec.cliConfigEnv}</code> pointed here.
           </p>
         )}
-        <p>
-          <span className="font-semibold text-ink-soft">Signing in:</span> with another {spec.displayName} window open,
-          macOS can hand the sign-in callback to the wrong app. Quit the others for the first sign-in, or temporarily
-          make Safari your default browser and switch back afterwards.
-        </p>
+        {/* The callback goes to a desktop app; a CLI-only app's sign-in comes
+            back to the CLI itself. */}
+        {spec.gui === null ? null : (
+          <p>
+            <span className="font-semibold text-ink-soft">Signing in:</span> with another {spec.displayName} window
+            open, macOS can hand the sign-in callback to the wrong app. Quit the others for the first sign-in, or
+            temporarily make Safari your default browser and switch back afterwards.
+          </p>
+        )}
       </PopoverContent>
     </Popover>
   )

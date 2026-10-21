@@ -39,10 +39,12 @@ function actionDetail(existing: ExistingInstallInfo): { path: string; size: numb
 export function DataSection({ onReimport }: Props) {
   const claudeMigration = useMigration('claude')
   const codexMigration = useMigration('codex')
+  const geminiMigration = useMigration('gemini')
   const backups = useMigrationBackups()
   const existingByApp: Record<AppId, ExistingInstallInfo> = {
     claude: claudeMigration.existing,
     codex: codexMigration.existing,
+    gemini: geminiMigration.existing,
   }
   const importable = importableAppsFrom(existingByApp)
 

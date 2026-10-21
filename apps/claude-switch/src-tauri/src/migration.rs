@@ -53,7 +53,13 @@ pub fn detect_for(kind: AppKind) -> AppResult<ExistingInstall> {
     let app = spec(kind);
     let desktop = crate::paths::stock_gui_support_dir(app)?;
     let code = crate::paths::stock_cli_config_dir(app)?;
-    Ok(detect(&desktop, &code))
+    let mut install = detect(&desktop, &code);
+    // An app without a desktop launcher has no desktop data to adopt, whatever
+    // happens to be in Application Support under its name.
+    if !app.has_desktop() {
+        install.gui_path = None;
+    }
+    Ok(install)
 }
 
 /// Sizes-only side-table for [`detect`]. Walks each tree once; returns
@@ -136,7 +142,13 @@ pub fn import(params: ImportParams) -> AppResult<ImportOutcome> {
         fs::create_dir_all(&cli_config)?;
     }
 
-    // Step 2: Copy source → profile-dir.
+    // Step 2: Copy source → profile-dir. The CLI's config goes where the
+    // profile's CLI will read it.
+    let app_spec = spec(params.app);
+    let cli_home = match app_spec.cli_config_subdir {
+        Some(subdir) => cli_config.join(subdir),
+        None => cli_config.clone(),
+    };
     let mut copied_gui = false;
     let mut copied_cli = false;
     if params.include_gui {
@@ -150,7 +162,7 @@ pub fn import(params: ImportParams) -> AppResult<ImportOutcome> {
     }
     if params.include_cli {
         if let Some(source) = params.cli_source.as_ref() {
-            if let Err(err) = copy_dir_recursive(source, &cli_config) {
+            if let Err(err) = copy_dir_recursive(source, &cli_home) {
                 let _ = fs::remove_dir_all(&params.profile_dir);
                 return Err(err);
             }
@@ -167,7 +179,6 @@ pub fn import(params: ImportParams) -> AppResult<ImportOutcome> {
     // Step 4: Move originals into the backup dir. `moved_gui` is tracked so
     // that the CLI block's rollback can undo it; the CLI move has no later
     // step that could fail, so we don't bother tracking moved_cli.
-    let app_spec = spec(params.app);
     let mut moved_gui: Option<PathBuf> = None;
     if copied_gui {
         let source = params.gui_source.as_ref().unwrap();
@@ -610,6 +621,35 @@ mod tests {
             .path()
             .join("profile/cli-config/settings.json")
             .is_file());
+    }
+
+    /// Gemini reads `<GEMINI_CLI_HOME>/.gemini`, so the stock `~/.gemini` goes
+    /// to the profile's `cli-config/.gemini`, not its `cli-config`.
+    #[test]
+    fn import_puts_gemini_config_in_the_profiles_config_subdir() {
+        let scratch = tempdir().unwrap();
+        let cli = make_source(scratch.path(), ".gemini", &[("settings.json", "{}")]);
+        let params = ImportParams {
+            app: crate::app_kind::AppKind::Gemini,
+            ..fixture_params(scratch.path(), None, Some(cli.clone()))
+        };
+
+        let outcome = import(params).unwrap();
+
+        assert!(outcome.profile.surfaces.cli);
+        assert!(!cli.exists());
+        assert!(scratch
+            .path()
+            .join("backup-12345/.gemini/settings.json")
+            .is_file());
+        assert!(scratch
+            .path()
+            .join("profile/cli-config/.gemini/settings.json")
+            .is_file());
+        assert!(!scratch
+            .path()
+            .join("profile/cli-config/settings.json")
+            .exists());
     }
 
     #[test]

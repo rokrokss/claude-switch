@@ -2,8 +2,9 @@
 //!
 //! Read from what the CLI already keeps on disk, never from the network: for
 //! Claude, the `oauthAccount` block of `.claude.json`; for Codex, the claims
-//! of the ID token in `auth.json`. Both are written by the app itself when it
-//! signs in, so a profile that has never been signed in simply has neither.
+//! of the ID token in `auth.json`; for Gemini, the active account in
+//! `google_accounts.json`. Each is written by the app itself when it signs
+//! in, so a profile that has never been signed in simply has none.
 //!
 //! Only what names the account is taken (email, person, organization, plan).
 //! Tokens are not read out of these files, and nothing here leaves the
@@ -17,7 +18,7 @@ use serde_json::Value;
 
 use crate::app_kind::AppKind;
 use crate::error::AppResult;
-use crate::paths::{cli_config_dir, stock_cli_config_dir};
+use crate::paths::{cli_config_home, stock_cli_config_dir};
 use crate::profiles;
 
 /// The account a profile is signed in under. Every field is optional: the
@@ -80,7 +81,10 @@ pub fn read(id: &str) -> AppResult<AccountStatus> {
                 .ok_or_else(|| {
                     crate::error::AppError::NotFound(format!("profile {id} not found"))
                 })?;
-            (profile.app, cli_config_dir(&profile.id)?)
+            (
+                profile.app,
+                cli_config_home(&profile.id, profile.app.spec())?,
+            )
         }
     };
     let gui_data = PathBuf::from(profiles::paths(id)?.gui_data_dir);
@@ -99,6 +103,9 @@ pub fn read(id: &str) -> AppResult<AccountStatus> {
         AppKind::Codex => {
             // Codex's desktop app and CLI both sign in through `auth.json`.
             AccountStatus::from_account(codex_account(&config_dir), AccountStatus::SignedOut)
+        }
+        AppKind::Gemini => {
+            AccountStatus::from_account(gemini_account(&config_dir), AccountStatus::SignedOut)
         }
     })
 }
@@ -376,6 +383,28 @@ fn pretty_plan(plan: &str) -> String {
     }
 }
 
+/// The Google account the Gemini CLI with config at `config_dir` is signed in
+/// as: the `active` one of its `google_accounts.json`, which signing out
+/// clears.
+fn gemini_account(config_dir: &Path) -> Option<ProfileAccount> {
+    let document = read_json(&config_dir.join("google_accounts.json"))?;
+    account_from_google_accounts(&document)
+}
+
+/// Pure: the account named by a parsed `google_accounts.json`.
+fn account_from_google_accounts(document: &Value) -> Option<ProfileAccount> {
+    let email = document
+        .get("active")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|email| !email.is_empty())?;
+    Some(ProfileAccount {
+        email: Some(email.to_owned()),
+        key: Some(format!("gemini|{email}").to_lowercase()),
+        ..ProfileAccount::default()
+    })
+}
+
 fn read_json(path: &Path) -> Option<Value> {
     serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
 }
@@ -384,6 +413,28 @@ fn read_json(path: &Path) -> Option<Value> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn reads_the_active_gemini_account() {
+        let document = json!({ "active": " ada@example.com ", "old": ["bob@example.com"] });
+        assert_eq!(
+            account_from_google_accounts(&document),
+            Some(ProfileAccount {
+                email: Some("ada@example.com".into()),
+                key: Some("gemini|ada@example.com".into()),
+                ..ProfileAccount::default()
+            })
+        );
+    }
+
+    /// Signing out of Gemini CLI clears `active` and keeps the account in
+    /// `old`, which names who was, not who is.
+    #[test]
+    fn a_gemini_account_signed_out_of_names_no_one() {
+        let document = json!({ "active": null, "old": ["ada@example.com"] });
+        assert_eq!(account_from_google_accounts(&document), None);
+        assert_eq!(account_from_google_accounts(&json!({ "active": "" })), None);
+    }
 
     #[test]
     fn reads_the_claude_account_preferring_the_display_name() {

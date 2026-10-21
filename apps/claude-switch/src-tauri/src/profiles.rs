@@ -11,8 +11,8 @@ use uuid::Uuid;
 use crate::app_kind::{spec, AppKind};
 use crate::error::{AppError, AppResult};
 use crate::paths::{
-    cli_wrapper_path, ensure_app_dir, gui_launcher_path, profile_dir, profiles_json_path,
-    resolve_gui_app, stock_cli_config_dir, stock_gui_support_dir,
+    cli_config_home, cli_wrapper_path, ensure_app_dir, gui_launcher_path, profile_dir,
+    profiles_json_path, resolve_gui_app, stock_cli_config_dir, stock_gui_support_dir,
 };
 use crate::slug::slugify;
 
@@ -563,7 +563,7 @@ pub fn paths(id: &str) -> AppResult<ProfilePaths> {
     Ok(ProfilePaths {
         data_dir: data_dir.display().to_string(),
         gui_data_dir: data_dir.join("gui-data").display().to_string(),
-        cli_config_dir: data_dir.join("cli-config").display().to_string(),
+        cli_config_dir: cli_config_home(&profile.id, spec)?.display().to_string(),
         gui_launcher_path: Some(gui_launcher_path(&profile.name, spec).display().to_string()),
         cli_wrapper_path: Some(cli_wrapper_path(&profile.slug, spec)?.display().to_string()),
     })

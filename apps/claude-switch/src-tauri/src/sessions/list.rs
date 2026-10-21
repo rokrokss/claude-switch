@@ -109,7 +109,8 @@ pub struct SessionList {
 /// The sessions `home` owns. Ownership of a Claude session depends on what
 /// every home of the app holds, so all of them are read, on a blocking thread
 /// as that walks every transcript. Codex sessions are what the home's
-/// `codex app-server` lists.
+/// `codex app-server` lists. Gemini's aren't listed: the app has no sessions
+/// to manage for it yet.
 pub async fn list_sessions(home: Home) -> AppResult<SessionList> {
     match home.app {
         AppKind::Claude => tokio::task::spawn_blocking(move || {
@@ -125,6 +126,7 @@ pub async fn list_sessions(home: Home) -> AppResult<SessionList> {
             sessions: codex::list(&home).await?,
             repair_count: 0,
         }),
+        AppKind::Gemini => Ok(SessionList::default()),
     }
 }
 
@@ -291,7 +293,7 @@ pub(super) fn unmovable_reason(
         SessionState::TranscriptMissing => TRANSCRIPT_DELETED,
         _ if in_scratch => IN_SCRATCH_FOLDER,
         SessionState::OpenInTerminal => match home.app {
-            AppKind::Claude => OPEN_IN_TERMINAL,
+            AppKind::Claude | AppKind::Gemini => OPEN_IN_TERMINAL,
             AppKind::Codex => CODEX_HAS_IT_OPEN,
         },
         SessionState::Idle | SessionState::OpenInDesktop => return None,

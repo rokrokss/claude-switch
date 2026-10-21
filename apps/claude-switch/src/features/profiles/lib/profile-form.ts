@@ -80,6 +80,15 @@ export function availableSurfaces(dependencies: Dependencies, app: FormApp): Sur
 }
 
 /**
+ * Pure: whether the form offers the desktop launcher. It does until an app is
+ * chosen, and then only for an app with a desktop app to launch — not Gemini,
+ * whose profiles are their CLI wrapper alone.
+ */
+export function offersDesktop(app: FormApp): boolean {
+  return app === '' || appSpecs[app].gui !== null
+}
+
+/**
  * Pure: the surfaces a profile will get — those chosen that are also available.
  */
 export function effectiveSurfaces(chosen: Surfaces, available: Surfaces): Surfaces {
@@ -163,15 +172,17 @@ export function signedCloneDescription(app: FormApp): string {
  */
 export function surfaceToggle(surface: Surface, app: FormApp, available: boolean, chosen: boolean): SurfaceToggle {
   const state = { checked: chosen && available, disabled: !available }
-  if (app === '') {
+  // An app without the surface (Gemini's desktop app) reads as no app yet; the
+  // form doesn't show it.
+  const surfaceSpec = app === '' ? null : appSpecs[app][surface]
+  if (app === '' || surfaceSpec === null) {
     return { ...state, title: fallbackTitles[surface], description: '', install: null }
   }
-  const spec = appSpecs[app]
   return {
     ...state,
-    title: spec[surface].label,
-    description: spec[surface].description,
-    install: available ? null : { href: spec[surface].installUrl, label: installLabel(surface, spec) },
+    title: surfaceSpec.label,
+    description: surfaceSpec.description,
+    install: available ? null : { href: surfaceSpec.installUrl, label: installLabel(surface, appSpecs[app]) },
   }
 }
 

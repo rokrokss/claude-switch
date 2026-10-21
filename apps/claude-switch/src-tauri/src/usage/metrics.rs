@@ -161,6 +161,7 @@ pub fn from_usage(app: AppKind, usage: &ProfileUsage) -> Vec<Metric> {
     let mut metrics = match app {
         AppKind::Claude => claude_windows(quota),
         AppKind::Codex => codex_windows(quota),
+        AppKind::Gemini => Vec::new(),
     };
     metrics.extend(additional_windows(quota));
     metrics.extend(extra(quota));

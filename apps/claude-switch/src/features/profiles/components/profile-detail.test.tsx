@@ -59,6 +59,7 @@ vi.mock('@/lib/commands', async () => {
       apps: {
         claude: { guiInstalled: true, cliInstalled: true },
         codex: { guiInstalled: false, cliInstalled: false },
+        gemini: { guiInstalled: false, cliInstalled: false },
       },
       localBinOnPath: true,
     })),
@@ -447,6 +448,14 @@ describe('ProfileDetail — surfaces', () => {
     renderDetail({ profile: profile({ surfaces: { gui: true, cli: false } }) })
     await findLaunchControl()
     expect(screen.queryAllByRole('status')).toHaveLength(0)
+  })
+
+  it('gives a Gemini profile its Terminal row alone, and no sessions', async () => {
+    renderDetail({ profile: profile({ app: 'gemini', surfaces: { gui: false, cli: true } }) })
+    expect(await screen.findByRole('button', { name: 'gemini-work' })).toBeInTheDocument()
+    expect(screen.queryByText('Desktop app')).toBeNull()
+    expect(screen.queryByText('Off — turn on in Edit')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Sessions' })).toBeNull()
   })
 
   it('offers neither route and exactly one instruction when both surfaces are off', async () => {
