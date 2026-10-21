@@ -1,4 +1,12 @@
-import type { ProfileUsage, QuotaError, QuotaUsage, RateLimitResetCredits, Spend, UsageWindow } from '@/lib/types'
+import type {
+  NamedLimit,
+  ProfileUsage,
+  QuotaError,
+  QuotaUsage,
+  RateLimitResetCredits,
+  Spend,
+  UsageWindow,
+} from '@/lib/types'
 
 const knownQuotaErrors: ReadonlyArray<QuotaError> = [
   'no_credentials',
@@ -54,9 +62,11 @@ function narrowQuota(input: unknown): QuotaUsage | null {
   }
   const resets = narrowResetCredits(input.rateLimitResetCredits)
   const spend = narrowSpend(input.spend)
+  const additionalLimits = narrowAdditionalLimits(input.additionalLimits)
   return {
     ...(resets ? { rateLimitResetCredits: resets } : {}),
     ...(spend ? { spend } : {}),
+    ...(additionalLimits.length > 0 ? { additionalLimits } : {}),
     primary: narrowWindow(input.primary),
     secondary: narrowWindow(input.secondary),
     scopedWeekly: Array.isArray(input.scopedWeekly)
@@ -101,6 +111,24 @@ function narrowResetCredits(input: unknown): RateLimitResetCredits | undefined {
       }))
     : null
   return { availableCount: input.availableCount, credits }
+}
+
+/**
+ * Named limits with a name and at least one window; anything else is dropped.
+ */
+function narrowAdditionalLimits(input: unknown): Array<NamedLimit> {
+  if (!Array.isArray(input)) {
+    return []
+  }
+  return input.filter(isRecord).flatMap((limit) => {
+    const name = typeof limit.name === 'string' ? limit.name.trim() : ''
+    const primary = narrowWindow(limit.primary)
+    const secondary = narrowWindow(limit.secondary)
+    if (!name || (primary === null && secondary === null)) {
+      return []
+    }
+    return [{ name, primary, secondary }]
+  })
 }
 
 export function narrowWindow(input: unknown): UsageWindow | null {

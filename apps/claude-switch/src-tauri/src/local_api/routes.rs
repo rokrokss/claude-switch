@@ -5,7 +5,7 @@
 //! - `GET /v1/usage`, `GET /v1/usage/:id`: [`limits::usage`].
 //!
 //! `:id` is a profile's exact id (`default:claude` for a stock install), or
-//! an app (`claude`, `codex`) for every profile of it. Errors are
+//! an app (`claude`, `codex`, `antigravity`) for every profile of it. Errors are
 //! `{"error": "<code>"}`. The routes follow OpenUsage's local API
 //! (MIT, <https://github.com/robinebers/openusage>).
 

@@ -363,6 +363,12 @@ function WhatWillHappenCard({ app }: { app: AppId }) {
               Credentials live in <code className="font-mono text-mono">auth.json</code> under{' '}
               <code className="font-mono text-mono">{spec.cliConfigEnv}</code> — isolated per profile, no Keychain.
             </>
+          ) : app === 'antigravity' ? (
+            <>
+              The stock sign-in stays in the macOS Keychain; a profile keeps its own in{' '}
+              <code className="font-mono text-mono">.gemini/antigravity-cli/antigravity-oauth-token</code> under the{' '}
+              <code className="font-mono text-mono">{spec.cliConfigEnv}</code> its wrapper gives agy.
+            </>
           ) : app === 'gemini' ? (
             <>
               Credentials live in <code className="font-mono text-mono">.gemini/oauth_creds.json</code> under{' '}

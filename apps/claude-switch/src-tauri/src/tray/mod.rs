@@ -515,7 +515,12 @@ pub(crate) fn targets() -> AppResult<Vec<Target>> {
         .map(|state| state.default_profile_names)
         .unwrap_or_default();
     let mut targets = Vec::new();
-    for app in [AppKind::Claude, AppKind::Codex, AppKind::Gemini] {
+    for app in [
+        AppKind::Claude,
+        AppKind::Codex,
+        AppKind::Gemini,
+        AppKind::Antigravity,
+    ] {
         let spec = app.spec();
         if !spec.has_usage {
             continue;

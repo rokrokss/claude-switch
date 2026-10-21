@@ -85,8 +85,9 @@ describe('importableAppsFrom', () => {
     claude: ExistingInstallInfo,
     codex: ExistingInstallInfo,
     gemini: ExistingInstallInfo = existing(),
+    antigravity: ExistingInstallInfo = existing(),
   ): Record<AppId, ExistingInstallInfo> {
-    return { claude, codex, gemini }
+    return { claude, codex, gemini, antigravity }
   }
 
   it('lists apps with a detected gui or cli install, claude before codex', () => {

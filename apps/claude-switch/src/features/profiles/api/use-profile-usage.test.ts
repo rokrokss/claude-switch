@@ -9,6 +9,23 @@ import { narrowProfileUsage } from './narrow-usage'
 import { ensureUsable, UsageUnavailableError } from './use-profile-usage'
 
 describe('narrowProfileUsage', () => {
+  it('keeps named limits with a window, and drops the rest', () => {
+    const result = narrowProfileUsage({
+      quota: {
+        additionalLimits: [
+          { name: 'Claude and GPT models', primary: null, secondary: { utilization: 3, resetsAt: null } },
+          { name: '', secondary: { utilization: 3, resetsAt: null } },
+          { name: 'Empty', primary: null, secondary: null },
+          'junk',
+        ],
+      },
+    })
+    expect(result.quota?.additionalLimits).toEqual([
+      { name: 'Claude and GPT models', primary: null, secondary: { utilization: 3, resetsAt: null } },
+    ])
+    expect(narrowProfileUsage({ quota: {} }).quota).not.toHaveProperty('additionalLimits')
+  })
+
   it('preserves reset counts and nullable expiry details', () => {
     const resets = { availableCount: 2, credits: [{ title: 'Full reset', status: 'available', expiresAt: null }] }
     const result = narrowProfileUsage({ quota: { rateLimitResetCredits: resets } })

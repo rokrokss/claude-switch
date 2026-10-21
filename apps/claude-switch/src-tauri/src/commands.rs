@@ -22,6 +22,7 @@ use crate::sessions::{
 };
 use crate::usage::{
     self,
+    antigravity::AntigravityQuotaProvider,
     codex::CodexQuotaProvider,
     quota::{ClaudeQuotaCache, ClaudeQuotaProvider},
     ProfileUsage, QuotaError,
@@ -644,6 +645,7 @@ pub(crate) async fn profile_usage(
             // refresher dance is needed.
             Ok(usage::build(&config_dir, &CodexQuotaProvider).await)
         }
+        AppKind::Antigravity => Ok(usage::build(&config_dir, &AntigravityQuotaProvider).await),
         AppKind::Gemini => unreachable!("Gemini has no usage, so it returned above"),
     }
 }
@@ -698,6 +700,7 @@ pub(crate) async fn stored_profile_usage(profile_id: &str) -> AppResult<ProfileU
             Ok(unless_held(profile_id, None, usage::build(&config_dir, &provider)).await)
         }
         AppKind::Codex => Ok(usage::build(&config_dir, &CodexQuotaProvider).await),
+        AppKind::Antigravity => Ok(usage::build(&config_dir, &AntigravityQuotaProvider).await),
         AppKind::Gemini => unreachable!("Gemini has no usage, so it returned above"),
     }
 }
@@ -808,7 +811,7 @@ pub(crate) fn profile_plan(profile_id: &str) -> Option<String> {
     let config_dir = resolve_cli_config_dir(profile_id).ok()?;
     match app {
         AppKind::Claude => usage::oauth::stored_plan(&config_dir),
-        AppKind::Codex | AppKind::Gemini => None,
+        AppKind::Codex | AppKind::Gemini | AppKind::Antigravity => None,
     }
 }
 

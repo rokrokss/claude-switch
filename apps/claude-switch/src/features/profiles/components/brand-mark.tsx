@@ -66,9 +66,10 @@ function ChatGptMark({ size = 16, className }: MarkProps) {
 }
 
 /**
- * Google's Gemini sparkle, in the brand colour Simple Icons gives it.
+ * Google's Gemini sparkle, in the brand colour Simple Icons gives it, or in
+ * `fill`.
  */
-function GeminiMark({ size = 16, className }: MarkProps) {
+function GeminiMark({ size = 16, className, fill = '#8E75B2' }: MarkProps & { fill?: string }) {
   return (
     // biome-ignore lint/a11y/noSvgWithoutTitle: decorative brand mark (aria-hidden); always labelled by adjacent text
     <svg
@@ -82,7 +83,7 @@ function GeminiMark({ size = 16, className }: MarkProps) {
     >
       <path
         d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"
-        fill="#8E75B2"
+        fill={fill}
       />
     </svg>
   )
@@ -95,6 +96,12 @@ export function BrandMark({ app, size, className }: { app: AppId; size?: number;
   }
   if (app === 'gemini') {
     return <GeminiMark size={size} className={className} />
+  }
+  // No mark of Antigravity's own is published under a licence that allows
+  // it, so its profiles wear the sparkle in Google's blue, told apart from
+  // Gemini's beside them.
+  if (app === 'antigravity') {
+    return <GeminiMark size={size} className={className} fill="#4285F4" />
   }
   return <ClaudeMark size={size} className={className} />
 }

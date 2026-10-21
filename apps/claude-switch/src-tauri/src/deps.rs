@@ -1,6 +1,7 @@
 //! Detect external dependencies the app relies on: Claude Desktop, the
 //! Claude Code CLI, the ChatGPT desktop app, the Codex CLI, the Gemini CLI,
-//! and whether `~/.local/bin` is on the user's interactive shell PATH.
+//! the Antigravity CLI, and whether `~/.local/bin` is on the user's
+//! interactive shell PATH.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -31,7 +32,12 @@ pub fn check_dependencies() -> AppResult<Dependencies> {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"));
     let shell_path = cached_shell_path(&home);
     let mut apps = HashMap::new();
-    for kind in [AppKind::Claude, AppKind::Codex, AppKind::Gemini] {
+    for kind in [
+        AppKind::Claude,
+        AppKind::Codex,
+        AppKind::Gemini,
+        AppKind::Antigravity,
+    ] {
         let app_spec = spec(kind);
         apps.insert(
             kind.as_str().to_string(),

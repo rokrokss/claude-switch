@@ -88,8 +88,11 @@ More: [design](docs/signed-clone-design.md) · [verification guide](docs/signed-
 | **Claude** (Desktop + Claude Code) | `Claude (<Name>).app` | `claude-<slug>`, sets `CLAUDE_CONFIG_DIR` | A macOS Keychain entry derived from the profile's config dir |
 | **ChatGPT** (Desktop) + **Codex** (CLI) | `ChatGPT (<Name>).app` | `codex-<slug>`, sets `CODEX_HOME` | `auth.json` inside the profile's `CODEX_HOME` |
 | **Gemini** (CLI) | None: Gemini.app is a sandboxed app with no user-data dir to point at a profile | `gemini-<slug>`, sets `GEMINI_CLI_HOME` | `.gemini/oauth_creds.json` inside the profile's `GEMINI_CLI_HOME` |
+| **Antigravity** (CLI) | None | `agy-<slug>`, sets `HOME` and `SSH_TTY` | `.gemini/antigravity-cli/antigravity-oauth-token` inside the profile's `HOME` |
 
-Gemini profiles are CLI only, and have no usage, spend or session list yet. Gemini CLI keeps its sign-in in that file unless `GEMINI_FORCE_ENCRYPTED_FILE_STORAGE=true` is set, which moves it to one Keychain item every Gemini profile shares.
+Gemini profiles are CLI only, and have no usage, spend or session list yet. Gemini CLI keeps its sign-in in that file unless `GEMINI_FORCE_ENCRYPTED_FILE_STORAGE=true` is set, which moves it to one Keychain item every Gemini profile shares. Since June 18, 2026 Gemini CLI no longer serves Google sign-ins of individual plans (free, Google AI Pro and Ultra), only API keys and Gemini Code Assist Standard and Enterprise; Google moved those plans to Antigravity.
+
+Antigravity profiles run Google's Antigravity CLI, `agy`, and are CLI only too. `agy` has no config-home variable and keeps its sign-in in one Keychain item every account would share, so the wrapper runs it with the profile as its `HOME`, and with `SSH_TTY` set, which has `agy` keep the sign-in in a file in that home instead of the Keychain. Everything in your real home but `.gemini` is linked into the profile's, so the tools `agy` runs (git, ssh, toolchains) find your usual setup; a new entry in your home is linked the next time the profile is saved. The profile's `.gemini` is its own: `agy`'s settings, history and sign-in, and Antigravity's MCP servers and hooks (`.gemini/config`); your global rules (`~/.gemini/GEMINI.md`) are inherited.
 
 ## 📦 Install
 
@@ -110,10 +113,10 @@ The `--config` override skips the signed update archive, which needs the release
 
 ## 🕹️ Using it
 
-Create a profile from the sidebar: choose an app (Claude, ChatGPT or Gemini), give it a name, pick a color, and choose the surfaces you want.
+Create a profile from the sidebar: choose an app (Claude, ChatGPT, Gemini or Antigravity), give it a name, pick a color, and choose the surfaces you want.
 
 - **Desktop app.** A `Claude (<Name>).app` or `ChatGPT (<Name>).app` launcher lands in `/Applications`. Spotlight, Launchpad, the Finder and ⌘-Tab see it as an app of its own, badged with the profile's color.
-- **CLI.** A `claude-<slug>`, `codex-<slug>` or `gemini-<slug>` command appears in `~/.local/bin`. Run it in any terminal to start the CLI with that profile's config and login.
+- **CLI.** A `claude-<slug>`, `codex-<slug>`, `gemini-<slug>` or `agy-<slug>` command appears in `~/.local/bin`. Run it in any terminal to start the CLI with that profile's config and login.
 
 Switch profiles from the sidebar: ⌘1…⌘9 jump to a slot, ⌘F filters the list, ⌘K opens the command palette, ⌘N creates a profile and ⌘, opens Settings.
 
@@ -148,6 +151,7 @@ A profile's detail page shows its current quota, refreshed every 5 minutes while
 
 - **Claude**: the rolling 5-hour window, the 7-day window and the 7-day Sonnet window, from Anthropic's `/api/oauth/usage` endpoint with the profile's own OAuth token. The endpoint and the Keychain naming are undocumented; if either changes, the meters show `—`.
 - **Codex**: the 5-hour and weekly windows, read through `codex app-server` (`account/rateLimits/read`) from the profile's own `auth.json`.
+- **Antigravity**: Gemini's 5-hour and weekly windows, then each other model group's (Claude and GPT models, …), read through `agy -p /usage --output-format json` on the profile's home. It needs `agy` 1.1.11 or later, starts no model turn and takes a few seconds, so an answer is reused for 2 minutes. A profile that isn't signed in isn't asked.
 
 The first refresh asks for Keychain access; choose "Always Allow".
 
@@ -245,13 +249,13 @@ A session open in a terminal can't be moved or archived until it is closed. If t
 
 ### Importing an existing install
 
-On first launch, or later from Settings → Data → "Detect and import…" (⌘I), the app can adopt your existing `~/.claude` and `~/Library/Application Support/Claude` (or `~/.codex` and `~/Library/Application Support/Codex`, or `~/.gemini`) as your first profile. It:
+On first launch, or later from Settings → Data → "Detect and import…" (⌘I), the app can adopt your existing `~/.claude` and `~/Library/Application Support/Claude` (or `~/.codex` and `~/Library/Application Support/Codex`, `~/.gemini`, or `~/.gemini/antigravity-cli`) as your first profile. A Gemini import leaves Antigravity's entries in `~/.gemini` (`antigravity*`, `config`) where they are. It:
 
 1. copies your data into the new profile,
 2. moves the originals into `~/Library/Application Support/claude-switch/migration-backup-<timestamp>/`,
 3. creates the profile's launcher and CLI wrapper.
 
-Afterwards use `claude-<slug>` (or `codex-<slug>`, `gemini-<slug>`) for that account. Claude profiles ask you to sign in once, since the Keychain entry follows the config dir.
+Afterwards use `claude-<slug>` (or `codex-<slug>`, `gemini-<slug>`, `agy-<slug>`) for that account. Claude profiles ask you to sign in once, since the Keychain entry follows the config dir, and so do Antigravity profiles, whose sign-in moves from the Keychain to a file.
 
 Backups are kept for 7 days. To undo an import before then, delete the profile and move the originals back:
 
@@ -304,4 +308,4 @@ Not on the same data directory. A build that doesn't know `signedClone` drops th
 
 MIT — see [LICENSE](LICENSE).
 
-claude-switch is not affiliated with or endorsed by Anthropic, OpenAI or Google. "Claude" and the Claude icon are Anthropic's, "ChatGPT" and "Codex" are OpenAI's, and "Gemini" and the Gemini icon are Google's. The icons shown here are what the app draws from the Claude.app installed on the Mac.
+claude-switch is not affiliated with or endorsed by Anthropic, OpenAI or Google. "Claude" and the Claude icon are Anthropic's, "ChatGPT" and "Codex" are OpenAI's, and "Gemini", "Antigravity" and the Gemini icon are Google's. The icons shown here are what the app draws from the Claude.app installed on the Mac.

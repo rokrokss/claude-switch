@@ -40,11 +40,13 @@ export function DataSection({ onReimport }: Props) {
   const claudeMigration = useMigration('claude')
   const codexMigration = useMigration('codex')
   const geminiMigration = useMigration('gemini')
+  const antigravityMigration = useMigration('antigravity')
   const backups = useMigrationBackups()
   const existingByApp: Record<AppId, ExistingInstallInfo> = {
     claude: claudeMigration.existing,
     codex: codexMigration.existing,
     gemini: geminiMigration.existing,
+    antigravity: antigravityMigration.existing,
   }
   const importable = importableAppsFrom(existingByApp)
 
