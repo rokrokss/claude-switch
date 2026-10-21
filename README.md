@@ -151,7 +151,7 @@ A profile's detail page shows its current quota, refreshed every 5 minutes while
 
 - **Claude**: the rolling 5-hour window, the 7-day window and the 7-day Sonnet window, from Anthropic's `/api/oauth/usage` endpoint with the profile's own OAuth token. The endpoint and the Keychain naming are undocumented; if either changes, the meters show `—`.
 - **Codex**: the 5-hour and weekly windows, read through `codex app-server` (`account/rateLimits/read`) from the profile's own `auth.json`.
-- **Antigravity**: Gemini's 5-hour and weekly windows, then each other model group's (Claude and GPT models, …), read through `agy -p /usage --output-format json` on the profile's home. It needs `agy` 1.1.11 or later, starts no model turn and takes a few seconds, so an answer is reused for 2 minutes. A profile that isn't signed in isn't asked.
+- **Antigravity**: Gemini's 5-hour and weekly windows, then each other model group's (Claude and GPT models, …), read through `agy -p /usage --output-format json` on the profile's home. It needs `agy` 1.1.11 or later, starts no model turn and takes about 5 seconds (checked on `agy` 1.4.4), so an answer is reused for 2 minutes. A profile or stock install that isn't signed in isn't asked, as `agy` would wait a minute for a sign-in.
 
 The first refresh asks for Keychain access; choose "Always Allow".
 

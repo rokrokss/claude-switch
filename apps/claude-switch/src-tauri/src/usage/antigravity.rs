@@ -53,9 +53,15 @@ impl super::QuotaProvider for AntigravityQuotaProvider {
     async fn fetch(&self, config_dir: &Path) -> Result<QuotaUsage, QuotaError> {
         let stock =
             crate::paths::stock_cli_config_dir(&ANTIGRAVITY).is_ok_and(|stock| stock == config_dir);
-        // Signed out, agy would start a sign-in; a profile's sign-in is a file,
-        // so that is told without running it.
-        if !stock && !signed_in(config_dir) {
+        // Signed out, agy would start a sign-in and wait a minute for it, so
+        // that is told without running it: from a profile's sign-in file, or
+        // from whether the stock one's Keychain item is there.
+        let signed_in = if stock {
+            stock_signed_in().await
+        } else {
+            signed_in(config_dir)
+        };
+        if !signed_in {
             return Err(QuotaError::NoCredentials);
         }
         let mut answers = answers().lock().await;
@@ -75,6 +81,20 @@ type Answer = Result<QuotaUsage, QuotaError>;
 fn answers() -> &'static Mutex<HashMap<PathBuf, (Instant, Answer)>> {
     static ANSWERS: OnceLock<Mutex<HashMap<PathBuf, (Instant, Answer)>>> = OnceLock::new();
     ANSWERS.get_or_init(Default::default)
+}
+
+/// Whether the stock agy's Keychain item, `gemini`/`antigravity`, is there.
+/// Only whether: the secret isn't read. True when that can't be told, so the
+/// run says.
+async fn stock_signed_in() -> bool {
+    let status = tokio::process::Command::new("/usr/bin/security")
+        .args(["find-generic-password", "-s", "gemini", "-a", "antigravity"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await;
+    status.map_or(true, |status| status.success())
 }
 
 /// Whether the profile with config home `config_dir` (its `cli-config`) has
@@ -172,8 +192,10 @@ fn no_browser_dir() -> std::io::Result<PathBuf> {
 #[derive(Debug, Deserialize)]
 struct Report {
     status: Option<String>,
-    /// The command's text, which says why when it failed.
+    /// The command's text, which can say why it failed.
     response: Option<String>,
+    /// Why it failed, e.g. `authentication failed or timed out`.
+    error: Option<String>,
     command: Option<Command>,
 }
 
@@ -219,7 +241,8 @@ fn parse(stdout: &str) -> Answer {
     };
     let report: Report = serde_json::from_str(json).map_err(|_| QuotaError::Unknown)?;
     if report.status.as_deref() != Some("SUCCESS") {
-        return Err(failure(report.response.as_deref().unwrap_or_default()));
+        let why = [report.error, report.response].into_iter().flatten();
+        return Err(failure(&why.collect::<Vec<_>>().join("\n")));
     }
     let groups = report
         .command
@@ -331,6 +354,23 @@ mod tests {
         ]}}
     }"#;
 
+    /// What agy 1.4.4 printed for a free account on 2026-10-22, verbatim.
+    const REAL_1_4_4: &str = r#"{"conversation_id":"","status":"SUCCESS","response":"Gemini Models\tWeekly Limit Remaining\t100%\t2026-10-28T21:18:55Z\nGemini Models\tFive Hour Limit Remaining\t100%\t2026-10-22T02:18:55Z\nClaude and GPT models\tWeekly Limit Remaining\t100%\t2026-10-28T21:18:55Z\nClaude and GPT models\tFive Hour Limit Remaining\t100%\t2026-10-22T02:18:55Z\n","duration_seconds":0,"num_turns":0,"usage":{"input_tokens":0,"output_tokens":0,"thinking_tokens":0,"cache_read_tokens":0,"total_tokens":0},"command":{"name":"usage","data":{"description":"Within each group, models share a weekly limit and a 5-hour limit. Quota is consumed proportionally to the cost of the tokens. Thus, limits will last longer with shorter tasks or using more cost-effective models. The 5-hour limit smooths out aggregate demand to fairly distribute global capacity across all users, while your weekly limit is tied directly to your individual tier.","groups":[{"name":"Gemini Models","description":"Models within this group: Gemini Flash, Gemini Pro","buckets":[{"id":"gemini-weekly","name":"Weekly Limit Remaining","window":"weekly","remaining_fraction":1,"reset_time":"2026-10-28T21:18:55Z"},{"id":"gemini-5h","name":"Five Hour Limit Remaining","window":"5h","remaining_fraction":1,"reset_time":"2026-10-22T02:18:55Z"}]},{"name":"Claude and GPT models","description":"Models within this group: Claude Opus, Claude Sonnet, GPT-OSS","buckets":[{"id":"3p-weekly","name":"Weekly Limit Remaining","window":"weekly","remaining_fraction":1,"reset_time":"2026-10-28T21:18:55Z"},{"id":"3p-5h","name":"Five Hour Limit Remaining","window":"5h","remaining_fraction":1,"reset_time":"2026-10-22T02:18:55Z"}]}]}}}"#;
+
+    #[test]
+    fn reads_what_agy_1_4_4_prints() {
+        let usage = parse(REAL_1_4_4).unwrap();
+        let session = usage.primary.unwrap();
+        assert_eq!(session.utilization, Some(0.0));
+        assert_eq!(session.resets_at.as_deref(), Some("2026-10-22T02:18:55Z"));
+        assert_eq!(usage.secondary.unwrap().utilization, Some(0.0));
+        assert_eq!(usage.additional_limits.len(), 1);
+        let third_party = &usage.additional_limits[0];
+        assert_eq!(third_party.name, "Claude and GPT models");
+        assert!(third_party.primary.is_some());
+        assert!(third_party.secondary.is_some());
+    }
+
     #[test]
     fn gemini_is_session_and_weekly_and_the_other_groups_are_limits_of_their_own() {
         let usage = parse(REPORT).unwrap();
@@ -389,6 +429,16 @@ mod tests {
         .unwrap();
         assert!(usage.primary.is_none());
         assert_eq!(usage.secondary.unwrap().utilization, Some(100.0));
+    }
+
+    /// What agy 1.4.4 prints, after waiting out its sign-in, for a home with
+    /// no sign-in of its own.
+    #[test]
+    fn a_report_of_failed_authentication_reads_as_no_credentials() {
+        let answer = parse(
+            r#"{"conversation_id":"","status":"ERROR","response":"","error":"authentication failed or timed out","duration_seconds":0,"num_turns":0}"#,
+        );
+        assert!(matches!(answer, Err(QuotaError::NoCredentials)));
     }
 
     #[test]
