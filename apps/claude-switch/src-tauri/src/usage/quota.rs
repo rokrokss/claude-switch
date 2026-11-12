@@ -152,6 +152,14 @@ async fn fetch_quota(
 /// rate-limit budget. With it, each token makes at most one upstream call
 /// per window, and during a cooldown we serve the rate-limited state from
 /// cache instead of re-poking (and re-tripping) the endpoint.
+///
+/// An access token past its stored expiry is reported as `Unauthorized`
+/// without asking the endpoint, and a `429` that comes back for one is
+/// reported the same way rather than cached. The endpoint answers an expired
+/// token with a 429 and an hour-long `Retry-After`, not a 401; taken at face
+/// value, a sign-in whose renewal failed would read as rate limited (and be
+/// held back as one) for up to an hour, with the renewal that fixes it never
+/// tried again.
 pub async fn fetch_quota_cached(
     cli_config_dir: &Path,
     client: &dyn UsageClient,
@@ -164,6 +172,11 @@ pub async fn fetch_quota_cached(
     // different hash, so this naturally stops short-circuiting after sign-in.
     if dead_credentials.is_dead(&token) {
         return Err(QuotaError::NeedsLogin);
+    }
+    let expires_at = stored_expiry(cli_config_dir, &token);
+    let expired = || expires_at.is_some_and(|at| chrono::Utc::now().timestamp_millis() >= at);
+    if expired() {
+        return Err(QuotaError::Unauthorized);
     }
     let key = token_cache_key(&token);
     if let Some(cached) = cache.get(&key) {
@@ -185,6 +198,9 @@ pub async fn fetch_quota_cached(
             cache.store_success(key, usage.clone());
             Ok(usage)
         }
+        // The token ran out while the request was in flight: this 429 is the
+        // endpoint's way of saying so, not a rate limit worth sitting out.
+        Err(QuotaError::RateLimited) if expired() => Err(QuotaError::Unauthorized),
         // Only rate limits are negatively cached. Network errors are
         // transient and Unauthorized drives the token-refresh retry in
         // `build_with_cli_refresh`, so neither must be pinned here.
@@ -194,6 +210,19 @@ pub async fn fetch_quota_cached(
         }
         Err(other) => Err(other),
     }
+}
+
+/// When `token` stops being accepted, in Unix milliseconds, as the stored
+/// sign-in records it. `None` when the sign-in doesn't say, or already holds
+/// another token, so a renewal landing in between is never taken for an
+/// expired token.
+fn stored_expiry(cli_config_dir: &Path, token: &str) -> Option<i64> {
+    let stored = crate::usage::credentials::read_stored(cli_config_dir).ok()?;
+    let login = crate::usage::oauth::login(&stored.document)?;
+    if login.access_token.as_deref().map(str::trim) != Some(token) {
+        return None;
+    }
+    login.expires_at.map(|at| at as i64)
 }
 
 /// Maps an HTTP response to a quota result. Shared by the cached and
@@ -1083,6 +1112,92 @@ mod tests {
         };
         let usage = fetch_quota(dir.path(), &client).await.unwrap();
         assert!(usage.primary.is_some());
+    }
+
+    // -- an expired token --
+
+    /// Writes a credentials file whose token carries the given `expiresAt`.
+    fn dir_with_token_expiring_at(expires_at_ms: i64) -> TempDir {
+        let dir = TempDir::new().unwrap();
+        fs::write(
+            dir.path().join(".credentials.json"),
+            format!(
+                r#"{{"claudeAiOauth":{{"accessToken":"sk-test","expiresAt":{expires_at_ms}}}}}"#
+            ),
+        )
+        .unwrap();
+        dir
+    }
+
+    fn rate_limiting_client() -> CountingClient {
+        CountingClient {
+            calls: std::sync::Mutex::new(0),
+            status: 429,
+            body: Vec::new(),
+            retry_after: Some(Duration::from_secs(3600)),
+        }
+    }
+
+    #[tokio::test]
+    async fn an_expired_token_asks_for_a_renewal_without_calling_upstream() {
+        // The endpoint would answer an expired token with a 429, which is
+        // not what it means. Don't ask: say the token needs renewing, which
+        // is what `build_with_renewal` acts on.
+        let dir = dir_with_token_expiring_at(1);
+        let cache = ClaudeQuotaCache::new();
+        let registry = DeadCredentialRegistry::new();
+        let client = rate_limiting_client();
+
+        let result = fetch_quota_cached(dir.path(), &client, &cache, &registry).await;
+
+        assert!(matches!(result.unwrap_err(), QuotaError::Unauthorized));
+        assert_eq!(*client.calls.lock().unwrap(), 0, "must not call upstream");
+        assert!(cache.get(&token_cache_key("sk-test")).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_rate_limit_on_a_token_that_expired_in_flight_is_a_renewal_not_a_cooldown() {
+        struct SlowClient;
+        #[async_trait]
+        impl UsageClient for SlowClient {
+            async fn fetch(&self, _: &str) -> Result<HttpResponse, QuotaError> {
+                tokio::time::sleep(Duration::from_millis(600)).await;
+                Ok(HttpResponse {
+                    status: 429,
+                    body: Vec::new(),
+                    retry_after: Some(Duration::from_secs(3600)),
+                })
+            }
+        }
+        let dir = dir_with_token_expiring_at(chrono::Utc::now().timestamp_millis() + 300);
+        let cache = ClaudeQuotaCache::new();
+        let registry = DeadCredentialRegistry::new();
+
+        let result = fetch_quota_cached(dir.path(), &SlowClient, &cache, &registry).await;
+
+        assert!(matches!(result.unwrap_err(), QuotaError::Unauthorized));
+        assert!(
+            cache.get(&token_cache_key("sk-test")).is_none(),
+            "no cooldown may be pinned for the expired token"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_rate_limit_on_a_live_token_is_still_a_rate_limit() {
+        // Far enough out that no test run reaches it.
+        const YEAR_2100_MS: i64 = 4_102_444_800_000;
+        let dir = dir_with_token_expiring_at(YEAR_2100_MS);
+        let cache = ClaudeQuotaCache::new();
+        let registry = DeadCredentialRegistry::new();
+        let client = rate_limiting_client();
+
+        let result = fetch_quota_cached(dir.path(), &client, &cache, &registry).await;
+
+        assert!(matches!(result.unwrap_err(), QuotaError::RateLimited));
+        assert!(matches!(
+            cache.get(&token_cache_key("sk-test")),
+            Some(Err(QuotaError::RateLimited))
+        ));
     }
 
     // -- caching + back-off --

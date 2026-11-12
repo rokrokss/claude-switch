@@ -32,11 +32,15 @@ struct ClaudeOauth {
 
 /// Reads the OAuth access token for a profile.
 ///
-/// Order:
-/// 1. `<cli_config_dir>/.credentials.json` (Linux/Windows; older macOS Claude Code).
-/// 2. macOS only: Keychain, querying
+/// Order, as Claude Code reads it:
+/// 1. macOS only: Keychain, querying
 ///    `Claude Code-credentials-<sha256(cli_config_dir)[:8]>` against the
 ///    current user (newer Claude Code on macOS — the default).
+/// 2. `<cli_config_dir>/.credentials.json` (Linux/Windows; on macOS only when
+///    the Keychain has nothing). Claude Code on macOS writes this file when a
+///    Keychain write fails and leaves it behind once Keychain writes work
+///    again, so beside a Keychain item it can hold a sign-in long since
+///    renewed past.
 ///
 /// On non-macOS platforms the keychain step is skipped — if the file
 /// isn't present we return `NoCredentials` so the UI shows the standard
@@ -65,14 +69,22 @@ pub struct StoredCredentials {
 }
 
 pub fn read_stored(cli_config_dir: &Path) -> Result<StoredCredentials, QuotaError> {
+    read_stored_with(cli_config_dir, read_from_keychain)
+}
+
+fn read_stored_with(
+    cli_config_dir: &Path,
+    read_keychain: impl FnOnce(&Path) -> Result<StoredCredentials, QuotaError>,
+) -> Result<StoredCredentials, QuotaError> {
+    let keychain = read_keychain(cli_config_dir);
     let file_path = cli_config_dir.join(".credentials.json");
-    if file_path.exists() {
-        return Ok(StoredCredentials {
-            document: read_from_file(&file_path)?,
-            source: CredentialSource::File(file_path),
-        });
+    if keychain.is_ok() || !file_path.exists() {
+        return keychain;
     }
-    read_from_keychain(cli_config_dir)
+    Ok(StoredCredentials {
+        document: read_from_file(&file_path)?,
+        source: CredentialSource::File(file_path),
+    })
 }
 
 /// Replaces the stored document at `source`. A keychain item is written with
@@ -364,9 +376,50 @@ mod tests {
 
     // -- cascade behavior --
 
+    fn keychain_with(document: &str) -> StoredCredentials {
+        StoredCredentials {
+            document: document.to_owned(),
+            source: CredentialSource::Keychain {
+                service: "Claude Code-credentials".into(),
+                account: "u".into(),
+            },
+        }
+    }
+
+    #[test]
+    fn keychain_item_wins_over_a_leftover_file() {
+        // Claude Code reads the Keychain first and leaves an old file behind
+        // once Keychain writes work again; that file's sign-in is dead.
+        let dir = TempDir::new().unwrap();
+        write_creds(
+            dir.path(),
+            r#"{"claudeAiOauth":{"accessToken":"stale-file"}}"#,
+        );
+        let stored = read_stored_with(dir.path(), |_| {
+            Ok(keychain_with(
+                r#"{"claudeAiOauth":{"accessToken":"live-keychain"}}"#,
+            ))
+        })
+        .unwrap();
+        assert_eq!(extract_token(&stored.document).unwrap(), "live-keychain");
+        assert!(matches!(stored.source, CredentialSource::Keychain { .. }));
+    }
+
+    #[test]
+    fn file_is_read_when_the_keychain_has_nothing() {
+        let dir = TempDir::new().unwrap();
+        write_creds(dir.path(), r#"{"claudeAiOauth":{"accessToken":"file"}}"#);
+        let stored = read_stored_with(dir.path(), |_| Err(QuotaError::NoCredentials)).unwrap();
+        assert_eq!(extract_token(&stored.document).unwrap(), "file");
+        assert_eq!(
+            stored.source,
+            CredentialSource::File(dir.path().join(".credentials.json"))
+        );
+    }
+
     #[test]
     fn missing_file_returns_no_credentials() {
-        // No credentials file → on macOS we fall through to keychain
+        // No credentials file → on macOS the keychain answers alone
         // (no entry exists for a random tempdir → exit 44 → NoCredentials);
         // on other platforms the keychain step is stubbed out and we
         // return NoCredentials directly. Either way the user sees the

@@ -159,14 +159,15 @@ pub fn from_litellm(body: &[u8]) -> Result<Catalog, CodecError> {
             cache_read.unwrap_or(input * 0.1) * 1e6,
         );
         rates.cache_read_explicit = cache_read.is_some();
-        rates.input_long =
-            number(&entry, "input_cost_per_token_above_200k_tokens").map(|v| v * 1e6);
-        rates.output_long =
-            number(&entry, "output_cost_per_token_above_200k_tokens").map(|v| v * 1e6);
-        rates.cache_write_long =
-            number(&entry, "cache_creation_input_token_cost_above_200k_tokens").map(|v| v * 1e6);
-        rates.cache_read_long =
-            number(&entry, "cache_read_input_token_cost_above_200k_tokens").map(|v| v * 1e6);
+        let thousands = long_context_thousands(&entry);
+        let long = |rate: &str| {
+            number(&entry, &format!("{rate}_above_{thousands}k_tokens")).map(|v| v * 1e6)
+        };
+        rates.input_long = long("input_cost_per_token");
+        rates.output_long = long("output_cost_per_token");
+        rates.cache_write_long = long("cache_creation_input_token_cost");
+        rates.cache_read_long = long("cache_read_input_token_cost");
+        rates.long_context_threshold = thousands * 1_000;
         if let Some(Value::Object(specific)) = entry.get("provider_specific_entry") {
             if let Some(fast) = number(specific, "fast") {
                 rates.fast_multiplier = fast;
@@ -175,6 +176,25 @@ pub fn from_litellm(body: &[u8]) -> Result<Catalog, CodecError> {
         entries.insert(key, rates);
     }
     non_empty(entries)
+}
+
+/// The prompt size, in thousands of tokens, past which a LiteLLM entry
+/// prices the whole request at its long-context rates. LiteLLM names the
+/// tier in the keys (`input_cost_per_token_above_100k_tokens` for Claude
+/// Haiku 5.5, `_above_272k_tokens` for OpenAI's), so the lowest such input
+/// key sets it; without one, the 200k that Claude's older models used.
+fn long_context_thousands(entry: &Map<String, Value>) -> u64 {
+    const DEFAULT_THOUSANDS: u64 = super::DEFAULT_LONG_CONTEXT_THRESHOLD / 1_000;
+    entry
+        .keys()
+        .filter_map(|key| {
+            key.strip_prefix("input_cost_per_token_above_")?
+                .strip_suffix("k_tokens")?
+                .parse::<u64>()
+                .ok()
+        })
+        .min()
+        .unwrap_or(DEFAULT_THOUSANDS)
 }
 
 /// models.dev's `api.json`: `{provider: {models: {id: {cost: …}}}}`, prices
@@ -230,8 +250,9 @@ fn number(object: &Map<String, Value>, key: &str) -> Option<f64> {
 
 /// The compact form: rates per million under short names, `i`nput,
 /// `o`utput, `c`ache `w`rite and `c`ache `r`ead, their `a`bove-threshold
-/// variants, and the `fast` multiplier. `scripts/update-pricing-snapshots.sh`
-/// writes the same.
+/// variants, the `l`ong-context `t`hreshold when it isn't the default, and
+/// the `fast` multiplier. `scripts/update-pricing-snapshots.sh` writes the
+/// same.
 #[derive(Serialize, Deserialize)]
 struct CompactCatalog {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -257,6 +278,10 @@ struct CompactModel {
     /// absent means published.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cre: Option<bool>,
+    /// Prompt tokens past which the `a` rates apply; absent means
+    /// [`DEFAULT_LONG_CONTEXT_THRESHOLD`](super::DEFAULT_LONG_CONTEXT_THRESHOLD).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    lt: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     fast: Option<f64>,
 }
@@ -273,6 +298,9 @@ pub fn from_compact(body: &[u8]) -> Result<Catalog, CodecError> {
             rates.cache_write_long = model.cwa;
             rates.cache_read_long = model.cra;
             rates.cache_read_explicit = model.cre.unwrap_or(true);
+            if let Some(threshold) = model.lt {
+                rates.long_context_threshold = threshold;
+            }
             rates.fast_multiplier = model.fast.unwrap_or(1.0);
             (key, rates)
         })
@@ -298,6 +326,8 @@ pub fn to_compact(catalog: &Catalog) -> Result<Vec<u8>, CodecError> {
                 cwa: rates.cache_write_long,
                 cra: rates.cache_read_long,
                 cre: (!rates.cache_read_explicit).then_some(false),
+                lt: (rates.long_context_threshold != super::DEFAULT_LONG_CONTEXT_THRESHOLD)
+                    .then_some(rates.long_context_threshold),
                 fast: (rates.fast_multiplier != 1.0).then_some(rates.fast_multiplier),
             };
             (key.clone(), model)
@@ -394,6 +424,44 @@ mod tests {
     }
 
     #[test]
+    fn litellm_names_the_long_context_tier_in_its_keys() {
+        // Claude Haiku 5.5 charges 5x past 100k tokens, not 200k; the
+        // `_batches` variants are a different price and don't set the tier.
+        let catalog = from_litellm(
+            br#"{"claude-haiku-5-5":{"input_cost_per_token":1e-7,"output_cost_per_token":5e-7,
+                   "cache_creation_input_token_cost":1.25e-7,"cache_read_input_token_cost":1e-8,
+                   "input_cost_per_token_above_100k_tokens":5e-7,
+                   "output_cost_per_token_above_100k_tokens":2.5e-6,
+                   "cache_creation_input_token_cost_above_100k_tokens":6.25e-7,
+                   "cache_read_input_token_cost_above_100k_tokens":5e-8,
+                   "input_cost_per_token_above_100k_tokens_batches":2.5e-7},
+                 "claude-sonnet-4-5":{"input_cost_per_token":3e-6,"output_cost_per_token":1.5e-5,
+                   "input_cost_per_token_above_200k_tokens":6e-6}}"#,
+        )
+        .unwrap();
+        let haiku = &catalog.entries["claude-haiku-5-5"];
+        assert_eq!(haiku.long_context_threshold, 100_000);
+        let long = [
+            haiku.input_long,
+            haiku.output_long,
+            haiku.cache_write_long,
+            haiku.cache_read_long,
+        ]
+        .map(|rate| rate.map(|v| (v * 1e4).round() / 1e4));
+        assert_eq!(long, [Some(0.5), Some(2.5), Some(0.625), Some(0.05)]);
+        let tokens = super::super::TokenBreakdown {
+            input: 150_000,
+            output: 1_000_000,
+            ..Default::default()
+        };
+        assert!((haiku.cost(&tokens, true) - (0.075 + 2.5)).abs() < 1e-9);
+
+        let sonnet = &catalog.entries["claude-sonnet-4-5"];
+        assert_eq!(sonnet.long_context_threshold, 200_000);
+        assert_eq!(sonnet.input_long.map(|v| v.round()), Some(6.0));
+    }
+
+    #[test]
     fn models_dev_keeps_the_first_provider_by_name() {
         let catalog = from_models_dev(
             br#"{"zeta":{"models":{"glm-5.2":{"cost":{"input":9,"output":9}}}},
@@ -415,8 +483,14 @@ mod tests {
         rates.cache_read_explicit = false;
         rates.fast_multiplier = 2.0;
         rates.output_long = Some(37.5);
+        let mut haiku = ModelRates::new(0.1, 0.5, 0.125, 0.01);
+        haiku.input_long = Some(0.5);
+        haiku.long_context_threshold = 100_000;
         let catalog = Catalog {
-            entries: HashMap::from([("claude-opus-4-8".to_owned(), rates)]),
+            entries: HashMap::from([
+                ("claude-opus-4-8".to_owned(), rates),
+                ("claude-haiku-5-5".to_owned(), haiku),
+            ]),
             retrieved_at: Some("2026-10-17T00:00:00Z".into()),
         };
         let back = from_compact(&to_compact(&catalog).unwrap()).unwrap();

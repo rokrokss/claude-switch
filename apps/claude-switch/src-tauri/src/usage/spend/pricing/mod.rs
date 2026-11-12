@@ -22,6 +22,10 @@ use supplement::Supplement;
 /// The provider whose fallback models the supplement lists for Codex.
 pub const CODEX_PROVIDER: &str = "codex";
 
+/// Prompt tokens past which long-context rates apply, unless a list names
+/// another tier.
+pub const DEFAULT_LONG_CONTEXT_THRESHOLD: u64 = 200_000;
+
 /// A model's rates, in USD per million tokens, with optional long-context
 /// rates and a fast-mode multiplier.
 #[derive(Debug, Clone, PartialEq)]
@@ -34,7 +38,7 @@ pub struct ModelRates {
     pub cache_read: f64,
     /// Rates for a request whose prompt passes
     /// [`long_context_threshold`](Self::long_context_threshold): the whole
-    /// request is billed at them. Named after the lists' `above_200k` fields.
+    /// request is billed at them. Named after the lists' `above_<N>k` fields.
     pub input_long: Option<f64>,
     pub output_long: Option<f64>,
     pub cache_write_long: Option<f64>,
@@ -63,7 +67,7 @@ impl ModelRates {
             cache_write_long: None,
             cache_read_long: None,
             cache_read_explicit: true,
-            long_context_threshold: 200_000,
+            long_context_threshold: DEFAULT_LONG_CONTEXT_THRESHOLD,
             fast_multiplier: 1.0,
         }
     }
