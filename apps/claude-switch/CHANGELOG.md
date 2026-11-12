@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.3.1 (2026-11-13)
+
+
+### Fixed
+
+* **usage:** a Claude profile's usage card, the menu bar and `claude-switch usage` no longer show another account's quota when the profile's stored sign-in belongs to a different account; the card names that account and offers to sign in again
+* **usage:** a Claude sign-in that lapsed after renewing it failed is renewed again, instead of reading as rate limited for up to an hour
+* **usage:** a Claude profile's Keychain sign-in is read before a `.credentials.json` Claude Code left behind, so usage no longer goes out on a sign-in long since renewed
+* **usage:** spend prices Claude Sonnet 5.5's cache reads at $0.10 instead of $0.20, and Claude Haiku 5.5's prompts past 100k tokens at its long-prompt rates
+* **shortcuts:** ⌘⌫ and ⌘C in a text field delete and copy text, instead of opening the delete dialog or copying the profile's CLI command
+
 ## 2.3.0 (2026-10-22)
 
 

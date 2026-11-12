@@ -583,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "claude-switch"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "async-trait",
  "block2",
