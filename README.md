@@ -149,7 +149,7 @@ Profiles imported from an existing install hold their own copy of everything and
 
 A profile's detail page shows its current quota, refreshed every 5 minutes while visible, or on demand with ↻.
 
-- **Claude**: the rolling 5-hour window, the 7-day window and the 7-day Sonnet window, from Anthropic's `/api/oauth/usage` endpoint with the profile's own OAuth token. The endpoint and the Keychain naming are undocumented; if either changes, the meters show `—`.
+- **Claude**: the rolling 5-hour window, the 7-day window and the 7-day Sonnet window, from Anthropic's `/api/oauth/usage` endpoint with the profile's own OAuth token. `/api/oauth/profile` then says which account that token belongs to: when it isn't one the profile is signed in under (a Keychain item holds whichever account last signed in through it), the card names that account instead of showing its quota. The endpoints and the Keychain naming are undocumented; if either changes, the meters show `—`.
 - **Codex**: the 5-hour and weekly windows, read through `codex app-server` (`account/rateLimits/read`) from the profile's own `auth.json`.
 - **Antigravity**: Gemini's 5-hour and weekly windows, then each other model group's (Claude and GPT models, …), read through `agy -p /usage --output-format json` on the profile's home. It needs `agy` 1.1.11 or later, starts no model turn and takes about 5 seconds (checked on `agy` 1.4.4), so an answer is reused for 2 minutes. A profile or stock install that isn't signed in isn't asked, as `agy` would wait a minute for a sign-in.
 
@@ -174,7 +174,7 @@ Exit status:
 
 - `0`: success.
 - `2`: a misuse or an unknown profile.
-- `4`: a fetch failed (the JSON still holds the last figures), or the profiles can't be read.
+- `4`: a fetch failed (the JSON still holds the last figures, unless the stored sign-in was another account's), or the profiles can't be read.
 
 ```json
 {
@@ -204,7 +204,7 @@ Profiles are keyed by id; a stock install is `default:claude`, `default:codex` o
 - `extra`: pay-as-you-go spend, in its currency.
 - `resets`: rate-limit resets left.
 
-`kind` is `consumption` (`used`, plus `limit`, `remaining` and `utilization` for a meter) or `balance` (`available`). A value that isn't known is left out rather than given as zero. A profile with no figures yet has no entry. A failed fetch keeps the last figures and adds `{"profileId", "code", "message"}` to `errors`.
+`kind` is `consumption` (`used`, plus `limit`, `remaining` and `utilization` for a meter) or `balance` (`available`). A value that isn't known is left out rather than given as zero. A profile with no figures yet has no entry. A failed fetch keeps the last figures and adds `{"profileId", "code", "message"}` to `errors`; when the code is `account_mismatch` (the stored sign-in is another account's), the last figures are dropped too, since there's no telling whose they were.
 
 ### Local API
 

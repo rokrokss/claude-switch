@@ -309,6 +309,7 @@ export type QuotaError =
   | 'unauthorized'
   | 'forbidden'
   | 'needs_login'
+  | 'account_mismatch'
   | 'rate_limited'
   | 'network'
   | 'unknown'
@@ -316,6 +317,10 @@ export type QuotaError =
 export type ProfileUsage = {
   quota: QuotaUsage | null
   quotaError: QuotaError | null
+  /**
+   * With `account_mismatch`, the email of the account the stored sign-in belongs to.
+   */
+  storedAccountEmail?: string
   fetchedAt: string
 }
 

@@ -13,6 +13,7 @@ const knownQuotaErrors: ReadonlyArray<QuotaError> = [
   'unauthorized',
   'forbidden',
   'needs_login',
+  'account_mismatch',
   'rate_limited',
   'network',
   'unknown',
@@ -52,6 +53,7 @@ export function narrowProfileUsage(input: unknown): ProfileUsage {
   return {
     quota: narrowQuota(input.quota),
     quotaError: narrowQuotaError(input.quotaError),
+    ...(typeof input.storedAccountEmail === 'string' ? { storedAccountEmail: input.storedAccountEmail } : {}),
     fetchedAt: typeof input.fetchedAt === 'string' ? input.fetchedAt : new Date().toISOString(),
   }
 }

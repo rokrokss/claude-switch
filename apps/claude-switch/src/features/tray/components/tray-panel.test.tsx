@@ -213,6 +213,16 @@ describe('TrayPanel', () => {
     expect(screen.getByText('Token refresh needed — run `claude-work` once, then retry.')).toBeInTheDocument()
   })
 
+  it("says when a profile's stored sign-in is another account's", () => {
+    vi.mocked(useTrayEntries).mockReturnValue([makeEntry({ usage: null, metrics: [], error: 'account_mismatch' })])
+    render(<TrayPanel />)
+    expect(
+      screen.getByText(
+        'The stored sign-in belongs to another account, not this profile — run `claude-work` and sign in again with /login.',
+      ),
+    ).toBeInTheDocument()
+  })
+
   it('shows a placed metric the profile does not report as having no data', () => {
     withSettings({
       ...defaultSettings,

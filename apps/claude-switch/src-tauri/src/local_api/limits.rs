@@ -89,6 +89,9 @@ pub fn describe(error: QuotaError, command: &str) -> String {
     match error {
         QuotaError::NoCredentials => format!("not signed in: run `{command}` and sign in"),
         QuotaError::NeedsLogin => format!("sign-in expired: run `{command}` and sign in again"),
+        QuotaError::AccountMismatch => {
+            format!("the stored sign-in is another account's: run `{command}` and sign in again")
+        }
         QuotaError::Unauthorized => {
             format!("token refresh needed: open claude-switch, or run `{command}` once")
         }
@@ -302,6 +305,7 @@ pub(crate) mod tests {
             usage: fetched_at.map(|at| ProfileUsage {
                 quota: None,
                 quota_error: None,
+                stored_account_email: None,
                 fetched_at: at.into(),
             }),
             metrics: if fetched_at.is_some() {
