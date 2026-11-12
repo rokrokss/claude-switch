@@ -106,6 +106,7 @@ export function codexDisplayToggleCopy(display: UsageDisplay): CodexDisplayToggl
 function UsageCardInner({ app, profileId, cliCommand }: { app: AppId; profileId: string; cliCommand: string }) {
   const { data, error, isLoading, isFetching, dataUpdatedAt, refetch } = useProfileUsage(profileId)
   const errorCode = usageErrorCode(error)
+  const storedAccountEmail = error instanceof UsageUnavailableError ? error.storedAccountEmail : undefined
   const [display, setDisplay] = useState<UsageDisplay>(readUsageDisplay)
   function changeDisplay(next: UsageDisplay) {
     setDisplay(next)
@@ -164,6 +165,7 @@ function UsageCardInner({ app, profileId, cliCommand }: { app: AppId; profileId:
             errorCode={errorCode}
             profileId={profileId}
             quota={data?.quota ?? null}
+            storedAccountEmail={storedAccountEmail}
           />
         )}
       </section>
@@ -246,18 +248,21 @@ function Body({
   errorCode,
   cliCommand,
   profileId,
+  storedAccountEmail,
 }: {
   app: AppId
   quota: ProfileUsage['quota']
   errorCode: QuotaError | null
   cliCommand: string
   profileId: string
+  storedAccountEmail?: string
 }) {
   // Stale-while-revalidate: whenever there's data, show the meters — even if
   // the latest refresh just failed — with a quiet "couldn't refresh" note so
   // the staleness stays honest. The full error message is reserved for when
-  // there's nothing cached to show.
-  if (quota) {
+  // there's nothing cached to show. A sign-in that belongs to another account
+  // is the exception: there's no telling whose the kept numbers are.
+  if (quota && errorCode !== 'account_mismatch') {
     return (
       <div className="flex flex-col gap-2">
         <Meters app={app} quota={quota} />
@@ -271,7 +276,9 @@ function Body({
   if (errorCode) {
     return (
       <div className="flex flex-col gap-2">
-        <p className="font-mono text-mono text-muted-strong">{quotaErrorMessage(app, errorCode, cliCommand)}</p>
+        <p className="font-mono text-mono text-muted-strong">
+          {quotaErrorMessage(app, errorCode, cliCommand, storedAccountEmail)}
+        </p>
         {canRelogin(errorCode) ? <ReloginButton profileId={profileId} /> : null}
       </div>
     )
@@ -279,10 +286,11 @@ function Body({
   return <MetersSkeleton />
 }
 
-// A failed token refresh and an expired session both recover the same way:
-// run the profile's CLI interactively once. The button opens it in Terminal.
+// A failed token refresh, an expired session and another account's sign-in
+// all recover the same way: run the profile's CLI interactively. The button
+// opens it in Terminal.
 function canRelogin(errorCode: QuotaError | null): boolean {
-  return errorCode === 'needs_login' || errorCode === 'unauthorized'
+  return errorCode === 'needs_login' || errorCode === 'unauthorized' || errorCode === 'account_mismatch'
 }
 
 function ReloginButton({ profileId }: { profileId: string }) {
@@ -308,6 +316,9 @@ export function quotaErrorShort(quotaError: QuotaError): string {
   if (quotaError === 'needs_login') {
     return 'sign-in needed'
   }
+  if (quotaError === 'account_mismatch') {
+    return "another account's sign-in"
+  }
   if (quotaError === 'unauthorized') {
     return 'token refresh needed'
   }
@@ -326,13 +337,22 @@ export function quotaErrorShort(quotaError: QuotaError): string {
 // Resolves the message shown in place of the meters for a given error code.
 // All app-specific copy lives in the registry so a ChatGPT pane never names
 // Anthropic (and vice versa); unknown stays neutral.
-export function quotaErrorMessage(app: AppId, quotaError: QuotaError, cliCommand: string): string {
+export function quotaErrorMessage(
+  app: AppId,
+  quotaError: QuotaError,
+  cliCommand: string,
+  storedAccountEmail?: string,
+): string {
   const usage = appSpecs[app].usage
   if (quotaError === 'no_credentials') {
     return (usage?.noCredentials ?? 'Sign in once with this profile to see usage.').replace('{command}', cliCommand)
   }
   if (quotaError === 'needs_login') {
     return `Session expired — run \`${cliCommand}\` and sign in to this profile again.`
+  }
+  if (quotaError === 'account_mismatch') {
+    const owner = storedAccountEmail ?? 'another account'
+    return `The stored sign-in belongs to ${owner}, not this profile — run \`${cliCommand}\` and sign in again with /login.`
   }
   if (quotaError === 'unauthorized') {
     // Not a real "session expired" — the CLI's short-lived access token rolls

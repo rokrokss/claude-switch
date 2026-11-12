@@ -223,15 +223,7 @@ async fn fetch(target: &Target, last: Option<&TrayEntry>) -> TrayEntry {
     )
     .await;
     let last_usage = last.and_then(|entry| entry.usage.clone());
-    let (usage, error) = match fetched {
-        Ok(Ok(usage)) if usage.quota.is_some() => (Some(usage), None),
-        Ok(Ok(usage)) => (
-            last_usage,
-            Some(usage.quota_error.unwrap_or(QuotaError::Unknown)),
-        ),
-        Ok(Err(_)) => (last_usage, Some(QuotaError::Unknown)),
-        Err(_) => (last_usage, Some(QuotaError::Network)),
-    };
+    let (usage, error) = tray::kept_usage(fetched, last_usage);
     let metrics = usage
         .as_ref()
         .map(|usage| metrics::from_usage(target.app, usage))

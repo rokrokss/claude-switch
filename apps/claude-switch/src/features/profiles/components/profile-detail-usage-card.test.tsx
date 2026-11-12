@@ -530,6 +530,7 @@ describe('ProfileDetailUsageCard', () => {
   it.each([
     ['no_credentials', /run `claude` once and sign in with \/login/i],
     ['needs_login', /session expired — run `claude`/i],
+    ['account_mismatch', /belongs to another account, not this profile — run `claude`/i],
     ['unauthorized', /token refresh needed — run `claude`/i],
     ['forbidden', /blocked upstream/i],
     ['rate_limited', /rate limited/i],
@@ -543,6 +544,12 @@ describe('ProfileDetailUsageCard', () => {
     expect(quotaErrorMessage('claude', 'no_credentials', 'claude-work')).toContain('`claude-work`')
     expect(quotaErrorMessage('claude', 'needs_login', 'claude-work')).toContain('claude-work')
     expect(quotaErrorMessage('claude', 'unauthorized', 'claude-work')).toContain('claude-work')
+  })
+
+  it('quotaErrorMessage names the account a stored sign-in belongs to', () => {
+    expect(quotaErrorMessage('claude', 'account_mismatch', 'claude-work', 'work@example.com')).toMatch(
+      /belongs to work@example\.com, not this profile — run `claude-work`/,
+    )
   })
 
   it('falls back to a neutral label when the scoped weekly names no model', () => {
@@ -654,6 +661,25 @@ describe('ProfileDetailUsageCard', () => {
     renderWithQuery(
       <ProfileDetailUsageCard app="claude" profileId="p1" cliEnabled={true} cliCommand="claude-personal" />,
     )
+    fireEvent.click(screen.getByRole('button', { name: /refresh sign-in/i }))
+    expect(openCliLogin).toHaveBeenCalledWith('p1')
+  })
+
+  it('hides kept meters and names the owner when the sign-in belongs to another account', () => {
+    ;(useProfileUsage as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: {
+        quota: { primary: { utilization: 40, resetsAt: null }, secondary: null, scopedWeekly: [] },
+        quotaError: null,
+        fetchedAt: '2026-11-13T00:00:00Z',
+      },
+      error: new UsageUnavailableError('account_mismatch', 'work@example.com'),
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    })
+    renderWithQuery(<ProfileDetailUsageCard app="claude" profileId="p1" cliEnabled={true} cliCommand="claude-work" />)
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    expect(screen.getByText(/work@example\.com/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /refresh sign-in/i }))
     expect(openCliLogin).toHaveBeenCalledWith('p1')
   })

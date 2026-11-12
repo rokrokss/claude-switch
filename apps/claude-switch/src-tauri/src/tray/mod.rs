@@ -588,15 +588,7 @@ async fn fetch_all(app: &AppHandle) -> bool {
             tokio::time::timeout(FETCH_DEADLINE, commands::profile_usage(&target.id, false)).await;
         let last = previous.iter().find(|entry| entry.id == target.id);
         let last_usage = last.and_then(|entry| entry.usage.clone());
-        let (usage, error) = match fetched {
-            Ok(Ok(usage)) if usage.quota.is_some() => (Some(usage), None),
-            Ok(Ok(usage)) => (
-                last_usage,
-                Some(usage.quota_error.unwrap_or(QuotaError::Unknown)),
-            ),
-            Ok(Err(_)) => (last_usage, Some(QuotaError::Unknown)),
-            Err(_) => (last_usage, Some(QuotaError::Network)),
-        };
+        let (usage, error) = kept_usage(fetched, last_usage);
         let metrics = usage
             .as_ref()
             .map(|usage| metrics::from_usage(target.app, usage))
@@ -676,6 +668,28 @@ async fn fetch_all(app: &AppHandle) -> bool {
     *state.refreshed_at.lock().unwrap() = Some(Instant::now());
     show(app, entries);
     passing_failure
+}
+
+/// Pure: the usage a profile's entry keeps after `fetched`, and why the fetch
+/// brought no quota, if it didn't. A fetch without one keeps `last_usage`,
+/// unless the stored sign-in turned out to be another account's: then there's
+/// no telling whose the last figures were either.
+pub(crate) fn kept_usage(
+    fetched: Result<AppResult<ProfileUsage>, tokio::time::error::Elapsed>,
+    last_usage: Option<ProfileUsage>,
+) -> (Option<ProfileUsage>, Option<QuotaError>) {
+    match fetched {
+        Ok(Ok(usage)) if usage.quota.is_some() => (Some(usage), None),
+        Ok(Ok(usage)) if matches!(usage.quota_error, Some(QuotaError::AccountMismatch)) => {
+            (None, usage.quota_error)
+        }
+        Ok(Ok(usage)) => (
+            last_usage,
+            Some(usage.quota_error.unwrap_or(QuotaError::Unknown)),
+        ),
+        Ok(Err(_)) => (last_usage, Some(QuotaError::Unknown)),
+        Err(_) => (last_usage, Some(QuotaError::Network)),
+    }
 }
 
 /// When a profile whose fetch was refused for a rate limit is asked again,
@@ -885,4 +899,48 @@ fn fallback_icon() -> Image<'static> {
 #[cfg(not(target_os = "macos"))]
 fn fallback_icon() -> Image<'static> {
     Image::new_owned(vec![0; 4], 1, 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::usage::QuotaUsage;
+
+    fn usage(quota: Option<QuotaUsage>, quota_error: Option<QuotaError>) -> ProfileUsage {
+        ProfileUsage {
+            quota,
+            quota_error,
+            stored_account_email: None,
+            fetched_at: "2026-11-13T12:00:00Z".into(),
+        }
+    }
+
+    #[test]
+    fn a_fetch_with_a_quota_is_kept() {
+        let (kept, error) = kept_usage(Ok(Ok(usage(Some(QuotaUsage::default()), None))), None);
+        assert!(kept.is_some_and(|kept| kept.quota.is_some()));
+        assert!(error.is_none());
+    }
+
+    #[test]
+    fn a_failed_fetch_keeps_the_last_figures() {
+        let last = usage(Some(QuotaUsage::default()), None);
+        let (kept, error) = kept_usage(
+            Ok(Ok(usage(None, Some(QuotaError::NeedsLogin)))),
+            Some(last),
+        );
+        assert!(kept.is_some_and(|kept| kept.quota.is_some()));
+        assert!(matches!(error, Some(QuotaError::NeedsLogin)));
+    }
+
+    #[test]
+    fn another_accounts_sign_in_drops_the_last_figures() {
+        let last = usage(Some(QuotaUsage::default()), None);
+        let (kept, error) = kept_usage(
+            Ok(Ok(usage(None, Some(QuotaError::AccountMismatch)))),
+            Some(last),
+        );
+        assert!(kept.is_none());
+        assert!(matches!(error, Some(QuotaError::AccountMismatch)));
+    }
 }

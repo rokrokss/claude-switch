@@ -74,9 +74,20 @@ impl ReqwestUsageClient {
 #[async_trait]
 impl UsageClient for ReqwestUsageClient {
     async fn fetch(&self, access_token: &str) -> Result<HttpResponse, QuotaError> {
+        self.get(USAGE_URL, access_token).await
+    }
+}
+
+impl ReqwestUsageClient {
+    /// GETs one of the OAuth endpoints with `access_token`, under the size cap.
+    pub(crate) async fn get(
+        &self,
+        url: &str,
+        access_token: &str,
+    ) -> Result<HttpResponse, QuotaError> {
         let mut response = self
             .client
-            .get(USAGE_URL)
+            .get(url)
             .bearer_auth(access_token)
             .header("anthropic-beta", BETA_HEADER)
             .header("user-agent", &self.user_agent)
@@ -93,7 +104,7 @@ impl UsageClient for ReqwestUsageClient {
             crate::logging::warn(
                 "usage",
                 &format!(
-                    "usage endpoint answered 429, Retry-After: {}",
+                    "{url} answered 429, Retry-After: {}",
                     retry_after_header.unwrap_or("none")
                 ),
             );
@@ -317,7 +328,7 @@ impl ClaudeQuotaCache {
     }
 }
 
-fn token_cache_key(token: &str) -> String {
+pub(crate) fn token_cache_key(token: &str) -> String {
     let digest = Sha256::digest(token.as_bytes());
     let mut hex = String::with_capacity(digest.len() * 2);
     for byte in digest {

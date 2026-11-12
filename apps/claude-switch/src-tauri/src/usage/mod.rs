@@ -13,6 +13,7 @@ pub(crate) mod refresh;
 pub(crate) mod resets;
 pub(crate) mod spend;
 pub(crate) mod sync;
+pub(crate) mod token_account;
 
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +26,10 @@ pub(crate) const CLAUDE_USER_AGENT: &str = "claude-cli/2.1.301 (external, cli)";
 pub struct ProfileUsage {
     pub quota: Option<QuotaUsage>,
     pub quota_error: Option<QuotaError>,
+    /// With `QuotaError::AccountMismatch`, the email of the account the stored
+    /// sign-in belongs to, when the profile endpoint named one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stored_account_email: Option<String>,
     pub fetched_at: String,
 }
 
@@ -134,6 +139,9 @@ pub enum QuotaError {
     /// must sign in to this profile again. Distinct from the transient
     /// `Unauthorized`, which a CLI refresh can fix.
     NeedsLogin,
+    /// The stored sign-in belongs to an account this profile isn't signed in
+    /// under, so its quota isn't this profile's to show.
+    AccountMismatch,
     RateLimited,
     Network,
     Unknown,
@@ -191,6 +199,7 @@ pub async fn build(config_dir: &Path, provider: &dyn QuotaProvider) -> ProfileUs
     ProfileUsage {
         quota,
         quota_error,
+        stored_account_email: None,
         fetched_at: Utc::now().to_rfc3339(),
     }
 }
@@ -238,6 +247,7 @@ pub async fn build_with_renewal(
             ProfileUsage {
                 quota: None,
                 quota_error: Some(QuotaError::NeedsLogin),
+                stored_account_email: None,
                 fetched_at: Utc::now().to_rfc3339(),
             }
         }
@@ -280,6 +290,7 @@ pub async fn build_with_cli_refresh(
         return ProfileUsage {
             quota: None,
             quota_error: Some(QuotaError::NeedsLogin),
+            stored_account_email: None,
             fetched_at: Utc::now().to_rfc3339(),
         };
     }
@@ -631,6 +642,28 @@ mod tests {
         // Wire contract: the frontend QuotaError union expects `forbidden`.
         let json = serde_json::to_string(&QuotaError::Forbidden).unwrap();
         assert_eq!(json, "\"forbidden\"");
+    }
+
+    #[test]
+    fn an_account_mismatch_names_the_stored_account_on_the_wire() {
+        // Wire contract: the frontend reads `account_mismatch` and
+        // `storedAccountEmail`, which is left out when there is none.
+        let mismatch = ProfileUsage {
+            quota: None,
+            quota_error: Some(QuotaError::AccountMismatch),
+            stored_account_email: Some("work@example.com".into()),
+            fetched_at: "now".into(),
+        };
+        let json = serde_json::to_value(&mismatch).unwrap();
+        assert_eq!(json["quotaError"], "account_mismatch");
+        assert_eq!(json["storedAccountEmail"], "work@example.com");
+
+        let plain = ProfileUsage {
+            stored_account_email: None,
+            ..mismatch
+        };
+        let json = serde_json::to_value(&plain).unwrap();
+        assert!(json.get("storedAccountEmail").is_none());
     }
 
     #[test]

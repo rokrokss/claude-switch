@@ -447,6 +447,7 @@ mod tests {
         ProfileUsage {
             quota: Some(quota),
             quota_error: None,
+            stored_account_email: None,
             fetched_at: "2026-10-17T12:00:00Z".into(),
         }
     }
@@ -560,6 +561,7 @@ mod tests {
         let usage = ProfileUsage {
             quota: None,
             quota_error: Some(crate::usage::QuotaError::Network),
+            stored_account_email: None,
             fetched_at: String::new(),
         };
         assert!(from_usage(AppKind::Claude, &usage).is_empty());

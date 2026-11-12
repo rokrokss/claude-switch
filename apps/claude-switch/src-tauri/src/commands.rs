@@ -24,7 +24,8 @@ use crate::usage::{
     self,
     antigravity::AntigravityQuotaProvider,
     codex::CodexQuotaProvider,
-    quota::{ClaudeQuotaCache, ClaudeQuotaProvider},
+    quota::{ClaudeQuotaCache, ClaudeQuotaProvider, ReqwestUsageClient},
+    token_account::TokenAccountCache,
     ProfileUsage, QuotaError,
 };
 
@@ -591,6 +592,9 @@ static CLAUDE_QUOTA_CACHE: OnceLock<ClaudeQuotaCache> = OnceLock::new();
 /// hash, not per profile.
 static CLAUDE_DEAD_CREDS: OnceLock<usage::dead_credentials::DeadCredentialRegistry> =
     OnceLock::new();
+/// One shared record of which account each Claude token belongs to, so a
+/// token is looked up once rather than on every poll.
+static CLAUDE_TOKEN_ACCOUNTS: OnceLock<TokenAccountCache> = OnceLock::new();
 
 #[tauri::command]
 pub async fn get_profile_usage(profile_id: String) -> AppResult<ProfileUsage> {
@@ -613,6 +617,7 @@ pub(crate) async fn profile_usage(
         return Ok(ProfileUsage {
             quota: None,
             quota_error: None,
+            stored_account_email: None,
             fetched_at: chrono::Utc::now().to_rfc3339(),
         });
     }
@@ -624,7 +629,7 @@ pub(crate) async fn profile_usage(
                 CLAUDE_DEAD_CREDS.get_or_init(usage::dead_credentials::DeadCredentialRegistry::new);
             let provider = ClaudeQuotaProvider::new(user_agent, cache, dead_credentials)
                 .map_err(|_| AppError::Io(std::io::Error::other("could not build HTTP client")))?;
-            Ok(unless_held(profile_id, Some(&config_dir), async {
+            let fetched = unless_held(profile_id, Some(&config_dir), async {
                 let renewed =
                     usage::build_with_renewal(&config_dir, &provider, dead_credentials).await;
                 let unrenewed = matches!(renewed.quota_error, Some(QuotaError::Unauthorized));
@@ -638,7 +643,8 @@ pub(crate) async fn profile_usage(
                 usage::build_with_cli_refresh(&config_dir, &provider, refresher, dead_credentials)
                     .await
             })
-            .await)
+            .await;
+            Ok(own_usage(profile_id, &config_dir, fetched).await)
         }
         AppKind::Codex => {
             // app-server refreshes its own token per call, so no external
@@ -686,6 +692,7 @@ pub(crate) async fn stored_profile_usage(profile_id: &str) -> AppResult<ProfileU
         return Ok(ProfileUsage {
             quota: None,
             quota_error: None,
+            stored_account_email: None,
             fetched_at: chrono::Utc::now().to_rfc3339(),
         });
     }
@@ -697,12 +704,30 @@ pub(crate) async fn stored_profile_usage(profile_id: &str) -> AppResult<ProfileU
                 CLAUDE_DEAD_CREDS.get_or_init(usage::dead_credentials::DeadCredentialRegistry::new);
             let provider = ClaudeQuotaProvider::new(user_agent, cache, dead_credentials)
                 .map_err(|_| AppError::Io(std::io::Error::other("could not build HTTP client")))?;
-            Ok(unless_held(profile_id, None, usage::build(&config_dir, &provider)).await)
+            let fetched = unless_held(profile_id, None, usage::build(&config_dir, &provider)).await;
+            Ok(own_usage(profile_id, &config_dir, fetched).await)
         }
         AppKind::Codex => Ok(usage::build(&config_dir, &CodexQuotaProvider).await),
         AppKind::Antigravity => Ok(usage::build(&config_dir, &AntigravityQuotaProvider).await),
         AppKind::Gemini => unreachable!("Gemini has no usage, so it returned above"),
     }
+}
+
+/// `fetched`, the usage of Claude profile `profile_id`, withheld as
+/// `AccountMismatch` when the sign-in stored for its config home `config_dir`
+/// is another account's ([`usage::token_account::guard`]). Runs after
+/// [`unless_held`], so the rate-limit hold sees what the endpoint said.
+async fn own_usage(
+    profile_id: &str,
+    config_dir: &std::path::Path,
+    fetched: ProfileUsage,
+) -> ProfileUsage {
+    let account_ids = accounts::claude_account_ids(profile_id, config_dir).unwrap_or_default();
+    let Ok(client) = ReqwestUsageClient::new(usage::CLAUDE_USER_AGENT.to_owned()) else {
+        return fetched;
+    };
+    let cache = CLAUDE_TOKEN_ACCOUNTS.get_or_init(TokenAccountCache::new);
+    usage::token_account::guard(fetched, config_dir, &account_ids, &client, cache).await
 }
 
 /// What's left of the cooldown a rate limit of Claude profile `profile_id`'s
@@ -731,6 +756,7 @@ async fn unless_held(
         return ProfileUsage {
             quota: None,
             quota_error: Some(QuotaError::RateLimited),
+            stored_account_email: None,
             fetched_at: now.to_rfc3339(),
         };
     }
@@ -800,6 +826,7 @@ async fn held_usage(profile_id: &str, probe_dir: Option<&std::path::Path>) -> Op
             reading,
         )),
         quota_error: None,
+        stored_account_email: None,
         fetched_at: read_at.to_rfc3339(),
     })
 }
