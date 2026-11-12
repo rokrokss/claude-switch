@@ -18,7 +18,8 @@
 # src-tauri/src/usage/spend/pricing/catalog.rs: rates per million tokens, a
 # cache write defaulting to the input rate and a cache read to a tenth of it,
 # with `"cre": false` marking a cache read that was filled in rather than
-# published. Prices claude-switch sets itself live in
+# published and `"lt"` a long-context tier other than 200k tokens. Prices
+# claude-switch sets itself live in
 # apps/landing/public/pricing-supplement.json instead.
 
 set -euo pipefail
@@ -65,6 +66,18 @@ def compact(i, o, cw, cr, cr_explicit, **extra):
     return model
 
 
+def long_context_thousands(entry):
+    """The tier LiteLLM names in its keys (`_above_100k_tokens`), the lowest
+    input one; 200 without one. Matches `long_context_thousands` in catalog.rs."""
+    prefix, suffix = "input_cost_per_token_above_", "k_tokens"
+    tiers = [
+        int(name[len(prefix):-len(suffix)])
+        for name in entry
+        if name.startswith(prefix) and name.endswith(suffix) and name[len(prefix):-len(suffix)].isdigit()
+    ]
+    return min(tiers, default=200)
+
+
 def write(name, models):
     if not models:
         sys.exit(f"{name}: the feed had no usable prices; keeping the old snapshot.")
@@ -86,16 +99,19 @@ for key, entry in litellm.items():
     cw = number(entry.get("cache_creation_input_token_cost"))
     cr = number(entry.get("cache_read_input_token_cost"))
     specific = entry.get("provider_specific_entry")
+    thousands = long_context_thousands(entry)
+    above = f"_above_{thousands}k_tokens"
     models[key] = compact(
         i * 1e6,
         o * 1e6,
         (cw if cw is not None else i) * 1e6,
         (cr if cr is not None else i * 0.1) * 1e6,
         cr is not None,
-        ia=per_million(number(entry.get("input_cost_per_token_above_200k_tokens"))),
-        oa=per_million(number(entry.get("output_cost_per_token_above_200k_tokens"))),
-        cwa=per_million(number(entry.get("cache_creation_input_token_cost_above_200k_tokens"))),
-        cra=per_million(number(entry.get("cache_read_input_token_cost_above_200k_tokens"))),
+        ia=per_million(number(entry.get("input_cost_per_token" + above))),
+        oa=per_million(number(entry.get("output_cost_per_token" + above))),
+        cwa=per_million(number(entry.get("cache_creation_input_token_cost" + above))),
+        cra=per_million(number(entry.get("cache_read_input_token_cost" + above))),
+        lt=thousands * 1000 if thousands != 200 else None,
         fast=number(specific.get("fast")) if isinstance(specific, dict) else None,
     )
 write("litellm.json", models)
