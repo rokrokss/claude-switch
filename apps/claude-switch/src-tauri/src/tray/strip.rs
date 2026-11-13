@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use super::TrayEntry;
 use crate::app_kind::AppKind;
 use crate::settings::{MenuBarSettings, MeterStyle};
-use crate::usage::metrics::{id, Metric, MetricValue, Unit};
+use crate::usage::metrics::{id, outdated, Metric, MetricValue, Unit};
 
 /// At most this many of a profile's starred metrics are drawn: two stack
 /// beside its mark.
@@ -29,7 +29,15 @@ pub struct Strip {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Group {
     pub app: AppKind,
-    pub values: Vec<String>,
+    pub values: Vec<Value>,
+}
+
+/// A value as the strip prints it, and whether its figures were read too
+/// long ago to be current, which draws it faded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Value {
+    pub text: String,
+    pub outdated: bool,
 }
 
 /// How the strip reads: which metrics are starred, and whether a meter shows
@@ -56,9 +64,14 @@ pub fn build(entries: &[TrayEntry], options: &Options, now: DateTime<Utc>) -> St
     let groups = entries
         .iter()
         .filter_map(|entry| {
-            let values: Vec<String> = starred(entry, options)
+            let values: Vec<Value> = starred(entry, options)
                 .into_iter()
-                .filter_map(|metric| value(metric, options.meter_style, now))
+                .filter_map(|metric| {
+                    Some(Value {
+                        text: value(metric, options.meter_style, now)?,
+                        outdated: outdated(metric, now),
+                    })
+                })
                 .collect();
             (!values.is_empty()).then_some(Group {
                 app: entry.app,
@@ -120,7 +133,12 @@ pub fn tooltip(entries: &[TrayEntry], options: &Options, now: DateTime<Utc>) -> 
             .into_iter()
             .filter_map(|metric| {
                 let value = value(metric, options.meter_style, now)?;
-                Some(format!("{} {value}", metric.label))
+                let note = if outdated(metric, now) {
+                    " (outdated)"
+                } else {
+                    ""
+                };
+                Some(format!("{} {value}{note}", metric.label))
             })
             .collect();
         if !values.is_empty() {
@@ -239,6 +257,7 @@ mod tests {
                 not_started: false,
             },
             state: None,
+            read_at: None,
         }
     }
 
@@ -282,7 +301,7 @@ mod tests {
         build(entries, &options, now())
             .groups
             .into_iter()
-            .map(|group| group.values)
+            .map(|group| group.values.into_iter().map(|value| value.text).collect())
             .collect()
     }
 
@@ -307,8 +326,40 @@ mod tests {
             },
             now(),
         );
-        assert_eq!(built.groups[0].values, ["2%"]);
+        assert_eq!(built.groups[0].values[0].text, "2%");
         assert_eq!(built.groups[0].app, AppKind::Codex);
+    }
+
+    #[test]
+    fn marks_values_read_too_long_ago() {
+        let read = |minutes: i64| Some((now() - chrono::Duration::minutes(minutes)).to_rfc3339());
+        let entries = [entry(
+            AppKind::Claude,
+            vec![
+                Metric {
+                    read_at: read(5),
+                    ..session(18.0)
+                },
+                Metric {
+                    read_at: read(11),
+                    ..weekly(24.0)
+                },
+            ],
+        )];
+        let options = Options {
+            menu_bar: &MenuBarSettings::default(),
+            meter_style: MeterStyle::Used,
+        };
+        let outdated: Vec<bool> = build(&entries, &options, now()).groups[0]
+            .values
+            .iter()
+            .map(|value| value.outdated)
+            .collect();
+        assert_eq!(outdated, [false, true]);
+        assert_eq!(
+            tooltip(&entries, &options, now()),
+            "claude-switch\nWork: Session 18%, Weekly 24% (outdated)"
+        );
     }
 
     #[test]
@@ -427,6 +478,7 @@ mod tests {
                         breakdown: None,
                     },
                     state: None,
+                    read_at: None,
                 },
                 Metric {
                     id: id::RESETS.into(),
@@ -440,6 +492,7 @@ mod tests {
                         breakdown: None,
                     },
                     state: None,
+                    read_at: None,
                 },
             ],
         )];

@@ -199,6 +199,29 @@ describe('TrayPanel', () => {
     expect(screen.getByText('Limit reached')).toBeInTheDocument()
   })
 
+  it('says when old figures were read instead of how they are faring', () => {
+    const read = (ago: number) => new Date(Date.now() - ago).toISOString()
+    vi.mocked(useTrayEntries).mockReturnValue([
+      makeEntry({
+        metrics: [
+          meter('session', 'Session', 60, { readAt: read(5 * 60_000) }),
+          meter('weekly', 'Weekly', 47, {
+            readAt: read(5 * 60_000),
+            state: { kind: 'closeToLimit', sparePercent: 6, projectedFraction: 0.94 },
+          }),
+          meter('weekly.fable', 'Weekly · Fable', 38, {
+            readAt: read(11 * hour),
+            state: { kind: 'closeToLimit', sparePercent: 3, projectedFraction: 0.97 },
+          }),
+        ],
+      }),
+    ])
+    render(<TrayPanel />)
+    expect(screen.getByText('~6% spare')).toBeInTheDocument()
+    expect(screen.getByText('read 11h ago')).toBeInTheDocument()
+    expect(screen.queryByText('~3% spare')).not.toBeInTheDocument()
+  })
+
   it('says a session has not started', () => {
     vi.mocked(useTrayEntries).mockReturnValue([
       makeEntry({ metrics: [meter('session', 'Session', 0, { resetsAt: null, notStarted: true })] }),

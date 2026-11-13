@@ -66,6 +66,25 @@ pub struct Metric {
     /// when sent rather than stored: it moves with the clock.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub state: Option<MeterState>,
+    /// When a quota's figures were read: its usage's `fetched_at`, or the
+    /// `read_at` of a row carried over from an earlier answer. Absent for
+    /// what the local logs report, which is read as it is shown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_at: Option<String>,
+}
+
+/// Figures read longer ago than this are shown as outdated: two missed
+/// fetches. The panel's `outdatedAfterMs` is the same.
+const OUTDATED_AFTER_SECS: i64 = 10 * 60;
+
+/// Whether `metric`'s figures were read too long before `now` to show as
+/// current.
+pub fn outdated(metric: &Metric, now: DateTime<Utc>) -> bool {
+    metric
+        .read_at
+        .as_deref()
+        .and_then(|at| DateTime::parse_from_rfc3339(at).ok())
+        .is_some_and(|at| (now - at.with_timezone(&Utc)).num_seconds() > OUTDATED_AFTER_SECS)
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -180,6 +199,11 @@ pub fn from_usage(app: AppKind, usage: &ProfileUsage) -> Vec<Metric> {
     metrics.extend(extra(quota));
     metrics.extend(credits(quota));
     metrics.extend(resets(quota));
+    for metric in &mut metrics {
+        metric
+            .read_at
+            .get_or_insert_with(|| usage.fetched_at.clone());
+    }
     metrics
 }
 
@@ -341,6 +365,7 @@ fn credits(quota: &QuotaUsage) -> Option<Metric> {
             breakdown: None,
         },
         state: None,
+        read_at: None,
     })
 }
 
@@ -368,6 +393,7 @@ fn percent_meter(
             not_started: starts_with_first_message && window.resets_at.is_none() && used <= 0.0,
         },
         state: None,
+        read_at: window.read_at.clone(),
     })
 }
 
@@ -400,6 +426,7 @@ fn extra(quota: &QuotaUsage) -> Option<Metric> {
         label: "Extra usage".to_owned(),
         value,
         state: None,
+        read_at: spend.read_at.clone(),
     })
 }
 
@@ -426,6 +453,7 @@ fn resets(quota: &QuotaUsage) -> Option<Metric> {
             breakdown: None,
         },
         state: None,
+        read_at: None,
     })
 }
 
@@ -440,6 +468,7 @@ mod tests {
             label: None,
             utilization,
             resets_at: resets_at.map(str::to_owned),
+            read_at: None,
         }
     }
 
@@ -530,6 +559,40 @@ mod tests {
     }
 
     #[test]
+    fn quota_metrics_say_when_they_were_read() {
+        let mut q = quota(
+            Some(window(Some(18.0), None, None)),
+            Some(window(Some(24.0), None, None)),
+        );
+        // A row a held profile's probe couldn't read keeps its own time.
+        q.scoped_weekly = vec![Window {
+            label: Some("Fable".into()),
+            read_at: Some("2026-10-17T09:50:00Z".into()),
+            ..window(Some(38.0), None, None)
+        }];
+        let metrics = from_usage(AppKind::Claude, &usage(q));
+        let read_at: Vec<_> = metrics.iter().map(|m| m.read_at.as_deref()).collect();
+        assert_eq!(
+            read_at,
+            [
+                Some("2026-10-17T12:00:00Z"),
+                Some("2026-10-17T12:00:00Z"),
+                Some("2026-10-17T09:50:00Z"),
+            ]
+        );
+
+        let at = |text: &str| text.parse::<DateTime<Utc>>().unwrap();
+        assert!(!outdated(&metrics[0], at("2026-10-17T12:10:00Z")));
+        assert!(outdated(&metrics[0], at("2026-10-17T12:10:01Z")));
+        assert!(outdated(&metrics[2], at("2026-10-17T12:00:00Z")));
+        let local = Metric {
+            read_at: None,
+            ..metrics[0].clone()
+        };
+        assert!(!outdated(&local, at("2026-10-18T00:00:00Z")));
+    }
+
+    #[test]
     fn a_claude_session_without_a_reset_time_has_not_started() {
         let metrics = from_usage(
             AppKind::Claude,
@@ -614,6 +677,7 @@ mod tests {
             exponent: 2,
             limit_minor: Some(5000),
             percent: None,
+            read_at: None,
         });
         let metrics = from_usage(AppKind::Claude, &usage(q.clone()));
         assert!(matches!(

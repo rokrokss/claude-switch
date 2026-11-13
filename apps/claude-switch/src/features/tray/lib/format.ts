@@ -10,6 +10,20 @@ const dayMs = 24 * hourMs
  * A deadline this close, or already past, reads as "soon".
  */
 const soonMs = 5 * minuteMs
+/**
+ * Figures read longer ago than this are outdated: two missed fetches. The
+ * backend's `OUTDATED_AFTER_SECS` is the same.
+ */
+export const outdatedAfterMs = 10 * minuteMs
+
+/**
+ * Whether figures read at `readAt` are too old at `now` to show as current.
+ * Figures without a reading time, the local logs', never are.
+ */
+export function isOutdated(readAt: string | undefined, now: number): boolean {
+  const at = readAt ? Date.parse(readAt) : Number.NaN
+  return Number.isFinite(at) && now - at > outdatedAfterMs
+}
 
 /**
  * A time left, rounded up to the minute: `2d 4h`, `3h 25m`, `12m`, or `soon`

@@ -242,6 +242,12 @@ export type UsageWindow = {
    * for windows whose label is fixed copy.
    */
   label?: string | null
+  /**
+   * When the window was read, when that's earlier than its usage's
+   * `fetchedAt`: a row a rate-limited profile's probe couldn't read, kept
+   * from the last answer.
+   */
+  readAt?: string
 }
 
 export type RateLimitResetCredits = {
@@ -275,6 +281,10 @@ export type Spend = {
    * Server-computed share of the cap consumed, on a 0..=100 scale.
    */
   percent: number | null
+  /**
+   * When it was read, when that's earlier than its usage's `fetchedAt`.
+   */
+  readAt?: string
 }
 
 export type QuotaUsage = {
@@ -472,6 +482,10 @@ type MetricBase = {
   id: string
   label: string
   state?: MeterState
+  /**
+   * When a quota's figures were read. Absent for what the local logs report.
+   */
+  readAt?: string
 }
 
 export type Metric =

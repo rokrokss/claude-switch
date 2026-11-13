@@ -486,6 +486,7 @@ fn into_window(raw: ApiWindow, label: Option<String>) -> Window {
         label,
         utilization: sanitize_percent(raw.utilization),
         resets_at: raw.resets_at,
+        read_at: None,
     }
 }
 
@@ -495,6 +496,7 @@ fn into_limit_window(raw: ApiLimit, label: Option<String>) -> Window {
         label,
         utilization: sanitize_percent(raw.percent),
         resets_at: raw.resets_at,
+        read_at: None,
     }
 }
 
@@ -517,6 +519,7 @@ fn into_spend(raw: ApiSpend) -> Option<Spend> {
         exponent: sanitize_exponent(used.exponent),
         limit_minor,
         percent: sanitize_percent(raw.percent),
+        read_at: None,
     })
 }
 

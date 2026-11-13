@@ -95,7 +95,14 @@ export function narrowSpend(input: unknown): Spend | undefined {
   const exponent = isSafeIntegerAtLeast(input.exponent, 0) && input.exponent <= 6 ? input.exponent : 2
   const percent =
     typeof input.percent === 'number' && Number.isFinite(input.percent) && input.percent >= 0 ? input.percent : null
-  return { usedMinor: input.usedMinor, currency: input.currency, exponent, limitMinor, percent }
+  return {
+    usedMinor: input.usedMinor,
+    currency: input.currency,
+    exponent,
+    limitMinor,
+    percent,
+    ...(typeof input.readAt === 'string' ? { readAt: input.readAt } : {}),
+  }
 }
 
 function narrowResetCredits(input: unknown): RateLimitResetCredits | undefined {
@@ -150,6 +157,7 @@ export function narrowWindow(input: unknown): UsageWindow | null {
     resetsAt,
     ...(windowDurationMins === undefined ? {} : { windowDurationMins }),
     ...(label === undefined ? {} : { label }),
+    ...(typeof input.readAt === 'string' ? { readAt: input.readAt } : {}),
   }
 }
 

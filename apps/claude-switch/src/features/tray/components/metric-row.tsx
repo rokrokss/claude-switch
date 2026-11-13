@@ -6,9 +6,10 @@ import { Flame, Star } from 'lucide-react'
 
 import { cn, TooltipBubble } from '@/design'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/design/ui/context-menu'
+import { formatUpdatedAgo } from '@/features/profiles/components/profile-detail-usage-card'
 import { openSettings, refreshUsage } from '@/lib/commands'
 
-import { formatDeadline, formatDuration, meterHeadline, shownFraction, valuesText } from '../lib/format'
+import { formatDeadline, formatDuration, isOutdated, meterHeadline, shownFraction, valuesText } from '../lib/format'
 import { paceTick, projectionNote, severityOf } from '../lib/pace'
 import { useParty } from './party'
 import { ResetsRow } from './resets-row'
@@ -134,11 +135,23 @@ function MeterRow({ spacing, ...props }: MeterProps & { spacing: string }) {
 }
 
 /**
- * The meter's label, and its warning when it isn't simply on course.
+ * When figures too old to show as current were read, or null for current ones.
+ */
+function readNote(metric: Metric, now: number): string | null {
+  if (!metric.readAt || !isOutdated(metric.readAt, now)) {
+    return null
+  }
+  return `read ${formatUpdatedAgo(now - Date.parse(metric.readAt))}`
+}
+
+/**
+ * The meter's label, and its warning when it isn't simply on course — or,
+ * for figures too old to say how it is faring, when they were read.
  */
 function MeterTitle({ meter, display, now }: MeterProps) {
-  const severity = severityOf(meter.state)
-  const warning = warningText(meter, display, now)
+  const read = readNote(meter, now)
+  const severity = read ? null : severityOf(meter.state)
+  const warning = read ? { text: read, flame: false } : warningText(meter, display, now)
   return (
     <div className="flex items-baseline justify-between gap-2">
       <span className={titleClasses}>{meter.label}</span>
@@ -154,15 +167,17 @@ function MeterTitle({ meter, display, now }: MeterProps) {
 
 /**
  * The bar, coloured by the meter's state, with the even-pace tick and the
- * projection on hover.
+ * projection on hover; plain grey, without either, for figures too old to
+ * pace.
  */
 function MeterBar({ meter, display, now, compact }: MeterProps) {
-  const party = useParty()
-  const severity = severityOf(meter.state)
+  const outdated = isOutdated(meter.readAt, now)
+  const party = useParty() && !outdated
+  const severity = outdated ? null : severityOf(meter.state)
   const fill = shownFraction(meter, display.meterStyle) * 100
-  const tick = paceTick(meter, display, now)
+  const tick = outdated ? null : paceTick(meter, display, now)
   // A spent meter's warning already says it.
-  const note = meter.state?.kind === 'spent' ? null : projectionNote(meter.state)
+  const note = outdated || meter.state?.kind === 'spent' ? null : projectionNote(meter.state)
   return (
     <div className="group relative mt-1">
       <div
@@ -293,13 +308,15 @@ function ValuesRow({
 }) {
   const soonest = metric.expiresAt?.[0]
   const untilLapse = soonest ? Date.parse(soonest) - now : null
+  const read = readNote(metric, now)
   return (
     <div className={cn('flex items-center justify-between gap-2', spacing)}>
       <span className={titleClasses}>{metric.label}</span>
       <span
-        className={cn('flex shrink-0 items-center gap-1.5', detailClasses, 'text-ink-soft')}
+        className={cn('flex shrink-0 items-center gap-1.5', detailClasses, read ? null : 'text-ink-soft')}
         title={untilLapse === null ? undefined : `The first lapses in ${formatDuration(untilLapse)}`}
       >
+        {read ? <span>{read} ·</span> : null}
         {untilLapse === null ? null : (
           <span aria-hidden className={cn('h-1.5 w-1.5 rounded-full', barTone[expirySeverity(untilLapse)])} />
         )}
