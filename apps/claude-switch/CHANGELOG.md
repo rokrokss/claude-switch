@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.3.2 (2026-11-14)
+
+
+### Fixed
+
+* **usage:** figures that stopped updating, after a sign-in lapsed or while a rate limit holds the profile, show as outdated instead of as current: greyed, without a pace mark, with when they were read ("read 6h ago") in the panel and on the profile's usage card, and faded in the menu bar
+* **usage:** while a rate limit holds a Claude profile back, its Fable row follows the reading Claude Code gets with each reply, as its 5-hour and weekly rows already did; when that reading has none, the row says when it was last read
+
 ## 2.3.1 (2026-11-13)
 
 
