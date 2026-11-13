@@ -300,6 +300,7 @@ fn window_of(buckets: &[Bucket], window: &str, minutes: i64) -> Option<Window> {
         label: None,
         utilization: Some(((1.0 - remaining) * 100.0) as f32),
         resets_at: bucket.reset_time.clone(),
+        read_at: None,
     })
 }
 

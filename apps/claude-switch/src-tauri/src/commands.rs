@@ -821,10 +821,7 @@ async fn held_usage(profile_id: &str, probe_dir: Option<&std::path::Path>) -> Op
     let reading = usage::probe::read(profile_id, probe_dir).await?;
     let read_at = reading.read_at;
     Some(ProfileUsage {
-        quota: Some(usage::probe::over(
-            last.and_then(|usage| usage.quota),
-            reading,
-        )),
+        quota: Some(usage::probe::over(last, reading)),
         quota_error: None,
         stored_account_email: None,
         fetched_at: read_at.to_rfc3339(),

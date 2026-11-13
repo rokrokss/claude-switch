@@ -513,6 +513,25 @@ describe('ProfileDetailUsageCard', () => {
     expect(screen.getByRole('progressbar', { name: 'Weekly · Fable' })).toHaveAttribute('aria-valuenow', '19')
   })
 
+  it('says when a scoped weekly kept from an earlier answer was read', () => {
+    // A rate-limited profile's probe read Session and Weekly, not Fable.
+    mockUsage({
+      primary: { utilization: 4, resetsAt: null },
+      secondary: { utilization: 24, resetsAt: null },
+      scopedWeekly: [
+        {
+          utilization: 38,
+          resetsAt: new Date(Date.now() + 6 * 24 * 3_600_000).toISOString(),
+          label: 'Fable',
+          readAt: new Date(Date.now() - 11 * 3_600_000).toISOString(),
+        },
+      ],
+    })
+    renderWithQuery(<ProfileDetailUsageCard app="claude" profileId="p1" cliEnabled />)
+    expect(screen.getByText(/read 11h ago/)).toBeInTheDocument()
+    expect(screen.queryByText(/resets in 6d/)).not.toBeInTheDocument()
+  })
+
   it('gives every scoped weekly its own meter', () => {
     mockUsage({
       primary: null,

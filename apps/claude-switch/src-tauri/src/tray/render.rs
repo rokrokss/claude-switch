@@ -31,6 +31,8 @@ const GROUP_GAP: f64 = 11.0;
 /// drawn in the larger one.
 const PAIR_FONT: f64 = 9.0;
 const SINGLE_FONT: f64 = 12.0;
+/// A value read too long ago to be current is drawn this faint.
+const OUTDATED_ALPHA: f64 = 0.45;
 /// Between the bottom of the upper value's digits and the top of the lower's.
 const LINE_GAP: f64 = 2.0;
 
@@ -116,7 +118,7 @@ pub fn bars(fractions: &[f64]) -> Option<Rendered> {
 pub fn concealed() -> Option<Rendered> {
     autoreleasepool(|_| {
         let font = NSFont::boldSystemFontOfSize(SINGLE_FONT);
-        let label = attributed("claude-switch", &font);
+        let label = attributed("claude-switch", &font, 1.0);
         let width = MARK + MARK_GAP + label.size().width;
         draw(width, || {
             NSColor::blackColor().set();
@@ -231,8 +233,9 @@ fn bar_fill(track_width: f64, fraction: f64) -> BarFill {
     }
 }
 
-fn attributed(text: &str, font: &NSFont) -> Retained<NSAttributedString> {
-    let black = NSColor::blackColor();
+/// `text` in `font`, black at `alpha`: the template keeps only the alpha.
+fn attributed(text: &str, font: &NSFont, alpha: f64) -> Retained<NSAttributedString> {
+    let black = NSColor::colorWithWhite_alpha(0.0, alpha);
     let keys = unsafe { [NSFontAttributeName, NSForegroundColorAttributeName] };
     let values: [&AnyObject; 2] = [font.as_ref(), black.as_ref()];
     let attributes = NSDictionary::from_slices(&keys, &values);
@@ -325,7 +328,8 @@ fn lay_out(group: &Group) -> Option<Laid> {
         .values
         .iter()
         .map(|value| {
-            let line = attributed(value, &font);
+            let alpha = if value.outdated { OUTDATED_ALPHA } else { 1.0 };
+            let line = attributed(&value.text, &font, alpha);
             let width = line.size().width;
             (line, width)
         })
@@ -403,11 +407,18 @@ fn draw(width: f64, paint: impl FnOnce()) -> Option<Rendered> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tray::strip::Value;
 
     fn group(app: AppKind, values: &[&str]) -> Group {
         Group {
             app,
-            values: values.iter().map(|value| (*value).to_owned()).collect(),
+            values: values
+                .iter()
+                .map(|value| Value {
+                    text: (*value).to_owned(),
+                    outdated: false,
+                })
+                .collect(),
         }
     }
 

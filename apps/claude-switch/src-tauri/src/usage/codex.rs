@@ -165,6 +165,7 @@ fn into_window(raw: RateLimitWindow) -> Window {
         label: None,
         utilization,
         resets_at,
+        read_at: None,
     }
 }
 

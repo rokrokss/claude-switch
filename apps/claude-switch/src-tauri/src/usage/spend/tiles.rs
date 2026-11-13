@@ -100,6 +100,7 @@ fn spend(
             }),
         },
         state: None,
+        read_at: None,
     })
 }
 
@@ -131,6 +132,7 @@ fn trend(history: &UsageHistory, today: NaiveDate) -> Option<Metric> {
             points,
         },
         state: None,
+        read_at: None,
     })
 }
 

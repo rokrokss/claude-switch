@@ -81,6 +81,7 @@ mod tests {
                     not_started: false,
                 },
                 state: None,
+                read_at: None,
             }],
             error: None,
             retry_at: None,

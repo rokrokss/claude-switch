@@ -10,6 +10,7 @@ import {
   formatDuration,
   formatMoment,
   formatReading,
+  isOutdated,
   meterHeadline,
   shownFraction,
   valuesText,
@@ -34,6 +35,16 @@ function meter(overrides: Partial<Meter> = {}): Meter {
     ...overrides,
   }
 }
+
+describe('isOutdated', () => {
+  it('holds figures read more than ten minutes ago, and none without a time', () => {
+    const now = Date.parse('2026-11-13T12:00:00Z')
+    expect(isOutdated('2026-11-13T11:50:00Z', now)).toBe(false)
+    expect(isOutdated('2026-11-13T11:49:59Z', now)).toBe(true)
+    expect(isOutdated(undefined, now)).toBe(false)
+    expect(isOutdated('not a time', now)).toBe(false)
+  })
+})
 
 describe('formatDuration', () => {
   it('rounds up to the minute and drops the smaller unit past a day', () => {

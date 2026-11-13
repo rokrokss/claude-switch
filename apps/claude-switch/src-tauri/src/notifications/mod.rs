@@ -176,6 +176,7 @@ mod tests {
                 not_started: false,
             },
             state: None,
+            read_at: None,
         }
     }
 
@@ -207,6 +208,7 @@ mod tests {
                 breakdown: None,
             },
             state: None,
+            read_at: None,
         };
         let entries = [entry(vec![
             meter("session", "Session", 92.0, 100.0),
@@ -246,6 +248,7 @@ mod tests {
                 not_started: false,
             },
             state: None,
+            read_at: None,
         };
         let toggles = crate::settings::NotificationSettings {
             almost_out: true,

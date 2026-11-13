@@ -93,6 +93,10 @@ pub struct Spend {
     pub limit_minor: Option<i64>,
     /// Server-computed share of the cap consumed, on a 0..=100 scale.
     pub percent: Option<f32>,
+    /// When it was read, when that's earlier than its usage's `fetched_at`,
+    /// as for [`Window::read_at`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,6 +128,11 @@ pub struct Window {
     pub label: Option<String>,
     pub utilization: Option<f32>,
     pub resets_at: Option<String>,
+    /// When the window was read, when that's earlier than its usage's
+    /// `fetched_at`: a row a held profile's probe couldn't read, carried over
+    /// from the endpoint's last answer ([`probe::over`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -379,6 +388,7 @@ mod tests {
                 label: None,
                 utilization: Some(50.0),
                 resets_at: None,
+                read_at: None,
             }),
             secondary: None,
             scoped_weekly: Vec::new(),

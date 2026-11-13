@@ -14,16 +14,11 @@ import {
 } from '@/features/profiles/components/profile-detail-usage-card'
 import { claimCodexReset, openExternalUrl, openSettings, refreshUsage } from '@/lib/commands'
 
-import { formatMoment } from '../lib/format'
+import { formatMoment, outdatedAfterMs } from '../lib/format'
 import { cardLayout } from '../lib/layout'
 import { copyAsImage, profileShareCard } from '../lib/share-image'
 import { starsFor } from '../lib/stars'
 import { MetricRow } from './metric-row'
-
-/**
- * Figures older than this are marked outdated: two missed fetches.
- */
-const outdatedAfterMs = 10 * 60_000
 
 const quickLinks: Record<AppId, Array<{ label: string; url: string }>> = {
   claude: [

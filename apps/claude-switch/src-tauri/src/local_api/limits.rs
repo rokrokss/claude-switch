@@ -292,6 +292,7 @@ pub(crate) mod tests {
                 not_started: false,
             },
             state: None,
+            read_at: None,
         }
     }
 
@@ -397,6 +398,7 @@ pub(crate) mod tests {
                     breakdown: None,
                 },
                 state: None,
+                read_at: None,
             },
             Metric {
                 id: id::EXTRA.into(),
@@ -412,6 +414,7 @@ pub(crate) mod tests {
                     breakdown: None,
                 },
                 state: None,
+                read_at: None,
             },
         ];
         let body = parsed(&limits(&[work], at("2026-10-17T12:01:00Z")));
@@ -448,6 +451,7 @@ pub(crate) mod tests {
                 breakdown: None,
             },
             state: None,
+            read_at: None,
         });
         let body = parsed(&limits(&[work], at("2026-10-17T12:01:00Z")));
         let resources = body["profiles"]["w"]["resources"].as_object().unwrap();

@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import { ArrowLeftRight, RefreshCw } from 'lucide-react'
 
 import { Skeleton, TooltipBubble } from '@/design'
+import { isOutdated } from '@/features/tray/lib/format'
 import { appSpecs } from '@/lib/app-registry'
 import { openCliLogin } from '@/lib/commands'
 
@@ -676,7 +677,7 @@ function SpendMeter({ spend }: { spend: Spend | undefined }) {
     <Meter
       label="Usage credits"
       shortLabel="Cr"
-      meterWindow={{ utilization: percent, resetsAt: null }}
+      meterWindow={{ utilization: percent, resetsAt: null, ...(spend.readAt ? { readAt: spend.readAt } : {}) }}
       trailing={`${used} of ${limit}`}
     />
   )
@@ -950,9 +951,12 @@ function Meter({
   const usedPercent = usedPercentFromUtilization(meterWindow?.utilization ?? null)
   const percent = displayPercent(usedPercent, display)
   const fillPercent = meterFillPercent(percent)
-  const barClass = meterToneBarClass[meterTone(usedPercent)]
-  const resetLabel = formatReset(meterWindow?.resetsAt ?? null)
-  const pacePercent = computePacePercent(meterWindow?.resetsAt ?? null, paceWindowMins)
+  // A row kept from an earlier answer (a rate-limited profile's probe
+  // couldn't read it) says when it was read, in grey and without a pace.
+  const readAt = meterWindow?.readAt && isOutdated(meterWindow.readAt, Date.now()) ? meterWindow.readAt : null
+  const barClass = meterToneBarClass[readAt ? 'muted' : meterTone(usedPercent)]
+  const resetLabel = readAt ? formatReadAgo(readAt) : formatReset(meterWindow?.resetsAt ?? null)
+  const pacePercent = readAt ? null : computePacePercent(meterWindow?.resetsAt ?? null, paceWindowMins)
 
   return (
     <div className={meterGridClass}>
@@ -966,7 +970,19 @@ function Meter({
         pacePercent={displayPacePercent(pacePercent, display)}
         percent={percent}
       />
-      <MeterTrailing percent={percent} resetLabel={resetLabel} trailing={trailing} />
+      <MeterTrailing
+        percent={percent}
+        resetLabel={resetLabel}
+        trailing={
+          readAt && trailing && resetLabel ? (
+            <>
+              {trailing} · {resetLabel.relative}
+            </>
+          ) : (
+            trailing
+          )
+        }
+      />
     </div>
   )
 }
@@ -1041,6 +1057,14 @@ function formatReset(resetsAt: string | null): ResetLabel | null {
   return {
     relative: formatResetRelative(date.getTime() - Date.now()),
     absolute: format(date, 'EEE d MMM, HH:mm'),
+  }
+}
+
+function formatReadAgo(readAt: string): ResetLabel {
+  const date = new Date(readAt)
+  return {
+    relative: `read ${formatUpdatedAgo(Date.now() - date.getTime())}`,
+    absolute: `Read ${format(date, 'EEE d MMM, HH:mm')}`,
   }
 }
 
