@@ -951,12 +951,7 @@ function Meter({
   const usedPercent = usedPercentFromUtilization(meterWindow?.utilization ?? null)
   const percent = displayPercent(usedPercent, display)
   const fillPercent = meterFillPercent(percent)
-  // A row kept from an earlier answer (a rate-limited profile's probe
-  // couldn't read it) says when it was read, in grey and without a pace.
-  const readAt = meterWindow?.readAt && isOutdated(meterWindow.readAt, Date.now()) ? meterWindow.readAt : null
-  const barClass = meterToneBarClass[readAt ? 'muted' : meterTone(usedPercent)]
-  const resetLabel = readAt ? formatReadAgo(readAt) : formatReset(meterWindow?.resetsAt ?? null)
-  const pacePercent = readAt ? null : computePacePercent(meterWindow?.resetsAt ?? null, paceWindowMins)
+  const timing = meterTiming(meterWindow, usedPercent, paceWindowMins)
 
   return (
     <div className={meterGridClass}>
@@ -964,26 +959,48 @@ function Meter({
       <MeterBar
         showDailySegments={showDailySegments}
         ariaLabel={label}
-        barClass={barClass}
+        barClass={meterToneBarClass[timing.tone]}
         display={display}
         fillPercent={fillPercent}
-        pacePercent={displayPacePercent(pacePercent, display)}
+        pacePercent={displayPacePercent(timing.pacePercent, display)}
         percent={percent}
       />
-      <MeterTrailing
-        percent={percent}
-        resetLabel={resetLabel}
-        trailing={
-          readAt && trailing && resetLabel ? (
-            <>
-              {trailing} · {resetLabel.relative}
-            </>
-          ) : (
-            trailing
-          )
-        }
-      />
+      <MeterTrailing percent={percent} resetLabel={timing.resetLabel} trailing={withReadNote(trailing, timing.read)} />
     </div>
+  )
+}
+
+/**
+ * A meter's tone, pace and reset. A row kept from an earlier answer (a
+ * rate-limited profile's probe couldn't read it) says when it was read
+ * instead, in grey and without a pace.
+ */
+function meterTiming(meterWindow: UsageWindow | null, usedPercent: number | null, paceWindowMins?: number | null) {
+  const readAt = meterWindow?.readAt
+  if (readAt && isOutdated(readAt, Date.now())) {
+    const read = formatReadAgo(readAt)
+    return { tone: 'muted' as const, resetLabel: read, pacePercent: null, read }
+  }
+  const resetsAt = meterWindow?.resetsAt ?? null
+  return {
+    tone: meterTone(usedPercent),
+    resetLabel: formatReset(resetsAt),
+    pacePercent: computePacePercent(resetsAt, paceWindowMins),
+    read: null,
+  }
+}
+
+/**
+ * A row's own trailing text, followed by when it was read if it is outdated.
+ */
+function withReadNote(trailing: ReactNode, read: ResetLabel | null): ReactNode {
+  if (!trailing || !read) {
+    return trailing
+  }
+  return (
+    <>
+      {trailing} · {read.relative}
+    </>
   )
 }
 

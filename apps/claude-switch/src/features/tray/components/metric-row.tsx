@@ -171,13 +171,9 @@ function MeterTitle({ meter, display, now }: MeterProps) {
  * pace.
  */
 function MeterBar({ meter, display, now, compact }: MeterProps) {
-  const outdated = isOutdated(meter.readAt, now)
+  const { outdated, severity, tick, note } = barMarks(meter, display, now)
   const party = useParty() && !outdated
-  const severity = outdated ? null : severityOf(meter.state)
   const fill = shownFraction(meter, display.meterStyle) * 100
-  const tick = outdated ? null : paceTick(meter, display, now)
-  // A spent meter's warning already says it.
-  const note = outdated || meter.state?.kind === 'spent' ? null : projectionNote(meter.state)
   return (
     <div className="group relative mt-1">
       <div
@@ -197,6 +193,23 @@ function MeterBar({ meter, display, now, compact }: MeterProps) {
       {note ? <TooltipBubble>{note}</TooltipBubble> : null}
     </div>
   )
+}
+
+/**
+ * What the bar shows besides its fill: its colour, the even-pace tick and the
+ * projection. Figures too old to pace show none of them.
+ */
+function barMarks(meter: Meter, display: Display, now: number) {
+  if (isOutdated(meter.readAt, now)) {
+    return { outdated: true, severity: null, tick: null, note: null }
+  }
+  return {
+    outdated: false,
+    severity: severityOf(meter.state),
+    tick: paceTick(meter, display, now),
+    // A spent meter's warning already says it.
+    note: meter.state?.kind === 'spent' ? null : projectionNote(meter.state),
+  }
 }
 
 /**
