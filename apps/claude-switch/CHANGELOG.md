@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.3.3 (2026-11-16)
+
+
+### Fixed
+
+* **tray:** with more than one display, a click on the item in another display's menu bar opens the panel under it, instead of at the top right of the built-in display
+
 ## 2.3.2 (2026-11-14)
 
 
