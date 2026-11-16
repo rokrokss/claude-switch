@@ -393,11 +393,18 @@ fn on_screen(panel: &WebviewWindow, icon: &Rect) -> bool {
 }
 
 /// The screen the item is on, if it's on one. macOS looks the point up in
-/// points, not the pixels the rest of the placement works in.
+/// points, not the pixels the rest of the placement works in. It looks up the
+/// item's centre, not its corner: the item is as tall as the main screen's
+/// menu bar, so on a screen with a thinner one it stands a point above the
+/// top edge, and its corner is on no screen at all.
 fn monitor_under(panel: &WebviewWindow, icon: &Rect) -> Option<tauri::Monitor> {
     let scale = panel.scale_factor().unwrap_or(1.0);
     let point = icon.position.to_logical::<f64>(scale);
-    panel.monitor_from_point(point.x, point.y).ok().flatten()
+    let size = icon.size.to_logical::<f64>(scale);
+    panel
+        .monitor_from_point(point.x + size.width / 2.0, point.y + size.height / 2.0)
+        .ok()
+        .flatten()
 }
 
 fn open_panel(app: &AppHandle, panel: &WebviewWindow, icon: Rect) {
